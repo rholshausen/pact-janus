@@ -103,6 +103,16 @@ static one says the type is lossy, this one says where the loss actually bit.
 decodes `"0.00"` to a string but encodes numbers back as `0` would record contract examples its own
 matcher rejects.
 
+An empty document names no columns, so `encode` writes its header from the `shape` the engine hands it
+(§6.2): an `each-like` of `min: 0` has an empty variant, `[]`, which the mock serves as the header row
+alone, `id,status,total\r\n`, and which `decode` reads back as `[]`. Without the shape it would serve
+an empty body, which `decode` refuses for having no header row.
+
+A body `decode` refuses — a row with fewer fields than the header — fails at the body in the
+component's words, `could not be decoded as 'text/csv': …`, and no check of its columns runs (§6.1).
+Each degradation a decode reports reaches a verification's reader as a `content-degraded` warning at
+`$.response.body[*].total`.
+
 ## 4. What a value operator means for CSV
 
 CSV has no types, so a CSV body decodes to strings: `items` is `"1"`, never `1`. A consumer who writes

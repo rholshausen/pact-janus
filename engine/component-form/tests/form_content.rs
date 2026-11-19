@@ -37,6 +37,7 @@ fn encode(document: Value) -> Result<String, String> {
       content_type: FORM.to_string(),
       document: RuntimeValue::from_json(&document),
       options: None,
+      shape: None,
     })
     .map(|result| {
       let bytes = BASE64.decode(result.value.content.as_str().unwrap()).unwrap();

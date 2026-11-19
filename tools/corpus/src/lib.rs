@@ -40,6 +40,10 @@ struct CaseFile {
   /// `base64` means the value is the base64 of an octet sequence.
   #[serde(default)]
   encoded: BTreeMap<String, String>,
+  /// The slots whose octets could not be decoded, by path, with what the interpreter reports at each
+  /// (plan-grammar spec §2.4, ADR 0101).
+  #[serde(default)]
+  undecodable: BTreeMap<String, String>,
   result: ExpectedResult,
   #[serde(rename = "also-compiled-from")]
   also_compiled_from: Option<Input>,
@@ -186,7 +190,7 @@ pub fn run_case(dir: &Path, accept: bool) -> CaseReport {
     }
   };
 
-  let resolver = match captured_values(&case.values, &case.encoded) {
+  let resolver = match captured_values(&case.values, &case.encoded, &case.undecodable) {
     Ok(resolver) => resolver,
     Err(err) => {
       problems.push(format!("values: {err}"));
@@ -243,16 +247,26 @@ fn component_actions() -> impl plan::ActionApplier {
 }
 
 /// A case's `values` as a resolver, each in the representation `encoded` names for its path: JSON by
-/// default, octets for `base64` (spec §6).
+/// default, octets for `base64` (spec §6), and each slot `undecodable` names as one that could not be
+/// decoded, which has no value.
 fn captured_values(
   values: &BTreeMap<String, Value>,
   encoded: &BTreeMap<String, String>,
+  undecodable: &BTreeMap<String, String>,
 ) -> Result<CapturedValues, String> {
   use base64::Engine as _;
   if let Some(path) = encoded.keys().find(|path| !values.contains_key(*path)) {
     return Err(format!("'encoded' names '{path}', which has no value"));
   }
+  if let Some(path) = undecodable.keys().find(|path| values.contains_key(*path)) {
+    return Err(format!(
+      "'undecodable' names '{path}', which 'values' gives a value"
+    ));
+  }
   let mut resolver = CapturedValues::new();
+  for (path, message) in undecodable {
+    resolver = resolver.capture_undecodable(path.clone(), message.clone());
+  }
   for (path, value) in values {
     let value = match encoded.get(path).map(String::as_str) {
       None => RuntimeValue::from_json(value),
@@ -298,8 +312,10 @@ fn check_refused(dir: &Path, case: &CaseFile, problems: &mut Vec<String>) {
   if case.also_compiled_from.is_some() {
     problems.push("'also-compiled-from' has no meaning for a case whose input is refused".to_string());
   }
-  if !case.values.is_empty() || !case.encoded.is_empty() {
-    problems.push("a refused input is never executed: 'values' and 'encoded' must be empty".to_string());
+  if !case.values.is_empty() || !case.encoded.is_empty() || !case.undecodable.is_empty() {
+    problems.push(
+      "a refused input is never executed: 'values', 'encoded' and 'undecodable' must be empty".to_string(),
+    );
   }
   for snapshot in ["plan.txt", "executed.txt"] {
     if dir.join(snapshot).exists() {

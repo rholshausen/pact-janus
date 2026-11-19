@@ -52,7 +52,10 @@
           "x-known-values": ["json", "text", "base64"],
           "default": "json"
         },
-        "options": { "type": "object" }
+        "options": { "type": "object" },
+        "shape": {
+          "description": "The shape the document was produced from, as the interaction declares it for the slot, in the form content/compile is given it: present when the engine produced the document from a shape (a mock's reply, a verifier's request), absent otherwise. A component writes from it only what the document cannot say, such as a CSV header for a document with no rows; it never changes what the document is, and decode(encode(d)) must still equal d (spec.md §6.2, ADR 0101)."
+        }
       }
     },
     "EncodeResult": {

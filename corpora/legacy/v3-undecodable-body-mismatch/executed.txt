@@ -1,0 +1,57 @@
+(
+  :"get a customer" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/customers/7',
+          '/customers/7'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'text/html',
+            'application/json'
+          ) => ERROR(Expected 'text/html' to equal 'application/json')
+        ) => BOOL(false)
+      ) => BOOL(false),
+      :body (
+        :"$.address" (
+          :"$.address.city" (
+            %match:equality (
+              $.response.body.address.city,
+              'London'
+            )
+          )
+        ),
+        :"$.name" (
+          %match:type (
+            $.response.body.name,
+            'Ada Lovelace'
+          )
+        )
+      ) => ERROR(could not be decoded as 'application/json': expected value at line 1 column 1)
+    ) => BOOL(false)
+  ) => BOOL(false)
+)

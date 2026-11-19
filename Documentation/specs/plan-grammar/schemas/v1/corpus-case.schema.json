@@ -24,6 +24,11 @@
         "x-known-values": ["base64"]
       }
     },
+    "undecodable": {
+      "type": "object",
+      "description": "The slots whose octets the component that claims them could not decode, by the path a resolver would supply, each with the message the interpreter reports at it (spec.md §2.4, ADR 0101). A slot named here has no entry in 'values'.",
+      "additionalProperties": { "type": "string" }
+    },
     "result": { "$ref": "#/$defs/ExpectedResult" },
     "also-compiled-from": {
       "$ref": "#/$defs/Input",

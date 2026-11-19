@@ -33,6 +33,11 @@ pub struct Encode {
   pub content_type: String,
   pub document: RuntimeValue,
   pub options: Option<Value>,
+  /// The shape the document was produced from, as the interaction declares it for the slot, when the
+  /// engine produced it from one: a mock's reply, a verifier's request (spec §6.2, ADR 0101). It is
+  /// what a component writes from when the document cannot say: a CSV header for a document with no
+  /// rows. It never changes what the document is.
+  pub shape: Option<Value>,
 }
 
 #[derive(Debug, Clone)]

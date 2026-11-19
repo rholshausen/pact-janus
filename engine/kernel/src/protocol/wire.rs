@@ -9,7 +9,7 @@
 //! make every variant's evidence meaningless.
 
 use crate::common::{ContentTypes, declared_type};
-use crate::component::{ContentComponent, Decode, Encode, Parts, SlotValue};
+use crate::component::{ComponentError, ContentComponent, Decode, Encode, Parts, SlotValue};
 use crate::plan::{CapturedValues, Executed, ExecutedKind, Mismatch, RuntimeValue};
 use crate::variant::generate::Generated;
 use base64::Engine as _;
@@ -28,6 +28,40 @@ pub(crate) fn find_container<'a>(executed: &'a Executed, label: &str) -> Option<
     .find(|child| matches!(&child.kind, ExecutedKind::Container { label: Some(l), .. } if l == label))
 }
 
+/// What decoding an arrival's slots came to (ADR 0101): the values a plan resolves against, with each
+/// slot that could not be decoded marked as such, and what else a reader should be told about them.
+pub(crate) struct Decoded {
+  pub values: CapturedValues,
+  pub notes: Vec<DecodeNote>,
+}
+
+/// Something about a slot's decoding that is not its document (ADR 0101).
+#[derive(Debug, Clone)]
+pub(crate) enum DecodeNote {
+  /// A loss the decode reported for this value (component-interfaces spec §6.4), located in the
+  /// interaction: the slot's path, then the path the component gave inside its document.
+  Degraded {
+    target: String,
+    content_type: String,
+    degradation: Value,
+  },
+  /// A slot the interaction declares one type for arrived labelled with another, and was decoded as
+  /// declared (contract-file spec §5.5): a decode instruction, not a constraint, but a reader whose
+  /// shape failed against it needs to be told (Phase 9 finding 13).
+  Relabelled {
+    target: String,
+    declared: String,
+    labelled: String,
+  },
+  /// The component did not refuse the octets but failed: it trapped, timed out or exited, and the
+  /// binding said so for it (component-interfaces spec §11.2). The slot is undecodable too.
+  Failed {
+    target: String,
+    content_type: String,
+    error: ComponentError,
+  },
+}
+
 /// A resolver over an inbound arrival's wire-form parts (component-interfaces spec §4), decoded to
 /// the document model a plan resolves against — the same `$.<part>.<slot>` paths `plan::compile`
 /// roots every slot at (shape spec §6.2). `declared` is the interaction's own `content-types`
@@ -38,15 +72,87 @@ pub(crate) fn parts_resolver(
   declared: &ContentTypes,
   content: Option<&dyn ContentComponent>,
 ) -> CapturedValues {
-  let mut resolver = CapturedValues::new();
+  decoded_parts(parts, declared, content).values
+}
+
+/// [`parts_resolver`], with what a reader is told about each slot's decoding beside it (ADR 0101).
+pub(crate) fn decoded_parts(
+  parts: &Parts,
+  declared: &ContentTypes,
+  content: Option<&dyn ContentComponent>,
+) -> Decoded {
+  let mut values = CapturedValues::new();
+  let mut notes = Vec::new();
   for (part_name, slots) in parts {
     for (slot_name, slot_value) in slots {
       let path = format!("$.{part_name}.{slot_name}");
       let declared = declared_type(Some(declared), part_name, slot_name);
-      resolver = resolver.capture(path, decode_slot(slot_value, declared, content));
+      if let (Some(declared), Some(labelled)) = (declared, slot_value.content_type.as_deref())
+        && !crate::component::media_type_matches(declared, labelled)
+      {
+        notes.push(DecodeNote::Relabelled {
+          target: path.clone(),
+          declared: declared.to_string(),
+          labelled: labelled.to_string(),
+        });
+      }
+      let decoded = decode_outcome(slot_value, declared, content);
+      for degradation in decoded.degradations {
+        let within = degradation
+          .get("path")
+          .and_then(Value::as_str)
+          .and_then(|inner| inner.strip_prefix('$'))
+          .unwrap_or_default();
+        notes.push(DecodeNote::Degraded {
+          target: format!("{path}{within}"),
+          content_type: decoded.content_type.clone().unwrap_or_default(),
+          degradation,
+        });
+      }
+      values = match decoded.failure {
+        None => values.capture(path, decoded.document),
+        Some(Failure { content_type, error }) => {
+          let message = undecodable_message(&content_type, &error);
+          if error.source.is_some() {
+            notes.push(DecodeNote::Failed {
+              target: path.clone(),
+              content_type,
+              error,
+            });
+          }
+          values.capture_undecodable(path, message)
+        }
+      };
     }
   }
-  resolver
+  Decoded { values, notes }
+}
+
+/// What the interpreter says at a slot that could not be decoded (ADR 0101): the component's own
+/// message, which says what is wrong with the octets, or that the component itself failed.
+fn undecodable_message(content_type: &str, error: &ComponentError) -> String {
+  match error.source {
+    None => format!("could not be decoded as '{content_type}': {}", error.message),
+    Some(_) => format!(
+      "could not be decoded as '{content_type}', because the component that decodes it failed ({}): {}",
+      error.code, error.message
+    ),
+  }
+}
+
+/// A component's answer when it could not decode a slot.
+struct Failure {
+  content_type: String,
+  error: ComponentError,
+}
+
+/// One slot's decoding: its document, or why it has none, and the losses the decode reported.
+struct SlotDecode {
+  document: RuntimeValue,
+  /// The type it was decoded as, when a component decoded it.
+  content_type: Option<String>,
+  failure: Option<Failure>,
+  degradations: Vec<Value>,
 }
 
 /// A wire-form slot's document value: a content component decodes anything with a content type —
@@ -54,37 +160,75 @@ pub(crate) fn parts_resolver(
 /// (component-interfaces spec §6, contract-file spec §5.5). Octets no component claims, with a type
 /// or without one, are the document model's bytes (ADR 0036 decision 2). Everything else — method,
 /// path, headers, a body carried as its JSON value — is already the document model's own value
-/// (contract-file spec §5.3's `json` default), so it is taken as-is.
+/// (contract-file spec §5.3's `json` default), so it is taken as-is. A slot that could not be decoded
+/// is absent here: what reads it to match it uses [`decoded_parts`], which says why.
 pub(crate) fn decode_slot(
   slot: &SlotValue,
   declared: Option<&str>,
   content: Option<&dyn ContentComponent>,
 ) -> RuntimeValue {
+  decode_outcome(slot, declared, content).document
+}
+
+fn decode_outcome(
+  slot: &SlotValue,
+  declared: Option<&str>,
+  content: Option<&dyn ContentComponent>,
+) -> SlotDecode {
   match claimant(slot, declared, content) {
     Some((content_type, content)) => match content.decode(Decode {
       content_type: content_type.to_string(),
       value: slot.clone(),
       options: None,
     }) {
-      Ok(result) => result.document,
-      // Undecodable is "not there", not a crash: the plan discovers it via `check:exists`/a
-      // failed match, same as any other absent value (plan-grammar spec §2.4).
+      Ok(result) => SlotDecode {
+        document: result.document,
+        content_type: Some(content_type.to_string()),
+        failure: None,
+        degradations: result.degradations,
+      },
+      // No octets are no document, whatever they are labelled: an empty body a component cannot
+      // read (JSON's, say) is absent, which an `optional` body admits, and not a decode failure.
+      Err(_) if is_empty(slot) => SlotDecode {
+        document: RuntimeValue::Absent,
+        content_type: Some(content_type.to_string()),
+        failure: None,
+        degradations: Vec::new(),
+      },
       Err(error) => {
-        tracing::debug!(
-          content_type,
-          ?error,
-          "slot could not be decoded; matching it as absent"
-        );
-        RuntimeValue::Absent
+        tracing::debug!(content_type, ?error, "slot could not be decoded");
+        SlotDecode {
+          document: RuntimeValue::Absent,
+          content_type: Some(content_type.to_string()),
+          failure: Some(Failure {
+            content_type: content_type.to_string(),
+            error,
+          }),
+          degradations: Vec::new(),
+        }
       }
     },
-    None => match (slot.encoded.as_deref(), slot.content.as_str()) {
-      (Some("base64"), Some(text)) => BASE64
-        .decode(text)
-        .map(RuntimeValue::Bytes)
-        .unwrap_or(RuntimeValue::Absent),
-      _ => RuntimeValue::from_json(&slot.content),
+    None => SlotDecode {
+      document: match (slot.encoded.as_deref(), slot.content.as_str()) {
+        (Some("base64"), Some(text)) => BASE64
+          .decode(text)
+          .map(RuntimeValue::Bytes)
+          .unwrap_or(RuntimeValue::Absent),
+        _ => RuntimeValue::from_json(&slot.content),
+      },
+      content_type: None,
+      failure: None,
+      degradations: Vec::new(),
     },
+  }
+}
+
+/// Whether a slot carries no octets at all.
+fn is_empty(slot: &SlotValue) -> bool {
+  match &slot.content {
+    Value::Null => true,
+    Value::String(text) => text.is_empty(),
+    _ => false,
   }
 }
 
@@ -181,17 +325,20 @@ pub(crate) fn served_slot(
 /// for (contract-file spec §5.5) is encoded through the component for that type, whatever the value
 /// is. An undeclared one keeps the default the declaration exists to override: a scalar rides as the
 /// transport's plain wire form (component-http reads `status` this way, no content component
-/// involved), and anything structured is encoded as `application/json`.
+/// involved), and anything structured is encoded as `application/json`. `shape` is the slot's shape,
+/// when the value was produced from one, which the component is handed (ADR 0101).
 pub(crate) fn encode_slot(
   value: &Value,
   declared: Option<&str>,
   content: Option<&dyn ContentComponent>,
+  shape: Option<&Value>,
 ) -> SlotValue {
   if let (Some(content_type), Some(content)) = (declared, content) {
     return match content.encode(Encode {
       content_type: content_type.to_string(),
       document: RuntimeValue::from_json(value),
       options: None,
+      shape: shape.cloned(),
     }) {
       Ok(result) => result.value,
       Err(error) => {
@@ -209,6 +356,7 @@ pub(crate) fn encode_slot(
       content_type: "application/json".to_string(),
       document: RuntimeValue::from_json(value),
       options: None,
+      shape: shape.cloned(),
     }) {
       Ok(result) => result.value,
       Err(_) => plain_slot(value),
@@ -317,6 +465,115 @@ mod tests {
       decode_slot(&octets(Some("text/plain")), None, Some(&Failing)),
       RuntimeValue::Absent
     );
+  }
+
+  /// Claims `text/plain`, and fails as a binding fails for a component that trapped.
+  struct Trapping;
+
+  impl ContentComponent for Trapping {
+    fn handles(&self, content_type: &str) -> bool {
+      content_type == "text/plain"
+    }
+    fn decode(&self, _req: Decode) -> Result<DecodeResult, ComponentError> {
+      Err(ComponentError::synthesised(
+        "component-trapped",
+        "unreachable executed",
+      ))
+    }
+    fn encode(&self, req: Encode) -> Result<EncodeResult, ComponentError> {
+      Failing.encode(req)
+    }
+    fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {
+      Failing.compile(req)
+    }
+    fn detect(&self, req: Detect) -> Result<DetectResult, ComponentError> {
+      Failing.detect(req)
+    }
+  }
+
+  fn reply(slot: SlotValue) -> Parts {
+    Parts::from([(
+      "response".to_string(),
+      std::collections::BTreeMap::from([("body".to_string(), slot)]),
+    )])
+  }
+
+  /// ADR 0101: octets a component refuses are an undecodable slot, which says why in the component's
+  /// words; a slot nothing reads from is unaffected.
+  #[test]
+  fn octets_a_component_refuses_are_an_undecodable_slot() {
+    use crate::plan::Resolver;
+    let decoded = decoded_parts(
+      &reply(octets(Some("text/plain"))),
+      &ContentTypes::new(),
+      Some(&Failing),
+    );
+    let undecodable = decoded
+      .values
+      .undecodable("$.response.body.name")
+      .expect("undecodable");
+    assert_eq!(undecodable.path, "$.response.body");
+    assert_eq!(undecodable.message, "could not be decoded as 'text/plain': never");
+    assert!(decoded.notes.is_empty(), "{:?}", decoded.notes);
+    assert_eq!(decoded.values.undecodable("$.response.status"), None);
+  }
+
+  /// No octets are no document, whatever they are labelled: an empty body JSON cannot read is absent,
+  /// as it always was, so an `optional` body still admits it.
+  #[test]
+  fn an_empty_slot_a_component_cannot_decode_is_absent_and_not_undecodable() {
+    use crate::plan::Resolver;
+    let empty = SlotValue {
+      content: json!(""),
+      encoded: Some("base64".to_string()),
+      content_type: Some("text/plain".to_string()),
+    };
+    let decoded = decoded_parts(&reply(empty), &ContentTypes::new(), Some(&Failing));
+    assert_eq!(decoded.values.undecodable("$.response.body"), None);
+    assert_eq!(decoded.values.resolve("$.response.body"), RuntimeValue::Absent);
+  }
+
+  /// Component-interfaces spec §11.2: a component that died is told apart from one that said no, so a
+  /// verifier can report it as the component's failure.
+  #[test]
+  fn a_component_that_failed_decoding_is_a_note_beside_the_undecodable_slot() {
+    use crate::plan::Resolver;
+    let decoded = decoded_parts(
+      &reply(octets(Some("text/plain"))),
+      &ContentTypes::new(),
+      Some(&Trapping),
+    );
+    let undecodable = decoded
+      .values
+      .undecodable("$.response.body")
+      .expect("undecodable");
+    assert_eq!(
+      undecodable.message,
+      "could not be decoded as 'text/plain', because the component that decodes it failed (component-trapped): unreachable executed"
+    );
+    assert!(
+      matches!(&decoded.notes[..], [DecodeNote::Failed { target, error, .. }]
+        if target == "$.response.body" && error.code == "component-trapped"),
+      "{:?}",
+      decoded.notes
+    );
+  }
+
+  /// Phase 9 finding 13: a declared slot labelled with another type is decoded as declared, and noted.
+  #[test]
+  fn a_declared_slot_labelled_otherwise_is_noted() {
+    let declared = ContentTypes::from([(
+      "response".to_string(),
+      std::collections::BTreeMap::from([("body".to_string(), "text/plain; charset=utf-8".to_string())]),
+    )]);
+    for (label, noted) in [("application/json", true), ("TEXT/PLAIN", false)] {
+      let decoded = decoded_parts(&reply(octets(Some(label))), &declared, Some(&Failing));
+      let relabelled = decoded
+        .notes
+        .iter()
+        .any(|note| matches!(note, DecodeNote::Relabelled { labelled, .. } if labelled == label));
+      assert_eq!(relabelled, noted, "{label}");
+    }
   }
 
   #[test]

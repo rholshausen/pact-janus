@@ -1,0 +1,49 @@
+{
+  "description": "a v3 JSON body whose octets could not be decoded is reported once, at the body, and none of its rules is run against a guess; the check of the reply's Content-Type header, which reads a header and not the body, still runs beside it (ADR 0101)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": { "name": "consumer" },
+      "provider": { "name": "provider" },
+      "interactions": [
+        {
+          "description": "get a customer",
+          "request": { "method": "GET", "path": "/customers/7" },
+          "response": {
+            "status": 200,
+            "headers": { "Content-Type": "application/json" },
+            "body": {
+              "name": "Ada Lovelace",
+              "address": { "city": "London" }
+            },
+            "matchingRules": {
+              "body": {
+                "$.name": { "matchers": [ { "match": "type" } ] }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": { "pactSpecification": { "version": "3.0.0" } }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/customers/7",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers": { "content-type": "text/html" },
+    "$.response.headers.content-type": "text/html"
+  },
+  "undecodable": {
+    "$.response.body": "could not be decoded as 'application/json': expected value at line 1 column 1"
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {"path": "$.response.headers.content-type", "message": "Expected 'text/html' to equal 'application/json'", "action": "legacy:header-value"},
+      {"path": "$.response.body", "message": "could not be decoded as 'application/json': expected value at line 1 column 1"}
+    ]
+  }
+}

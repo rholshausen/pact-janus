@@ -779,6 +779,10 @@ impl ContentComponent for WasmComponent {
     if let Some(options) = req.options {
       body["options"] = options;
     }
+    // The shape it was produced from (spec §6.2, ADR 0101), when there is one.
+    if let Some(shape) = req.shape {
+      body["shape"] = shape;
+    }
     let result = self.instance_call("content/encode", body)?;
     let value = result
       .get("value")

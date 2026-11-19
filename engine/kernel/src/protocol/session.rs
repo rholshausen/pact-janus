@@ -81,6 +81,9 @@ pub(crate) struct InteractionEntry {
   fresh: Arc<BTreeMap<String, contract::ShapePart>>,
   /// The interaction's declared content types, as an exchange reads them.
   content_types: Arc<ContentTypes>,
+  /// The shapes of the slots `content_types` declares, which the component encoding one is handed
+  /// (ADR 0101).
+  content_shapes: Arc<BTreeMap<String, contract::ShapePart>>,
   /// Converted from a v1–v4 interaction (`add-pact-interaction`, ADR 0066): its selection is the
   /// one `upgrade` records, a `base` variant that pins nothing, whatever policy a host asks for, and
   /// that variant is the interaction's own example.
@@ -396,6 +399,7 @@ impl ConsumerSession {
       .map(|(name, slots)| (name.clone(), slots.clone()))
       .collect();
     let content_types = Arc::new(spec.content_types.clone().unwrap_or_default());
+    let content_shapes = Arc::new(content_shapes(&raw_parts, &content_types));
     self.interactions.insert(
       handle.clone(),
       InteractionEntry {
@@ -409,6 +413,7 @@ impl ConsumerSession {
         armings: HashMap::new(),
         fresh: Arc::new(fresh),
         content_types,
+        content_shapes,
         converted: None,
       },
     );
@@ -681,7 +686,12 @@ impl ConsumerSession {
         handle,
         variant_id,
       );
-      let parts = exchange::wire_parts(&delivered, &entry.content_types, self.scope.content().as_deref());
+      let parts = exchange::wire_parts(
+        &delivered,
+        &entry.content_types,
+        &entry.content_shapes,
+        self.scope.content().as_deref(),
+      );
       entry.exercised.insert(
         variant_id.to_string(),
         Exercised {
@@ -706,6 +716,7 @@ impl ConsumerSession {
           request_plan: Arc::clone(request_plan),
           response_parts: Arc::clone(&arming.parts),
           content_types: Arc::clone(&entry.content_types),
+          content_shapes: Arc::clone(&entry.content_shapes),
           fresh: Arc::clone(&entry.fresh),
           provider_state: Arc::clone(&arming.provider_state),
           redacted: Arc::clone(&redacted),
@@ -978,6 +989,24 @@ fn provider_state(spec: &InteractionSpec, assignment: &Assignment) -> serde_json
 /// already rejected anything not shaped this way by the time this is called, so the fallbacks
 /// below never actually trigger; they just avoid a panic on a document this function is not the
 /// one validating.
+/// The shape of each slot `declared` gives a content type, by part (ADR 0101).
+pub(crate) fn content_shapes(
+  parts: &BTreeMap<String, contract::ShapePart>,
+  declared: &ContentTypes,
+) -> BTreeMap<String, contract::ShapePart> {
+  declared
+    .iter()
+    .filter_map(|(part, slots)| {
+      let shapes = parts.get(part)?;
+      let declared: contract::ShapePart = slots
+        .keys()
+        .filter_map(|slot| Some((slot.clone(), shapes.get(slot)?.clone())))
+        .collect();
+      (!declared.is_empty()).then(|| (part.clone(), declared))
+    })
+    .collect()
+}
+
 pub(crate) fn raw_parts(interaction: &Value) -> BTreeMap<String, contract::ShapePart> {
   let Some(parts) = interaction.get("parts").and_then(Value::as_object) else {
     return BTreeMap::new();

@@ -48,6 +48,9 @@ pub(crate) struct ArmedExchange {
   /// The interaction's declared content types (contract-file spec §5.5): how the inbound request's
   /// slots are decoded and the reply's encoded.
   pub content_types: Arc<ContentTypes>,
+  /// The shapes of the slots `content_types` declares, which the component encoding the reply is
+  /// handed (ADR 0101).
+  pub content_shapes: Arc<BTreeMap<String, crate::contract::ShapePart>>,
   /// The interaction's shapes, by part, for the parts whose shapes name a generator (ADR 0048): a
   /// reply is filled with fresh values there each time it is served. The recorded evidence stays
   /// `response_parts`, so a contract recorded twice is the same contract.
@@ -349,6 +352,7 @@ pub(crate) fn handle_arrival(
           answering,
           &transport.content_slots(),
           armed.content_types.get(answering),
+          armed.content_shapes.get(answering),
           content,
         ),
       })
@@ -509,12 +513,14 @@ fn fill_fresh(
 pub(crate) fn wire_parts(
   payload: &Payload,
   declared: &ContentTypes,
+  shapes: &BTreeMap<String, crate::contract::ShapePart>,
   content: Option<&dyn ContentComponent>,
 ) -> Parts {
   payload
     .iter()
     .map(|(part_name, slots)| {
       let types = declared.get(part_name);
+      let part_shapes = shapes.get(part_name);
       let part: Part = slots
         .iter()
         .map(|(slot_name, value)| {
@@ -522,7 +528,8 @@ pub(crate) fn wire_parts(
           let wired = match (value, declared) {
             (Generated::Octets(bytes), declared) => octets_slot(bytes, declared),
             (Generated::Document(value), Some(content_type)) => {
-              encode_slot(value, Some(content_type), content)
+              let shape = part_shapes.and_then(|shapes| shapes.get(slot_name));
+              encode_slot(value, Some(content_type), content, shape)
             }
             (Generated::Document(value), None) => plain_slot(value),
           };
@@ -543,6 +550,7 @@ fn response_parts(
   answering: &str,
   content_slots: &ContentSlots,
   declared_types: Option<&BTreeMap<String, String>>,
+  shapes: Option<&crate::contract::ShapePart>,
   content: Option<&dyn ContentComponent>,
 ) -> Parts {
   let mut parts = Parts::new();
@@ -557,7 +565,12 @@ fn response_parts(
         .map(String::as_str);
       let wired = match value {
         Generated::Octets(bytes) => octets_slot(bytes, declared_type),
-        Generated::Document(value) if is_content => encode_slot(value, declared_type, content),
+        Generated::Document(value) if is_content => encode_slot(
+          value,
+          declared_type,
+          content,
+          shapes.and_then(|shapes| shapes.get(slot_name)),
+        ),
         Generated::Document(value) => plain_slot(value),
       };
       part.insert(slot_name.clone(), wired);

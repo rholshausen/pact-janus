@@ -71,6 +71,7 @@ fn decode_then_encode_round_trips() {
       content_type: "application/json".to_string(),
       document: document.clone(),
       options: None,
+      shape: None,
     })
     .expect("a RuntimeValue always encodes to JSON");
   let decoded = component
@@ -94,6 +95,7 @@ fn encode_produces_base64_octets_with_the_declared_content_type() {
       content_type: "application/json".to_string(),
       document: RuntimeValue::from_json(&json!({"a": 1})),
       options: None,
+      shape: None,
     })
     .unwrap();
   assert_eq!(encoded.value.encoded.as_deref(), Some("base64"));

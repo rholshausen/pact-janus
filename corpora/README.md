@@ -25,7 +25,10 @@ readability:
   `100` and `100.0` to be one value (ADR 0072). `xml-text-as-written/` and its `-mismatch` twin are a contract's XML
   text compared as written: whitespace around it, and a CDATA section's contents, match only text
   written the same way, while a member shaped on `#trimmed` matches whatever whitespace is around it
-  (ADR 0075).
+  (ADR 0075). `undecodable-slot/` is a body whose octets
+  could not be decoded: no node that reads it runs, its container reports the component's message once,
+  at the body, and the status beside it is still checked (ADR 0101; a case's `undecodable` names such a
+  slot).
 - `legacy/` — representative v2/v3/v4 matching-rule constructs compiled directly (design 3.5),
   including `v3-cascading-type/` (the precedence algorithm that is design 3.5's own reason to
   exist) and `v4-closed-request-body/` (the request/response closed-object asymmetry). `two-path-
@@ -64,6 +67,8 @@ readability:
   which fails as today's verifier fails it; its upgraded contract names it `pact:ignore-order`, which
   fails by name, so the two reach one verdict with different mismatches, and it is not an `upgrade-`
   case (ADR 0073).
+  `v3-undecodable-body-mismatch/` is a v3 JSON body that could not be decoded, reported once at the body
+  with none of its rules run, beside the reply's `Content-Type` header check, which still runs (ADR 0101).
   `v3-or-first-alternative-fails/` is an `OR` a later alternative passes, and `v3-xml-not-empty-text/`
   an element's `notEmpty` met by its text, an `OR` too: neither is failed by an alternative it did not
   need, and `v3-or-every-alternative-fails-mismatch/` reports each alternative's mismatch (staged plan

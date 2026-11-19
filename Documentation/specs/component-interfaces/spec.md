@@ -589,7 +589,7 @@ Schema: [`schemas/v1/content.schema.json`](schemas/v1/content.schema.json).
 | Operation | Body → Result |
 |---|---|
 | `content/decode` | `{ content-type, value, options? }` → `{ document, degradations? }` |
-| `content/encode` | `{ content-type, document, options? }` → `{ value }` |
+| `content/encode` | `{ content-type, document, options?, shape? }` → `{ value }` |
 | `content/compile` | `{ content-type, shape, path }` → `{}` |
 | `content/detect` | `{ value, hint? }` → `{ media-type?, confidence? }` |
 | `content/label` | `{ content-type, value, at }` → `{ media-type? }` |
@@ -604,7 +604,16 @@ content of the rule that the kernel knows nothing about JSON.
 
 A component that cannot decode answers with an error (§11.1), and the engine fails the interaction. It
 never applies a shape to a guess: shape spec §2.2 makes that normative, and this is the operation where
-it is enforced.
+it is enforced ([ADR 0101](../../decisions/0101-a-slot-that-cannot-be-decoded-fails-at-the-slot-a-decodes-losses-are-warnings-and-encode-is-given-the-shape.md)):
+
+- **An error the component produced** is its verdict on the octets. The slot has no document: no plan
+  node whose value under test is read from it is executed, and the slot fails once, at its path, with the
+  component's message (`could not be decoded as 'text/csv': …`, plan grammar §2.4).
+- **An error the binding synthesised** (§11.2) means the component died, not that the octets are wrong. A
+  verification fails the variant as `component-failed` (§11.3). A mock has no error to give an arrival,
+  so there the slot is undecodable as above, its message saying the component failed.
+- **No octets are no document.** An empty slot a component cannot decode is absent, not undecodable, so
+  an empty body labelled `application/json` is what a shape that admits no body admits.
 
 A decoded document's objects keep their members in the order the component wrote them, and the engine
 keeps that order wherever the document goes; it never compares by it (engine-protocol spec §2.4,
@@ -670,7 +679,11 @@ of `form-data`. The order between differently named parts is not part of the doc
 `encode` is decode's inverse, and it exists because a consumer test must *produce* bodies: each selected
 variant's document becomes the octets a mock serves (plan 4.3/4.4). That document's members are in the
 order its shape declares them (shape spec §4.3), so a component that writes members in the order it is
-handed them serves what the author wrote. `decode(encode(d))` MUST equal `d`
+handed them serves what the author wrote. When the engine produced the document from a shape, `encode` is given that
+shape too, as `shape`: the slot's shape as the interaction declares it, the form `compile` is given. A
+component writes from it only what the document cannot say, such as the header row of a CSV document
+with no rows, and never what the document is. `shape` is absent when no shape produced the document, and
+`encode` must work without it (ADR 0101). `decode(encode(d))` MUST equal `d`
 for every document the component's own `decode` can produce. Round-tripping is not a nicety here —
 a contract records both the shape and a produced example, and a component whose two halves disagree
 records an example its own matcher would reject.
@@ -739,7 +752,10 @@ the component to **say so rather than pretend**, and this is where it says it:
   where the loss occurred.
 
 An engine SHOULD surface declared degradations in `explain` output and in verification results. A
-component that silently narrows what it can distinguish makes a contract weaker than it reads.
+component that silently narrows what it can distinguish makes a contract weaker than it reads. A
+verification surfaces each per-decode degradation of a reply as a `content-degraded` warning before the
+variant's result, located in the interaction: the slot's path, then the component's path inside its
+document (engine-protocol spec §9.6, ADR 0101).
 
 ### 6.5 Detection
 
@@ -1325,6 +1341,7 @@ Every component failure surfaces to the host as one of the protocol's two compon
 | a component that declared a contribution it may not (§2.4) | `component-unavailable`, `details.reason` = `component-invalid` |
 | a component that answered with an error | `component-failed`, `details.error` = the `ComponentError` verbatim |
 | a component that trapped, timed out or exited | `component-failed`, `details.error` = the synthesised error (§11.2) |
+| a content component that refused a slot's octets (`decode`) | not an error: the slot fails at its path as a mismatch (§6.1) |
 
 A `component-failed` error's `chain` is its own layer (`the '<component>' component failed`), then
 the component error's `chain`, or the component error's `{code, message}` as one layer when it has

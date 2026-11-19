@@ -283,6 +283,10 @@ fn column_degradations(column: &[&str], path: &str, name: &str) -> Vec<Value> {
 /// `decode` can produce — arrays of objects, or arrays of arrays, of strings. Anything wider is
 /// written as the text that spells it (a number as its JSON text, `null` as an empty field), which
 /// `decode` then reads back as a string: that is the declared degradation, not a round-trip failure.
+///
+/// A document with no rows names no columns, so its header comes from the `shape` the engine hands
+/// over when it produced the document from one: the row shape's members, in the order they are
+/// declared. Without it, an empty document is an empty body, which `decode` refuses.
 fn encode(body: &Value) -> OpResult {
   let content_type = content_type(body)?;
   let header = header_mode(&content_type, body.get("options"))?;
@@ -316,6 +320,9 @@ fn encode(body: &Value) -> OpResult {
           columns.push(name.clone());
         }
       }
+    }
+    if rows.is_empty() {
+      columns = body.get("shape").map(shape_columns).unwrap_or_default();
     }
     if !columns.is_empty() {
       write_record(&mut writer, columns.iter().cloned())?;
@@ -354,6 +361,31 @@ fn encode(body: &Value) -> OpResult {
   Ok(
     json!({ "value": { "content": BASE64.encode(octets), "encoded": "base64", "content-type": content_type } }),
   )
+}
+
+/// The columns a body of `shape` has: the members of its rows' object shape, in declared order. A row
+/// shape is an `each-like`'s `items` or an `array`'s first entry, and of a `one-of`, its first
+/// alternative that has members; anything else names none.
+fn shape_columns(shape: &Value) -> Vec<String> {
+  let row = match shape.get("shape").and_then(Value::as_str) {
+    Some("each-like") => shape.get("items"),
+    Some("array") => shape.get("entries").and_then(|entries| entries.get(0)),
+    _ => None,
+  };
+  row_members(row).unwrap_or_default()
+}
+
+fn row_members(row: Option<&Value>) -> Option<Vec<String>> {
+  let row = row?;
+  match row.get("shape").and_then(Value::as_str)? {
+    "object" => Some(row.get("members")?.as_object()?.keys().cloned().collect()),
+    "one-of" => row
+      .get("alternatives")?
+      .as_object()?
+      .values()
+      .find_map(|alternative| row_members(Some(alternative))),
+    _ => None,
+  }
 }
 
 fn field(value: &Value, path: &str) -> Result<String, Value> {

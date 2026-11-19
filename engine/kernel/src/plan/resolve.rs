@@ -23,6 +23,28 @@ pub trait Resolver {
   /// plan discovers via `check:exists`, not a reason to abort execution (protocol spec §10.1's
   /// errors-are-values rule applies here too — a missing capture is not even an error).
   fn resolve(&self, path: &str) -> RuntimeValue;
+
+  /// Why the slot `path` is at or under has no document, when its octets could not be decoded
+  /// (component-interfaces spec §6.1, ADR 0101): the message the interpreter reports at the slot. A
+  /// node whose value under test is read from such a slot is not executed, since a shape never applies
+  /// to a guess. `None`, the default, is a value that resolves as [`Resolver::resolve`] says.
+  fn undecodable(&self, _path: &str) -> Option<Undecodable> {
+    None
+  }
+
+  /// Whether any slot could not be decoded, so an interpreter need not ask of every node.
+  fn any_undecodable(&self) -> bool {
+    false
+  }
+}
+
+/// A slot whose octets the component that claims them could not decode (ADR 0101): where it is, and
+/// what to say about it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Undecodable {
+  /// The slot's absolute path: `$.response.body`.
+  pub path: String,
+  pub message: String,
 }
 
 /// Where `match:content-type` (shape spec §4.2) actually gets its answer: a content component's
@@ -48,6 +70,8 @@ pub trait ContentDetector {
 #[derive(Debug, Default)]
 pub struct CapturedValues {
   captured: BTreeMap<String, RuntimeValue>,
+  /// The slots that could not be decoded, by path, with what the interpreter says at each.
+  undecodable: BTreeMap<String, String>,
 }
 
 impl CapturedValues {
@@ -58,6 +82,19 @@ impl CapturedValues {
   /// Capture an already-decoded value at `path` (an absolute path, e.g. `"$.response.body"`).
   pub fn capture(mut self, path: impl Into<String>, value: RuntimeValue) -> CapturedValues {
     self.captured.insert(path.into(), value);
+    self
+  }
+
+  /// A slot at `path` whose octets could not be decoded, and why (ADR 0101): it resolves as absent,
+  /// and a node reading it is not executed ([`Resolver::undecodable`]).
+  pub fn capture_undecodable(
+    mut self,
+    path: impl Into<String>,
+    message: impl Into<String>,
+  ) -> CapturedValues {
+    let path = path.into();
+    self.captured.insert(path.clone(), RuntimeValue::Absent);
+    self.undecodable.insert(path, message.into());
     self
   }
 
@@ -83,6 +120,29 @@ impl Resolver for CapturedValues {
         Some(cut) => candidate = &candidate[..cut],
         None => return RuntimeValue::Absent,
       }
+    }
+  }
+
+  fn any_undecodable(&self) -> bool {
+    !self.undecodable.is_empty()
+  }
+
+  /// The slot a path is at or under, when that slot could not be decoded. A value captured at a
+  /// longer path is its own, decoded or not: the v1–v4 resolver captures each header beside the
+  /// slot holding them all.
+  fn undecodable(&self, path: &str) -> Option<Undecodable> {
+    let mut candidate = path;
+    loop {
+      if let Some(message) = self.undecodable.get(candidate) {
+        return Some(Undecodable {
+          path: candidate.to_string(),
+          message: message.clone(),
+        });
+      }
+      if self.captured.contains_key(candidate) {
+        return None;
+      }
+      candidate = &candidate[..candidate.rfind(['.', '['])?];
     }
   }
 }

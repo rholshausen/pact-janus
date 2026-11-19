@@ -554,3 +554,218 @@ fn a_csv_body_is_pinned_to_its_variant() {
   assert!(events.contains("expect:count"), "{events}");
   assert!(events.contains("csv:integer"), "{events}");
 }
+
+// ---------------------------------------------------------------------------------------------
+// Content that is not JSON (staged plan S5.3, ADR 0101)
+// ---------------------------------------------------------------------------------------------
+
+/// Serve every variant of `interaction` from a consumer session and return each one's body as the
+/// mock served it, by variant id, then finalise.
+fn served_bodies(engine: &mut Engine, interaction: Value) -> Vec<(String, String)> {
+  let created = send(
+    engine,
+    "consumer-session/create",
+    json!({ "config": { "consumer": { "name": "reporting" }, "provider": { "name": "order-service" },
+                        "components": [declaration()] } }),
+  );
+  let session = created["ok"]["session"].clone();
+  let added = send(
+    engine,
+    "consumer-session/add-interaction",
+    json!({ "session": session, "interaction": interaction }),
+  );
+  let handle = added["ok"]["handle"].clone();
+  let variants = send(
+    engine,
+    "consumer-session/variants",
+    json!({ "session": session, "handle": handle }),
+  );
+  let started = send(
+    engine,
+    "consumer-session/start-transport",
+    json!({ "session": session, "transport": "http" }),
+  );
+  let endpoint = &started["ok"]["endpoint"];
+  let addr = format!("{}:{}", endpoint["host"].as_str().unwrap(), endpoint["port"]);
+  let mut bodies = Vec::new();
+  for variant in variants["ok"]["variants"].as_array().unwrap() {
+    send(
+      engine,
+      "consumer-session/serve-variant",
+      json!({ "session": session, "handle": handle, "variant": variant["id"] }),
+    );
+    let (status, _, body) = http_get(&addr, "/orders.csv");
+    assert_eq!(status, 200, "{body}");
+    bodies.push((variant["id"].as_str().unwrap().to_string(), body));
+  }
+  send(engine, "consumer-session/finalise", json!({ "session": session }));
+  bodies
+}
+
+/// Phase 9 finding 12, closed. A list that may be empty has an empty variant (ADR 0079), whose
+/// document has no rows and so names no columns. `content/encode` is handed the slot's shape, and the
+/// component writes the header from it: the mock serves a body the component's own `decode` reads back
+/// as no rows, where it served an empty body that `decode` refuses.
+#[test]
+fn an_empty_csv_variant_is_served_as_the_header_its_shape_declares() {
+  let mut engine = engine();
+  let mut interaction = orders_csv_interaction();
+  interaction["parts"]["response"]["body"]["min"] = json!(0);
+  let bodies = served_bodies(&mut engine, interaction);
+  let empty: Vec<&String> = bodies
+    .iter()
+    .filter(|(_, body)| body.lines().count() == 1)
+    .map(|(_, body)| body)
+    .collect();
+  assert_eq!(
+    empty,
+    [&"id,status,items\r\n".to_string()],
+    "one variant has no rows, served as the header alone: {bodies:?}"
+  );
+  assert!(
+    bodies.iter().any(|(_, body)| body.lines().count() == 2),
+    "and one has a row: {bodies:?}"
+  );
+}
+
+/// A provider that answers every request with `body`, labelled `content_type`, until the test ends.
+fn fixed_provider(content_type: &'static str, body: &'static str) -> String {
+  let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+  let addr = listener.local_addr().unwrap();
+  std::thread::spawn(move || {
+    for stream in listener.incoming() {
+      let Ok(mut stream) = stream else { continue };
+      let mut request = [0u8; 4096];
+      let _ = stream.read(&mut request);
+      let _ = write!(
+        stream,
+        "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+      );
+    }
+  });
+  format!("http://{addr}")
+}
+
+/// Verify `contract` against `base_url` and return (summary, every event).
+fn verify_events(engine: &mut Engine, contract: &Value, base_url: &str) -> (Value, Vec<Value>) {
+  let started = send(
+    engine,
+    "verification/verify",
+    json!({
+      "source": { "kind": "inline", "contracts": [contract] },
+      "target": { "transports": [ { "transport": "http", "options": { "base-url": base_url } } ],
+                  "components": [declaration()] },
+      "options": { "executed-plan": "on-failure" },
+    }),
+  );
+  let stream = started["ok"]["stream"]
+    .as_str()
+    .unwrap_or_else(|| panic!("verify: {started}"))
+    .to_string();
+  let mut events = Vec::new();
+  for _ in 0..100 {
+    let polled = send(
+      engine,
+      "events/poll",
+      json!({ "streams": [stream], "wait-ms": 5_000 }),
+    );
+    for event in polled["ok"]["events"].as_array().unwrap() {
+      events.push(event.clone());
+      if event["last"] == json!(true) {
+        return (event["payload"].clone(), events);
+      }
+    }
+  }
+  panic!("the run never finished");
+}
+
+fn of_kind<'a>(events: &'a [Value], kind: &str) -> Vec<&'a Value> {
+  events
+    .iter()
+    .filter(|event| event["kind"] == kind)
+    .map(|event| &event["payload"])
+    .collect()
+}
+
+/// Phase 9 finding 14, closed. A body the component cannot decode — a ragged row — is reported at the
+/// body with the component's own message, once, and no shape is applied to a guess: no "expected at
+/// least 1 item" for a body that has no document.
+#[test]
+fn a_csv_reply_that_cannot_be_decoded_is_reported_at_the_body_in_the_components_words() {
+  let mut engine = engine();
+  let contract = consumer_run(&mut engine);
+  let provider = fixed_provider("text/csv", "id,status,items\r\n66,PENDING\r\n");
+  let (summary, events) = verify_events(&mut engine, &contract, &provider);
+  assert_eq!(summary["status"], "failed", "{summary}");
+  for result in of_kind(&events, "verification/interaction-result") {
+    let mismatches = result["mismatches"]
+      .as_array()
+      .unwrap_or_else(|| panic!("{result}"));
+    assert_eq!(mismatches.len(), 1, "one mismatch, at the body: {result}");
+    assert_eq!(mismatches[0]["path"], "$.response.body");
+    let message = mismatches[0]["message"].as_str().unwrap();
+    assert!(
+      message.starts_with("could not be decoded as 'text/csv': ") && message.contains("fields"),
+      "the component says what is wrong with the octets: {message}"
+    );
+  }
+}
+
+/// Phase 9 finding 13. A provider answering JSON where CSV was declared is still decoded as declared
+/// (contract-file spec §5.5), and a warning before the result says what it was labelled, so the
+/// size mismatch that follows is read for what it is.
+#[test]
+fn a_reply_labelled_json_where_csv_was_declared_is_said_to_be() {
+  let mut engine = engine();
+  let contract = consumer_run(&mut engine);
+  let provider = fixed_provider(
+    "application/json",
+    r#"[{"id":"66","status":"PENDING","items":"1"}]"#,
+  );
+  let (summary, events) = verify_events(&mut engine, &contract, &provider);
+  assert_eq!(summary["status"], "failed", "{summary}");
+  let warnings = of_kind(&events, "verification/warning");
+  let differs: Vec<&&Value> = warnings
+    .iter()
+    .filter(|warning| warning["code"] == "content-type-differs")
+    .collect();
+  assert!(!differs.is_empty(), "{warnings:?}");
+  assert_eq!(differs[0]["target"], "$.response.body");
+  assert_eq!(differs[0]["declared"], "text/csv");
+  assert_eq!(differs[0]["labelled"], "application/json");
+  // Before the result it qualifies.
+  let position = |code: &str| events.iter().position(|event| event["payload"]["code"] == code);
+  let result = events
+    .iter()
+    .position(|event| event["kind"] == "verification/interaction-result")
+    .unwrap();
+  assert!(position("content-type-differs").unwrap() < result);
+}
+
+/// Spec §6.4: a loss a decode reports for this value is surfaced, as a `content-degraded` warning
+/// located in the interaction, and changes no verdict. The sample provider's `items` column is a
+/// number, which CSV can only carry as text.
+#[test]
+fn a_degradation_a_decode_reports_is_a_warning_located_in_the_reply() {
+  let mut engine = engine();
+  let contract = consumer_run(&mut engine);
+  let provider = order_service::start(order_service::Config {
+    token: None,
+    ..Default::default()
+  })
+  .unwrap();
+  let (summary, events) = verify_events(&mut engine, &contract, provider.base_url().as_str());
+  assert_eq!(summary["status"], "verified", "{summary}");
+  let warnings = of_kind(&events, "verification/warning");
+  let degraded = warnings
+    .iter()
+    .find(|warning| warning["code"] == "content-degraded" && warning["target"] == "$.response.body[*].items")
+    .unwrap_or_else(|| panic!("{warnings:?}"));
+  assert_eq!(degraded["content-type"], "text/csv");
+  assert_eq!(degraded["degradation"]["code"], "numeric-lexical");
+  assert!(
+    degraded["message"].as_str().unwrap().contains("numeric-lexical"),
+    "{degraded}"
+  );
+}

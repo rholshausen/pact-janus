@@ -30,6 +30,6 @@ pub use render::{
   executed as render_executed, executed_marked as render_executed_marked, pretty as render_pretty,
   pretty_marked as render_pretty_marked,
 };
-pub use resolve::{CapturedValues, ContentDetector, Resolver};
+pub use resolve::{CapturedValues, ContentDetector, Resolver, Undecodable};
 pub use tokens::{Token, TokenKind, tokens};
 pub use value::{RuntimeValue, is_written_integer, member_path, navigate, pointer, unquote};

@@ -100,6 +100,7 @@ fn a_string_encodes_as_utf8_octets_labelled_as_asked_and_decodes_back() {
       content_type: "text/plain; charset=utf-8".to_string(),
       document: RuntimeValue::String("Hello Wörld!".to_string()),
       options: None,
+      shape: None,
     })
     .expect("a string encodes")
     .value;
@@ -120,6 +121,7 @@ fn a_document_that_is_not_a_string_does_not_encode() {
       content_type: "text/plain".to_string(),
       document: RuntimeValue::from_json(&json!({ "a": 1 })),
       options: None,
+      shape: None,
     })
     .expect_err("an object is not text");
   assert_eq!(error.code, "encode-failed");

@@ -1,0 +1,45 @@
+{
+  "description": "a body whose octets could not be decoded has no document to apply its shape to: no node that reads it is executed, its container reports the decode failure once, at the slot, and the rest of the reply is still checked (ADR 0101)",
+  "input": {
+    "kind": "spec",
+    "spec": {
+      "description": "get an order",
+      "parts": {
+        "request": {
+          "method": { "shape": "equality", "example": "GET" },
+          "path": { "shape": "equality", "example": "/orders/7" }
+        },
+        "response": {
+          "status": { "shape": "equality", "example": 200 },
+          "body": {
+            "shape": "object",
+            "members": {
+              "id": { "shape": "integer", "example": 7 },
+              "status": { "shape": "any-of", "options": ["PENDING", "SHIPPED"], "example": "PENDING" },
+              "items": {
+                "shape": "each-like",
+                "min": 1,
+                "items": { "shape": "object", "members": { "sku": { "shape": "string", "example": "A-1" } } }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/orders/7",
+    "$.response.status": 500
+  },
+  "undecodable": {
+    "$.response.body": "could not be decoded as 'application/json': expected value at line 1 column 1"
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {"path": "$.response.body", "message": "could not be decoded as 'application/json': expected value at line 1 column 1"},
+      {"path": "$.response.status", "message": "Expected 500 to equal 200", "action": "match:equality"}
+    ]
+  }
+}

@@ -2981,6 +2981,25 @@ The component model, opened to the ecosystem.
 - **S5.3 Content components that are not JSON** — **M**: `encode` seeing the shape (finding 12), and
   decode errors and degradations reaching the user as their own finding kind, not as "expected a
   value" (findings 13, 14). Member order moved to S1.20.
+  *Done 2026-11-20* ([ADR 0101](decisions/0101-a-slot-that-cannot-be-decoded-fails-at-the-slot-a-decodes-losses-are-warnings-and-encode-is-given-the-shape.md)):
+  - `content/encode` takes an optional `shape`, the slot's shape as declared, whenever the engine
+    produced the document from one. The CSV component writes an empty document's header from it, so an
+    `each-like` of `min: 0`'s empty variant is served as the header row and decodes back to `[]`.
+  - A slot whose octets a component refuses has no document. No plan node whose value under test is read
+    from it runs, and the innermost container holding every one of them fails once, at the slot's path,
+    in the component's words (plan grammar §2.4). Nodes reading anything else still run, and so does
+    `match:content-type`. An empty slot is absent, as before, so a 204 labelled JSON still passes.
+  - A component that died decoding a reply (an error the binding synthesised) fails the variant as
+    `component-failed`, naming `content/<type>` and the slot.
+  - A verification warns, before the result, of each degradation a decode reported (`content-degraded`,
+    located in the reply) and of a declared slot labelled with another type (`content-type-differs`),
+    which is finding 13's answer: the declaration is a decode instruction, so the label is not a failure,
+    but the reader of a size mismatch is told why.
+  - Corpus: `shapes/undecodable-slot/` and `legacy/v3-undecodable-body-mismatch/`, and a case's
+    `undecodable`. `engine/kernel/tests/decoding.rs` and `csv_component.rs` hold the rest.
+  - Not done, on purpose: the consumer side does not report its own requests' degradations, `explain`
+    does not print declared ones, and `matcher/apply`'s failures are still node errors. ADR 0101 says
+    what evidence would change each.
 - **S5.4 Plan fragments versus operator-level substitution** — decision, gate F, before any third
   party depends on either; with it, a fragment's access to octets (finding 22) and where action
   configuration lives in the grammar (finding 24, ADR 0022 decision 6's provisional mapping).
@@ -3254,7 +3273,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.8 | No shape can be derived for a message producer, and nothing identifies a message's operation for a selector (both built: ADR 0090, ADR 0091) | ADR 0025's and ADR 0086's tripwires; asked 2026-11-13 |
 | S4.10 | No provider-shape plugin for Drift; waits on Drift publishing its plugin interfaces and SDK | provider-shape plugin proposal; 2026-11-18 |
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
-| S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
+| S5.3 | `encode` sees the shape; decode errors and degradations reach the user (done: ADR 0101) | findings 12–14 |
 | S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099) | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |

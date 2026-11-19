@@ -491,7 +491,9 @@ bytes were spelled. So the type is declared beside the parts, nested the same wa
   `content-type` member (§5.3), with the document itself still recorded as JSON so it stays readable.
   A verifier encodes a replayed request slot through that component, and decodes the reply's
   declared slots under the declared type rather than the type the provider labelled them with — the
-  consumer's shape is about the document as the consumer declared it.
+  consumer's shape is about the document as the consumer declared it. A reply labelled otherwise is not a mismatch,
+  but a verification says so, as a `content-type-differs` warning before the result
+  ([ADR 0101](../../decisions/0101-a-slot-that-cannot-be-decoded-fails-at-the-slot-a-decodes-losses-are-warnings-and-encode-is-given-the-shape.md)).
 - **A converted contract's evidence is the pact's octets.** `janus upgrade` records a declared body as
   the pact recorded it, `text` when it is UTF-8 and `base64` otherwise, with the pact's type, so a
   replay sends the bytes the pact's verification sends; and it declares a multipart type without its

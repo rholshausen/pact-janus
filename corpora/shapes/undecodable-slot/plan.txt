@@ -1,0 +1,68 @@
+(
+  :"get an order" (
+    :request (
+      :method (
+        %match:equality (
+          $.request.method,
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/orders/7'
+        )
+      )
+    ),
+    :response (
+      :body (
+        %expect:object (
+          $.response.body
+        ),
+        :"$.id" (
+          %match:integer (
+            $.response.body.id
+          )
+        ),
+        :"$.items" (
+          %expect:array (
+            $.response.body.items
+          ),
+          %expect:size (
+            $.response.body.items,
+            1,
+            NULL
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.items
+            ),
+            :"$.items[*]" (
+              %expect:object (
+                ~>
+              ),
+              :"$.items[*].sku" (
+                %match:string (
+                  ~>.sku
+                )
+              )
+            )
+          )
+        ),
+        :"$.status" (
+          %match:any-of (
+            $.response.body.status,
+            'PENDING',
+            'SHIPPED'
+          )
+        )
+      ),
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      )
+    )
+  )
+)

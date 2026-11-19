@@ -312,6 +312,10 @@ Three sources are the source of truth and take precedence over this file when th
 > `substitutions` in its handshake's `content-types` entry, and the engine compiles every slot itself,
 > pinning included, so a variant is checked at its point whatever decodes the slot (finding 21 closed).
 > Plan fragments are withdrawn; an action gets the value and `config.arguments`, normatively.
+> S5.3 (ADR 0101): `content/encode` is given the slot's shape, so an empty CSV variant is served as its
+> header row. A slot a component cannot decode fails once, at the slot, in the component's words, and no
+> node reading it runs; a component that died decoding a reply is `component-failed`; a decode's
+> degradations and a declared slot labelled otherwise are `verification/warning`s.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

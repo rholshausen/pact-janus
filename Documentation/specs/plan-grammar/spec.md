@@ -181,6 +181,16 @@ whose name has a character the plain form would end at (`.`, `[`, `]`, `'`, `\`,
 space), with `\` and `'` escaped by a `\` (`$.body.order['@{urn:names}name']`,
 [ADR 0039](../../decisions/0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md)).
 
+A resolver can say a slot **could not be decoded**: its content component refused its octets
+(component-interfaces spec §6.1). A shape never applies to a guess, so a node whose value under test is
+read from that slot is **not executed**, and has no result. The innermost container holding every node
+that reads the slot reports it instead, once: its result is an `error` at the slot's path carrying the
+component's message, such as `could not be decoded as 'text/csv': …`. A node that reads something else
+still runs beside it, and so does `match:content-type`, which reads a slot's octets and labels, not its
+document. A container all of whose nodes were not executed, and which does not report the slot, has no
+result either
+([ADR 0101](../../decisions/0101-a-slot-that-cannot-be-decoded-fails-at-the-slot-a-decodes-losses-are-warnings-and-encode-is-given-the-shape.md)).
+
 ### 2.5 Determinism
 
 **Compiling the same inputs with the same engine MUST produce the same plan**, node for node, in the
@@ -611,12 +621,15 @@ octets is written as its base64 and tagged in `encoded`, which maps a path in `v
 representation: `base64`, as engine-protocol spec §2.5 defines it. A binary body is the case that needs
 it, since a body no content component claims is its octets (ADR 0036).
 
+A slot whose octets could not be decoded has no value. `undecodable` maps its path to the message the
+interpreter reports at it (§2.4), and `values` has no entry for it (ADR 0101).
+
 **A case may say that its input is refused.** Some rules are about what never becomes a plan — an
 operator nobody can contribute, a shape that does not parse. Such a case has `status: invalid` and a
 `problems` list in place of `mismatches`: each problem has the `pointer` the engine reports (an RFC 6901
 pointer into the input) and words its message must contain. The engine must refuse the input with
 exactly those problems, in order. There is no plan, so the case has no `plan.txt` or `executed.txt`,
-and its `values` are empty.
+and its `values`, `encoded` and `undecodable` are empty.
 
 ### 6.2 Snapshots and assertions are different failures
 

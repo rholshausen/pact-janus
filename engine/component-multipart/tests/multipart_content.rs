@@ -278,6 +278,7 @@ fn encode(document: &RuntimeValue, content_type: &str) -> SlotValue {
       content_type: content_type.to_string(),
       document: document.clone(),
       options: None,
+      shape: None,
     })
     .expect("encodes")
     .value
@@ -360,6 +361,7 @@ fn a_document_that_is_not_a_multipart_body_does_not_encode(#[case] document: Val
     content_type: "multipart/form-data".to_string(),
     document: RuntimeValue::from_json(&document),
     options: None,
+    shape: None,
   });
   let error = result.expect_err("refused");
   assert!(error.message.contains(message), "{}", error.message);

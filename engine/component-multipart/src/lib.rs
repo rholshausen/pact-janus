@@ -115,6 +115,7 @@ impl MultipartContent {
             content_type: content_type.to_string(),
             document: body.clone(),
             options: None,
+            shape: None,
           })
           .map_err(|err| format!("part '{name}': {}", err.message))
           .and_then(|result| slot_bytes(&result.value))

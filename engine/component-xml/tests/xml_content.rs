@@ -280,6 +280,7 @@ fn it_decodes_a_slot_and_encodes_a_document_back() {
       content_type: "text/xml".to_string(),
       document: decoded.document,
       options: None,
+      shape: None,
     })
     .expect("encodes");
   assert_eq!(encoded.value.content_type.as_deref(), Some("text/xml"));

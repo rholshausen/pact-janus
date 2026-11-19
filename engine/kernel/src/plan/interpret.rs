@@ -19,7 +19,7 @@
 //! from either compiler.
 
 use super::model::{Literal, Node, NodeKind, Plan};
-use super::resolve::{ContentDetector, Resolver};
+use super::resolve::{ContentDetector, Resolver, Undecodable};
 use super::value::{RuntimeValue, is_written_integer, navigate};
 use crate::display::{Kind, Marked};
 use serde_json::Number;
@@ -91,6 +91,8 @@ struct Ctx<'a> {
   /// Beside each of `current`, where that item is in the interaction, when it is anywhere: the
   /// element a `flow:for-each` is on is `<array's path>[i]`, an entry `<object's path>.<key>`.
   current_paths: Vec<Option<String>>,
+  /// The undecodable slots a container has already reported (ADR 0101), so each is reported once.
+  reported: Vec<String>,
 }
 
 impl Ctx<'_> {
@@ -148,6 +150,7 @@ pub fn execute_with(
     actions,
     current: Vec::new(),
     current_paths: Vec::new(),
+    reported: Vec::new(),
   };
   run(&plan.root, &mut ctx)
 }
@@ -223,6 +226,9 @@ fn children_of(executed: &Executed) -> &[Executed] {
 
 fn run(node: &Node, ctx: &mut Ctx) -> Executed {
   match &node.kind {
+    NodeKind::Container { label, children } if ctx.resolver.any_undecodable() => {
+      run_container_reading_undecodable(label, children, ctx)
+    }
     NodeKind::Container { label, children } => {
       let executed_children: Vec<Executed> = children.iter().map(|c| run(c, ctx)).collect();
       let failed = executed_children.iter().any(child_failed);
@@ -279,6 +285,121 @@ fn run(node: &Node, ctx: &mut Ctx) -> Executed {
       }
     }
     NodeKind::Action { name, children } => run_action(name, children, ctx),
+  }
+}
+
+/// A container, when some slot could not be decoded (ADR 0101, plan-grammar spec §2.4). A shape never
+/// applies to a guess (component-interfaces spec §6.1), so a node whose value under test is read from
+/// an undecodable slot is not executed, and has no result. The innermost container holding every node
+/// that reads the slot reports it instead: its result is an `error` at the slot's path, saying why it
+/// could not be decoded, once however many nodes read it. So the `:body` container of a body that could
+/// not be decoded is the one that reports it, and a v1–v4 body's check of its `Content-Type` header,
+/// which reads a header, still runs beside it.
+fn run_container_reading_undecodable(label: &Option<String>, children: &[Node], ctx: &mut Ctx) -> Executed {
+  let read: Vec<Vec<Undecodable>> = children.iter().map(|child| slots_read(child, ctx)).collect();
+  let mut slots: Vec<&Undecodable> = Vec::new();
+  for undecodable in read.iter().flatten() {
+    if !slots.iter().any(|slot| slot.path == undecodable.path) {
+      slots.push(undecodable);
+    }
+  }
+  // A slot only one child reads is that child's to report, when it is a container; it is entered.
+  let mut entered = vec![false; children.len()];
+  let mut reports = None;
+  for slot in slots {
+    let readers: Vec<usize> = (0..children.len())
+      .filter(|&i| read[i].iter().any(|undecodable| undecodable.path == slot.path))
+      .collect();
+    if let [only] = readers[..]
+      && matches!(children[only].kind, NodeKind::Container { .. })
+    {
+      entered[only] = true;
+      continue;
+    }
+    if !ctx.reported.contains(&slot.path) {
+      ctx.reported.push(slot.path.clone());
+      reports.get_or_insert_with(|| slot.clone());
+    }
+  }
+  let mut skipped = false;
+  let executed_children: Vec<Executed> = children
+    .iter()
+    .enumerate()
+    .map(|(i, child)| {
+      if !entered[i] && reads_undecodable(child, ctx).is_some() {
+        skipped = true;
+        skip(child)
+      } else {
+        run(child, ctx)
+      }
+    })
+    .collect();
+  let result = match reports {
+    Some(Undecodable { path, message }) => Some(NodeResult::Error {
+      message,
+      path: Some(path),
+      marks: None,
+    }),
+    None if skipped && executed_children.iter().all(|c| c.result.is_none()) => None,
+    None => Some(NodeResult::Value(RuntimeValue::Bool(
+      !executed_children.iter().any(child_failed),
+    ))),
+  };
+  Executed {
+    kind: ExecutedKind::Container {
+      label: label.clone(),
+      children: executed_children,
+    },
+    result,
+  }
+}
+
+/// Every undecodable slot some node in `node` reads its value under test from ([`reads_undecodable`]).
+fn slots_read(node: &Node, ctx: &Ctx) -> Vec<Undecodable> {
+  match &node.kind {
+    NodeKind::Container { children, .. } => {
+      children.iter().flat_map(|child| slots_read(child, ctx)).collect()
+    }
+    _ => reads_undecodable(node, ctx).into_iter().collect(),
+  }
+}
+
+/// The undecodable slot `node` reads its value under test from, if it reads one: an action's first
+/// absolute `resolve`, depth first (spec §2.3's rule for where a value under test comes from), and, for
+/// a container, the slot every node in it reads, when they all read the same one. `match:content-type`
+/// reads the slot's octets and labels, not its document (component-interfaces spec §6.5), so it always
+/// runs; an annotation reads nothing.
+fn reads_undecodable(node: &Node, ctx: &Ctx) -> Option<Undecodable> {
+  match &node.kind {
+    NodeKind::Annotation { .. } => None,
+    NodeKind::Action { name, .. } if name == "match:content-type" => None,
+    NodeKind::Container { children, .. } => {
+      let mut read = None;
+      for child in children {
+        if matches!(child.kind, NodeKind::Annotation { .. }) {
+          continue;
+        }
+        let undecodable = reads_undecodable(child, ctx)?;
+        match &read {
+          Some(Undecodable { path, .. }) if *path != undecodable.path => return None,
+          Some(_) => {}
+          None => read = Some(undecodable),
+        }
+      }
+      read
+    }
+    _ => first_resolve(node).and_then(|path| ctx.resolver.undecodable(path)),
+  }
+}
+
+fn first_resolve(node: &Node) -> Option<&str> {
+  match &node.kind {
+    NodeKind::Resolve { path } => Some(path),
+    NodeKind::Container { children, .. }
+    | NodeKind::Action { children, .. }
+    | NodeKind::Pipeline { children }
+    | NodeKind::Splat { children } => children.iter().find_map(first_resolve),
+    _ => None,
   }
 }
 

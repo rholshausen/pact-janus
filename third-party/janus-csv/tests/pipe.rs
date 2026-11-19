@@ -257,6 +257,39 @@ fn encode_inverts_decode() {
   assert_eq!(decoded["ok"]["document"], document);
 }
 
+/// Phase 9 finding 12 (ADR 0101): a document with no rows names no columns, so the header comes from
+/// the shape the engine hands over, in its declared order, and decodes back to no rows.
+#[test]
+fn an_empty_document_is_written_as_the_header_its_shape_declares() {
+  let mut component = greeted();
+  let shape = json!({ "shape": "each-like", "min": 0, "items": { "shape": "object", "members": {
+    "id": { "shape": "string", "example": "66" },
+    "status": { "shape": "string", "example": "PENDING" },
+    "items": { "shape": "integer", "example": 1 } } } });
+  let encoded = call(
+    &mut component,
+    "content/encode",
+    json!({ "content-type": "text/csv", "document": [], "shape": shape }),
+  );
+  let value = &encoded["ok"]["value"];
+  let text = String::from_utf8(BASE64.decode(value["content"].as_str().unwrap()).unwrap()).unwrap();
+  assert_eq!(text, "id,status,items\r\n");
+  let decoded = call(
+    &mut component,
+    "content/decode",
+    json!({ "content-type": "text/csv", "value": value }),
+  );
+  assert_eq!(decoded["ok"]["document"], json!([]));
+
+  let shapeless = call(
+    &mut component,
+    "content/encode",
+    json!({ "content-type": "text/csv", "document": [] }),
+  );
+  let text = shapeless["ok"]["value"]["content"].as_str().unwrap();
+  assert_eq!(text, "", "with no shape, an empty document names no columns");
+}
+
 #[test]
 fn encode_spells_typed_values_as_text() {
   let mut component = greeted();

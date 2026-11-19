@@ -44,7 +44,7 @@ use super::contributions::Contributions;
 use super::events::Stream;
 use super::frame::EngineError;
 use super::scope::Scope;
-use super::wire::{encode_slot, find_container, mismatch_json, parts_resolver};
+use super::wire::{DecodeNote, Decoded, decoded_parts, encode_slot, find_container, mismatch_json};
 use crate::broker::{
   BrokerAuth, BrokerClient, BrokerDescriptor, FetchRequest, FetchedPact, InteractionResult, PublishRequest,
 };
@@ -62,7 +62,7 @@ use crate::legacy::compile::{self as legacy_compile, compile_response as compile
 use crate::legacy::pact::{
   self as legacy_pact, MessageInteraction, PactInteraction, PluginInteraction, RequestTemplate,
 };
-use crate::plan::{self, ActionApplier, Assignment, CapturedValues, Status, execute_with, outcome};
+use crate::plan::{self, ActionApplier, Assignment, Status, execute_with, outcome};
 use crate::shape::fresh;
 use crate::variant::params;
 use serde::Deserialize;
@@ -1687,11 +1687,14 @@ struct Ready {
   /// because the difference *is* a different reading of the same parts: design 3.5's plans
   /// address a header as one value per name (`legacy_pact::header_captures`), shapes address the
   /// slot the transport actually produced.
-  resolve: fn(&Parts, &ContentTypes, Option<&dyn ContentComponent>) -> CapturedValues,
+  resolve: fn(&Parts, &ContentTypes, Option<&dyn ContentComponent>) -> Decoded,
   /// The interaction's declared content types (contract-file spec §5.5): the request's declared
   /// slots are encoded through them before sending, the reply's decoded under them. Empty for a
   /// v1–v4 pact, which has no declarations.
   content_types: ContentTypes,
+  /// The shapes of the slots `content_types` declares, which the component encoding one is handed
+  /// (ADR 0101). Empty for a v1–v4 pact, whose request is sent as the pact recorded it.
+  content_shapes: BTreeMap<String, contract::ShapePart>,
   /// Emitted before this variant's exchange starts, so a warning precedes the result it qualifies.
   warnings: Vec<Value>,
   /// The members whose values nothing reported repeats (ADR 0074 decision 7).
@@ -1811,9 +1814,13 @@ fn prepare_janus(
         resolve: if emissive {
           produced_resolver
         } else {
-          parts_resolver
+          decoded_parts
         },
         content_types: interaction.content_types.clone().unwrap_or_default(),
+        content_shapes: super::session::content_shapes(
+          &interaction.parts,
+          interaction.content_types.as_ref().unwrap_or(&ContentTypes::new()),
+        ),
         states: states.unwrap_or_default(),
         request,
         generate_from: None,
@@ -1881,18 +1888,18 @@ fn produced_resolver(
   parts: &crate::component::Parts,
   declared: &ContentTypes,
   content: Option<&dyn ContentComponent>,
-) -> CapturedValues {
-  let resolver = parts_resolver(parts, declared, content);
+) -> Decoded {
+  let mut decoded = decoded_parts(parts, declared, content);
   let Some(message) = parts.get(PRODUCED_PART) else {
-    return resolver;
+    return decoded;
   };
-  match super::wire::produced_message_type(message, content) {
-    Some(content_type) => resolver.capture(
+  if let Some(content_type) = super::wire::produced_message_type(message, content) {
+    decoded.values = decoded.values.capture(
       format!("$.{PRODUCED_PART}.metadata.contentType"),
       plan::RuntimeValue::String(content_type),
-    ),
-    None => resolver,
+    );
   }
+  decoded
 }
 
 /// A v1–v4 pact's interaction (plan task 5.4): compiled by design 3.5's matching-rule compiler,
@@ -1963,6 +1970,7 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str, redaction: &Red
       // The reply's body is read as the pact's content type (ADR 0036 decision 4); the request
       // replays the recorded octets, so it declares nothing.
       content_types: legacy_pact::response_types(&response),
+      content_shapes: BTreeMap::new(),
       states,
       request,
       generate_from: RequestTemplate::of(&interaction.request).map(Box::new),
@@ -2083,6 +2091,7 @@ fn prepare_legacy_message(
       plan: legacy_compile::compile_message(&expected, legacy_pact::MESSAGE_PART),
       resolve: legacy_message_resolver,
       content_types: legacy_pact::message_types(&expected),
+      content_shapes: BTreeMap::new(),
       states,
       request: Parts::new(),
       generate_from: None,
@@ -2148,8 +2157,12 @@ fn legacy_resolver(
   parts: &Parts,
   declared: &ContentTypes,
   content: Option<&dyn ContentComponent>,
-) -> CapturedValues {
-  legacy_pact::header_captures(parts_resolver(parts, declared, content), parts)
+) -> Decoded {
+  let decoded = decoded_parts(parts, declared, content);
+  Decoded {
+    values: legacy_pact::header_captures(decoded.values, parts),
+    notes: decoded.notes,
+  }
 }
 
 /// A produced message read the way a message's plan addresses it: the generic slot captures, the
@@ -2159,8 +2172,12 @@ fn legacy_message_resolver(
   parts: &Parts,
   declared: &ContentTypes,
   content: Option<&dyn ContentComponent>,
-) -> CapturedValues {
-  legacy_pact::message_captures(parts_resolver(parts, declared, content), parts)
+) -> Decoded {
+  let decoded = decoded_parts(parts, declared, content);
+  Decoded {
+    values: legacy_pact::message_captures(decoded.values, parts),
+    notes: decoded.notes,
+  }
 }
 
 /// A v1–v4 body design 3.5 cannot compile, as the error a result carries: a body that claimed to be
@@ -2349,6 +2366,7 @@ fn verify_exchange(
     match (&exchange.ready.answer, target) {
       (Answer::Produced { part }, _) => match produce(exchange, part, &base, ctx, &mut scratch) {
         Produced::Scored(driven) => {
+          emit_warnings(ctx, driven.warnings);
           result = Some(driven.payload);
           executed_plan = driven.executed;
         }
@@ -2365,6 +2383,7 @@ fn verify_exchange(
       },
       (Answer::Driven, Some(target)) => match drive_exchange(exchange, target, &base, ctx, &mut scratch) {
         Ok(driven) => {
+          emit_warnings(ctx, driven.warnings);
           result = Some(driven.payload);
           reply = driven.reply;
           executed_plan = driven.executed;
@@ -2666,7 +2685,7 @@ fn fill_slot(
   let mut document = document.to_json();
   let before = failures.len();
   fresh::fill(shape, &mut document, at, fresh, failures);
-  let mut encoded = encode_slot(&document, Some(&content_type), content);
+  let mut encoded = encode_slot(&document, Some(&content_type), content, Some(shape));
   if !matches!(encoded.encoded.as_deref(), Some("base64" | "text")) {
     failures.truncate(before);
     return unread(
@@ -2701,6 +2720,13 @@ fn warn_unhandled_state(exchange: &Exchange<'_>, state: &str, ctx: &RunContext<'
       "message": format!("no state-setup hook handles the provider state '{state}', so the exchange runs without setting it up"),
     }),
   );
+}
+
+/// Warnings that qualify the result about to be reported, before it.
+fn emit_warnings(ctx: &RunContext<'_>, warnings: Vec<Value>) {
+  for warning in warnings {
+    ctx.stream.emit("verification/warning", warning);
+  }
 }
 
 /// Each generator that produced nothing, as a `generator-failed` warning before the result it
@@ -2771,6 +2797,8 @@ struct Driven {
   payload: Value,
   reply: Option<Parts>,
   executed: Option<Value>,
+  /// What the reply's decoding says beside the verdict (ADR 0101), emitted before the result.
+  warnings: Vec<Value>,
 }
 
 /// Send the request and score the reply against this replay's plan ([`score`]) — pinned to the
@@ -2806,6 +2834,7 @@ fn drive(
   let request = encode_declared(
     request,
     &exchange.ready.content_types,
+    &exchange.ready.content_shapes,
     &target.component.content_slots(),
     content,
   );
@@ -2874,9 +2903,34 @@ fn score(
 ) -> Driven {
   let reference = exchange.reference;
   let variant = &exchange.ready.variant;
-  let resolver = (exchange.ready.resolve)(&reply, &exchange.ready.content_types, content);
+  let Decoded {
+    values: resolver,
+    notes,
+  } = (exchange.ready.resolve)(&reply, &exchange.ready.content_types, content);
   // What the provider answered under a redacted member is a secret too (ADR 0074 decision 7).
   secrets.collect_parts(&exchange.ready.redacted, &reply);
+  let warnings = decode_warnings(exchange, &notes);
+  // A component that died decoding the reply, rather than refusing it, is the component's failure and
+  // not the provider's (component-interfaces spec §11.3, ADR 0101 decision 4).
+  if let Some(DecodeNote::Failed {
+    target,
+    content_type,
+    error,
+  }) = notes
+    .iter()
+    .find(|note| matches!(note, DecodeNote::Failed { .. }))
+  {
+    let mut error = EngineError::component_failed(&format!("content/{content_type}"), error);
+    if let Some(details) = error.details.as_mut() {
+      details["path"] = json!(target);
+    }
+    return Driven {
+      payload: json!({ "interaction": reference, "variant": variant, "status": "failed", "error": error }),
+      reply: Some(reply),
+      executed: None,
+      warnings,
+    };
+  }
   // `match:content-type` reads the reply's own octets and labels (staged plan S1.10, ADR 0049): by
   // the declared or labelled type on the contract path, by detection on the v1–v4 path.
   let detection = content.map(|content| crate::component::ContentDetection {
@@ -2937,7 +2991,46 @@ fn score(
     payload,
     reply: Some(reply),
     executed,
+    warnings,
   }
+}
+
+/// What a reply's decoding says beside its verdict (ADR 0101), as `verification/warning`s before the
+/// result: a loss a decode reported (`content-degraded`), and a slot that arrived labelled with a type
+/// other than the one the contract declares and was decoded as declared (`content-type-differs`). A
+/// v1–v4 pact's type is checked on its header (ADR 0043), so a pact's replay is not told the second.
+fn decode_warnings(exchange: &Exchange<'_>, notes: &[DecodeNote]) -> Vec<Value> {
+  let (reference, variant) = (exchange.reference, &exchange.ready.variant);
+  notes
+    .iter()
+    .filter_map(|note| match note {
+      DecodeNote::Degraded {
+        target,
+        content_type,
+        degradation,
+      } => {
+        let code = degradation.get("code").and_then(Value::as_str).unwrap_or("degraded");
+        let message = degradation.get("message").and_then(Value::as_str).unwrap_or_default();
+        Some(json!({
+          "code": "content-degraded",
+          "interaction": reference, "variant": variant, "target": target,
+          "content-type": content_type, "degradation": degradation,
+          "message": format!("decoded as '{content_type}', which loses something here ({code}): {message}"),
+        }))
+      }
+      DecodeNote::Relabelled {
+        target,
+        declared,
+        labelled,
+      } if !exchange.ready.legacy => Some(json!({
+        "code": "content-type-differs",
+        "interaction": reference, "variant": variant, "target": target,
+        "declared": declared, "labelled": labelled,
+        "message": format!("the contract declares '{declared}' and the provider labelled it '{labelled}'; it was decoded as '{declared}'"),
+      })),
+      _ => None,
+    })
+    .collect()
 }
 
 /// This engine's resolution against the one the contract recorded, when they differ (§6.4).
@@ -2995,6 +3088,7 @@ fn interaction_spec(interaction: &contract::Interaction) -> Result<InteractionSp
 fn encode_declared(
   mut request: Parts,
   declared: &ContentTypes,
+  shapes: &BTreeMap<String, contract::ShapePart>,
   content_slots: &crate::component::ContentSlots,
   content: Option<&dyn ContentComponent>,
 ) -> Parts {
@@ -3008,7 +3102,8 @@ fn encode_declared(
         && names.contains(slot_name)
         && as_document
       {
-        *slot = encode_slot(&slot.content, Some(content_type), content);
+        let shape = shapes.get(part_name).and_then(|shapes| shapes.get(slot_name));
+        *slot = encode_slot(&slot.content, Some(content_type), content, shape);
       }
     }
   }
