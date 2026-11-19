@@ -465,10 +465,23 @@ Arguments:
   <REFERENCE>  What to fetch: registry/repository:tag, or registry/repository@sha256:...
 
 Options:
-      --digest <sha256:...>  The manifest digest the artifact must match
-      --output <FORMAT>      text prints a summary and the declaration to paste; json prints one
-                             document [default: text] [possible values: text, json]
-  -h, --help                 Print help
+      --digest <sha256:...>
+          The manifest digest the artifact must match
+      --certificate-identity <IDENTITY>
+          The identity its Sigstore signature must name; without this or a pattern, every signer
+          that verifies is reported
+      --certificate-identity-regexp <PATTERN>
+          A regular expression the whole of the signature's identity must match
+      --certificate-oidc-issuer <URL>
+          The OIDC issuer that must have vouched for the signature's identity
+      --trusted-root <FILE>
+          A Sigstore trusted root to verify signatures against, in place of the public-good
+          instance's
+      --output <FORMAT>
+          text prints a summary and the declaration to paste; json prints one document [default:
+          text] [possible values: text, json]
+  -h, --help
+          Print help
 
 Global options:
   -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the

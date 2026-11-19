@@ -85,6 +85,10 @@ pact_janus_test_servers = { path = "../tools/test-servers" }
 # Snapshot tests of the command surface: trycmd runs the cases under tests/cmd/ (help, usage errors,
 # exit codes, offline commands), and snapbox compares whole outputs inside tests/cli.rs, where a
 # case needs a provider or a registry running first.
+# The Sigstore the signature tests sign with: the component host's own test Sigstore, included by
+# path (ADR 0099). Both already in the tree.
+ring = "0.17"
+x509-cert = { version = "0.2", features = ["sct"] }
 trycmd = "1.2"
 snapbox = "1.2"
 rstest = "0.28"

@@ -43,6 +43,9 @@ struct State {
   token_for: Option<String>,
   /// The `Authorization` every registry request needs, answering a `Basic` challenge.
   basic: Option<String>,
+  /// No referrers API, as `registry:2`: a client lists a manifest's referrers from the referrers tag
+  /// schema's index instead, which `attach` then writes, as `cosign` does.
+  no_referrers_api: bool,
 }
 
 pub struct Registry {
@@ -128,7 +131,33 @@ impl Registry {
           continue;
         };
         let tamper = state.tamper.clone().unwrap_or(Tamper::None);
-        let response = if let Some((repository, id)) = rest.split_once("/blobs/uploads/") {
+        let response = if let Some((repository, subject)) = rest.split_once("/referrers/") {
+          // OCI distribution 1.1: an image index of every manifest in the repository whose `subject`
+          // is this digest, each described by its `artifactType`.
+          if state.no_referrers_api {
+            status(404)
+          } else {
+            let prefix = format!("{repository}:sha256:");
+            let manifests: Vec<serde_json::Value> = state
+              .manifests
+              .iter()
+              .filter(|(key, _)| key.starts_with(&prefix))
+              .filter_map(|(_, (content_type, bytes))| {
+                let manifest: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+                (manifest.pointer("/subject/digest")?.as_str()? == subject).then(|| {
+                  serde_json::json!({ "mediaType": content_type, "digest": sha256(bytes), "size": bytes.len(),
+                                      "artifactType": manifest.get("artifactType") })
+                })
+              })
+              .collect();
+            Response::from_data(
+              serde_json::to_vec(&serde_json::json!({ "schemaVersion": 2,
+                "mediaType": "application/vnd.oci.image.index.v1+json", "manifests": manifests }))
+              .unwrap(),
+            )
+            .with_header(header("content-type", "application/vnd.oci.image.index.v1+json"))
+          }
+        } else if let Some((repository, id)) = rest.split_once("/blobs/uploads/") {
           match method {
             Method::Post => {
               let id = UPLOADS.fetch_add(1, Ordering::Relaxed).to_string();
@@ -251,6 +280,58 @@ impl Registry {
   /// These credentials on every request, answering a `Basic` challenge: `registry:2` with htpasswd.
   pub fn require_basic(&self, username: &str, password: &str) {
     self.state.lock().unwrap().basic = Some(basic(username, password));
+  }
+
+  /// A manifest's bytes, by its digest.
+  pub fn manifest(&self, repository: &str, digest: &str) -> Option<Vec<u8>> {
+    let state = self.state.lock().unwrap();
+    state
+      .manifests
+      .get(&format!("{repository}:{digest}"))
+      .map(|(_, bytes)| bytes.clone())
+  }
+
+  /// Answer the referrers API with a 404, as `registry:2` does.
+  pub fn without_referrers_api(&self) {
+    self.state.lock().unwrap().no_referrers_api = true;
+  }
+
+  /// Attach a referrer manifest to `subject`, as `cosign` does: put its blobs and the manifest by its
+  /// digest, and, from a registry without the referrers API, add it to the referrers tag schema's index
+  /// (`sha256-<hex>`). The referrer's digest.
+  pub fn attach(&self, repository: &str, subject: &str, manifest: &[u8], blobs: &[Vec<u8>]) -> String {
+    let mut state = self.state.lock().unwrap();
+    for blob in blobs {
+      state.blobs.insert(sha256(blob), blob.clone());
+    }
+    let digest = sha256(manifest);
+    let content_type = "application/vnd.oci.image.manifest.v1+json".to_string();
+    state.manifests.insert(
+      format!("{repository}:{digest}"),
+      (content_type.clone(), manifest.to_vec()),
+    );
+    if state.no_referrers_api {
+      let tag = format!("{repository}:{}", subject.replace(':', "-"));
+      let mut index = state
+        .manifests
+        .get(&tag)
+        .and_then(|(_, bytes)| serde_json::from_slice::<serde_json::Value>(bytes).ok())
+        .unwrap_or_else(|| {
+          serde_json::json!({ "schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json", "manifests": [] })
+        });
+      let artifact_type =
+        serde_json::from_slice::<serde_json::Value>(manifest).unwrap()["artifactType"].clone();
+      index["manifests"].as_array_mut().unwrap().push(serde_json::json!({
+        "mediaType": content_type, "digest": digest, "size": manifest.len(), "artifactType": artifact_type }));
+      state.manifests.insert(
+        tag,
+        (
+          "application/vnd.oci.image.index.v1+json".to_string(),
+          serde_json::to_vec(&index).unwrap(),
+        ),
+      );
+    }
+    digest
   }
 
   /// Every request since the last call, as `METHOD /path?query`.

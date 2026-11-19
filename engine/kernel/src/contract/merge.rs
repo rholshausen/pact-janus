@@ -249,6 +249,7 @@ mod tests {
               kind: "file".to_string(),
               reference: None,
               digest: Some(digest.to_string()),
+              signer: None,
             },
           })
           .collect(),

@@ -25,6 +25,7 @@ fn main() {
         reference: Some(path),
         digest: None,
         auth: None,
+        signature: None,
       },
       grants: Grants::default(),
       limits: Limits::default(),

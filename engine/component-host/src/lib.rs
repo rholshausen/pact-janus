@@ -22,13 +22,14 @@
 //!   instance ever is.
 
 pub mod oci;
+pub mod signature;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::{
   Apply, ApplyResult, Compile, CompileResult, ComponentDeclaration, ComponentError, ComponentLoader,
   ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult, Fetched, Grants, Label,
-  LabelResult, Loaded, MatcherComponent, SlotValue, media_type_matches,
+  LabelResult, Loaded, MatcherComponent, Signer, SlotValue, media_type_matches,
 };
 use pact_janus_kernel::persisted::Persisted;
 use pact_janus_kernel::plan::RuntimeValue;
@@ -121,19 +122,71 @@ impl WasmLoader {
     })
   }
 
-  /// Fetch a component into the cache, check it, and say what it is — the digest to pin and the
-  /// handshake that will answer — without a project or a run. What `janus component pull` prints.
+  /// Fetch a component into the cache, check it, and say what it is — the digest to pin, the
+  /// handshake that will answer, and who signed it — without a project or a run. What `janus
+  /// component pull` prints. A `trust` that names a signer is held to as a declaration's is
+  /// (ADR 0099); one that names none reports every signer whose signature verifies against its
+  /// trusted root, which is what a declaration would then name.
   pub fn pull(
     &self,
     reference: &str,
     digest: Option<&str>,
     auth: Option<&oci::Credentials>,
-  ) -> Result<(oci::Pulled, Value), ComponentError> {
+    trust: &signature::Trust,
+  ) -> Result<(oci::Pulled, Value, Vec<Signer>), ComponentError> {
     let parsed = oci::Reference::parse(reference).map_err(|message| load_error(&message))?;
     let pulled = self.oci.pull(&parsed, digest, auth)?;
+    // Signatures before the handshake, as at load: a signer the trust names is checked before a byte
+    // of the component is compiled.
+    let signers = if trust.names_a_signer() {
+      let attached = self.oci.bundles(&parsed, &pulled.digest, auth)?;
+      vec![signed_by(&parsed, &pulled.digest, &attached, trust)?]
+    } else {
+      // Naming no signer, a pull is not about signatures: one the registry will not list is a
+      // warning, and the pull reports no signer.
+      let attached = self
+        .oci
+        .bundles(&parsed, &pulled.digest, auth)
+        .unwrap_or_else(|err| {
+          tracing::warn!(reference = %parsed, "the component's signatures could not be listed: {}", err.message);
+          Vec::new()
+        });
+      let mut signers: Vec<Signer> = attached
+        .iter()
+        .filter_map(|bundle| match check(trust, &pulled.digest, bundle) {
+          Ok(signer) => Some(signer),
+          Err(why) => {
+            tracing::info!(reference = %parsed, referrer = %bundle.referrer, "a signature that does not verify: {why}");
+            None
+          }
+        })
+        .collect();
+      signers.sort_by(|a, b| (&a.issuer, &a.identity).cmp(&(&b.issuer, &b.identity)));
+      signers.dedup();
+      signers
+    };
     let hello = self.describe(&pulled.wasm, reference)?;
     check_artifact_config(&pulled, &hello)?;
-    Ok((pulled, hello))
+    Ok((pulled, hello, signers))
+  }
+
+  /// ADR 0099 decision 4: the bundles the cache remembers for this digest first, so a pinned component
+  /// whose signature verified loads again with no request; the registry's when none of those is from
+  /// the trusted signer — a signature added since, or a declaration that now trusts someone else.
+  fn verify_signature(
+    &self,
+    reference: &oci::Reference,
+    digest: &str,
+    auth: Option<&oci::Credentials>,
+    trust: &signature::Trust,
+  ) -> Result<Signer, ComponentError> {
+    if let Some(cached) = self.oci.cached_bundles(reference, digest)
+      && let Ok(signer) = signed_by(reference, digest, &cached, trust)
+    {
+      return Ok(signer);
+    }
+    let attached = self.oci.bundles(reference, digest, auth)?;
+    signed_by(reference, digest, &attached, trust)
   }
 
   /// A component's handshake, under no grants and with no import check — the question is only what
@@ -156,6 +209,15 @@ impl WasmLoader {
         declaration.source.kind
       )));
     };
+    // ADR 0099 decision 3: a declaration that is not one the loader can verify fails before anything
+    // is fetched, as a malformed credential does.
+    let trust = declaration
+      .source
+      .signature
+      .as_ref()
+      .map(signature::Trust::from_declared)
+      .transpose()
+      .map_err(|message| load_error(&format!("component '{}': {message}", declaration.name)))?;
     if declaration.source.kind == "oci" {
       let parsed = oci::Reference::parse(reference).map_err(|message| load_error(&message))?;
       // ADR 0052: the declaration's credential, and only that. A run reads no environment, so a
@@ -179,10 +241,19 @@ impl WasmLoader {
           err
         })?;
       tracing::info!(component = %declaration.name, reference = %parsed, digest = %pulled.digest, "component resolved");
+      // ADR 0099: after the digest, before a byte is compiled.
+      let signer = trust
+        .as_ref()
+        .map(|trust| self.verify_signature(&parsed, &pulled.digest, auth.as_ref(), trust))
+        .transpose()?;
+      if let Some(signer) = &signer {
+        tracing::info!(component = %declaration.name, identity = %signer.identity, issuer = %signer.issuer, "component signature verified");
+      }
       let bytes = std::mem::take(&mut pulled.wasm);
       let fetched = Fetched {
         reference: Some(parsed.without_digest().to_string()),
         digest: pulled.digest.clone(),
+        signer,
       };
       return Ok((
         bytes,
@@ -195,6 +266,12 @@ impl WasmLoader {
     if declaration.source.auth.is_some() {
       return Err(load_error(&format!(
         "a '{}' source takes no 'auth': a credential is for a registry",
+        declaration.source.kind
+      )));
+    }
+    if trust.is_some() {
+      return Err(load_error(&format!(
+        "a '{}' source takes no 'signature': a signature is found beside an artifact in a registry, and a file is pinned by its 'digest'",
         declaration.source.kind
       )));
     }
@@ -219,6 +296,7 @@ impl WasmLoader {
     let fetched = Fetched {
       reference: None,
       digest: actual,
+      signer: None,
     };
     Ok((bytes, format!("'{path}'"), fetched, None))
   }
@@ -266,6 +344,57 @@ impl WasmLoader {
       engine: self.engine.clone(),
     })
   }
+}
+
+fn check(trust: &signature::Trust, digest: &str, bundle: &oci::Attached) -> Result<Signer, String> {
+  match &bundle.bytes {
+    Ok(bytes) => trust.check(digest, bytes),
+    Err(why) => Err(why.clone()),
+  }
+}
+
+/// The signer `trust` accepts among `attached`, or why there is none (ADR 0099 decision 5):
+/// `signature-missing` when nothing is attached, `signature-untrusted` when something is and none of
+/// it verifies as from that signer — naming, for each, who it is from or why it does not verify.
+fn signed_by(
+  reference: &oci::Reference,
+  digest: &str,
+  attached: &[oci::Attached],
+  trust: &signature::Trust,
+) -> Result<Signer, ComponentError> {
+  let mut refused = Vec::new();
+  for bundle in attached {
+    match check(trust, digest, bundle) {
+      Ok(signer) => return Ok(signer),
+      Err(why) => refused.push(json!({ "referrer": bundle.referrer, "reason": why })),
+    }
+  }
+  let wanted = trust.describe();
+  let (code, message) = if refused.is_empty() {
+    (
+      "signature-missing",
+      format!("'{reference}' ({digest}) has no signature attached, and one from {wanted} is required"),
+    )
+  } else {
+    let reasons: Vec<&str> = refused.iter().filter_map(|r| r["reason"].as_str()).collect();
+    (
+      "signature-untrusted",
+      format!(
+        "'{reference}' ({digest}) has no signature from {wanted}: {}",
+        reasons.join("; ")
+      ),
+    )
+  };
+  Err(ComponentError {
+    code: code.to_string(),
+    category: "component".to_string(),
+    message,
+    source: Some("engine".into()),
+    details: Some(Box::new(json!({
+      "reference": reference.to_string(), "digest": digest, "signatures": refused,
+    }))),
+    chain: None,
+  })
 }
 
 /// The artifact's config blob: the identity the handshake declared, and nothing more (spec §10.3 —

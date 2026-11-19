@@ -1198,8 +1198,8 @@ engine never repeats it, in an error, an event, a summary or a log, where an `au
 variables as its `auth`. The cache lives at
 `JANUS_COMPONENT_CACHE`, else the user cache directory's `pact-janus/components`, laid out as an OCI image
 layout's `blobs/sha256/<hex>`. A load failure the loader produced carries `source: "engine"` and one of
-`digest-mismatch`, `not-a-component`, `artifact-mismatch`, `not-found`, `unauthorized` or `unavailable`
-as its code, inside the `component-unavailable` of §11.3.
+`digest-mismatch`, `not-a-component`, `artifact-mismatch`, `signature-missing`, `signature-untrusted`,
+`not-found`, `unauthorized` or `unavailable` as its code, inside the `component-unavailable` of §11.3.
 
 The engine records each declared component a consumer session or verification run loaded: its name
 and version, as its handshake gave them, and where its bytes came from, by the digest a declaration
@@ -1210,9 +1210,44 @@ A contract lists them as `metadata.components` (contract-file spec §3.2) and a 
 `components` (engine-protocol spec §9.6). A loader says where it found the bytes, and a loader that
 cannot is recorded by its source's kind alone.
 
-Signature verification is not specified in v1. It belongs on top of digest pinning rather than instead
-of it, and the prototype has no evidence about which scheme the ecosystem would adopt; adding it later
-is additive.
+A declaration may name the signer an `oci` source's artifact must be signed by
+([ADR 0099](../../decisions/0099-verify-a-components-sigstore-signature-found-as-an-oci-referrer-against-the-signer-its-declaration-names.md)).
+It sits on top of the digest, never instead of it. The digest says which bytes, and the signature says
+who published them:
+
+```json component-config
+{ "components": [
+    { "name": "csv",
+      "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-csv:1.2.0", "digest": "sha256:9f2c…",
+                  "signature": { "identity": "https://github.com/acme/janus-csv/.github/workflows/release.yml@refs/tags/v1.2.0",
+                                 "issuer": "https://token.actions.githubusercontent.com" } } } ] }
+```
+
+A signature is a Sigstore bundle attached to the artifact's manifest as an OCI referrer, as `cosign sign`
+writes one. A loader lists the manifest's referrers through the referrers API, or, from a registry
+without it, through the referrers tag schema's index (`sha256-<hex>`). It uses a referrer whose
+`artifactType` begins `application/vnd.dev.sigstore.bundle` and whose `subject` is the manifest digest,
+fetching it and its bundle by digest and checking both as it checks every blob. A bundle counts when it
+is a DSSE envelope over an in-toto statement whose subject is the manifest digest and whose predicate is
+`https://sigstore.dev/cosign/sign/v1` or `https://slsa.dev/provenance/v1`, and when it verifies in full
+against the trusted root: certificate chain, SCT, transparency log entry and envelope signature. Its
+certificate's identity must then match the declaration's. `issuer` is required, with exactly one of
+`identity`, compared exactly, and `identity-pattern`, a regular expression that must match the whole
+identity. A member of `signature` the loader does not know fails the load, because a trust constraint
+that is ignored is not enforced.
+
+The trusted root is the Sigstore public-good instance's, as the engine's release carries it, unless
+`trusted-root` names a trusted root file. The host's loader resolves that path against the configuration
+file, as it resolves a `file` source. Nothing is fetched from Sigstore at run time: a run reaches the
+registry and nothing else. Verification happens after the digest is checked and before a byte is
+compiled, both at load and in `janus component pull`. A pinned component whose signature verified once
+loads again from the cache, its bundle verified again, with no request. A `file` source takes no
+`signature`. A declaration with none loads unverified, as it always has.
+
+A load with no signature from the trusted signer fails with `signature-missing` when nothing is
+attached, and with `signature-untrusted` when something is but none of it verifies as from that signer,
+naming who each one is from or why it does not verify. The engine records the signer it verified with
+the component, as its source's `signer` (contract-file spec §3.2).
 
 ### 10.4 Grants
 

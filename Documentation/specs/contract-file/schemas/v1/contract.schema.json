@@ -304,7 +304,18 @@
       "properties": {
         "kind": { "type": "string", "description": "The declaration's source kind: an open vocabulary, 'oci' and 'file' among it (component-interfaces spec §10.2)." },
         "reference": { "type": "string", "description": "An 'oci' source's reference, its registry, repository and tag, without the digest." },
-        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "The digest a declaration would pin: an 'oci' source's manifest digest as the loader resolved it, or the SHA-256 of a 'file' source's bytes. Absent only when the loader could not say." }
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$", "description": "The digest a declaration would pin: an 'oci' source's manifest digest as the loader resolved it, or the SHA-256 of a 'file' source's bytes. Absent only when the loader could not say." },
+        "signer": { "$ref": "#/$defs/RecordedSigner" }
+      }
+    },
+    "RecordedSigner": {
+      "title": "RecordedSigner",
+      "description": "The signer whose Sigstore signature the loader verified, when the component's declaration named one (component-interfaces spec §10.3, ADR 0099): the identity and OIDC issuer its certificate names. Absent when the declaration named no signer, whether or not the artifact was signed, since nothing was verified.",
+      "type": "object",
+      "required": ["identity", "issuer"],
+      "properties": {
+        "identity": { "type": "string", "minLength": 1 },
+        "issuer": { "type": "string", "minLength": 1 }
       }
     }
   }

@@ -1096,6 +1096,22 @@ pub struct PullArgs {
   #[arg(long, value_name = "sha256:...")]
   pub digest: Option<String>,
 
+  /// The identity its Sigstore signature must name; without this or a pattern, every signer that verifies is reported
+  #[arg(long, value_name = "IDENTITY", conflicts_with = "certificate_identity_regexp")]
+  pub certificate_identity: Option<String>,
+
+  /// A regular expression the whole of the signature's identity must match
+  #[arg(long, value_name = "PATTERN")]
+  pub certificate_identity_regexp: Option<String>,
+
+  /// The OIDC issuer that must have vouched for the signature's identity
+  #[arg(long, value_name = "URL")]
+  pub certificate_oidc_issuer: Option<String>,
+
+  /// A Sigstore trusted root to verify signatures against, in place of the public-good instance's
+  #[arg(long, value_name = "FILE")]
+  pub trusted_root: Option<PathBuf>,
+
   /// text prints a summary and the declaration to paste; json prints one document
   #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
   pub output: Output,

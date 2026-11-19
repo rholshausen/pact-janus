@@ -302,6 +302,12 @@ Three sources are the source of truth and take precedence over this file when th
 > the engine's own version. S5.1b (ADR 0098): the loader also accepts the CNCF Wasm OCI layout `wkg oci
 > push` writes, a Janus component's when its config's `component.exports` names the pipe, checked
 > before the layer is fetched; the handshake alone names it (`tests/oci.rs` pushes with `JANUS_WKG`).
+> S5.1c (ADR 0099): an `oci` source's `signature` names the signer it trusts (`issuer`, and `identity` or
+> a whole-match `identity-pattern`). The loader verifies the Sigstore bundles `cosign sign` attaches as
+> OCI referrers, offline, with `sigstore-verify` on `ring`, against the public-good trusted root it
+> carries or a declared `trusted-root`, and fails as `signature-missing` or `signature-untrusted`. The
+> record names the `signer`, and `janus component pull` takes cosign's flags. `tests/signature.rs`
+> signs with a Sigstore made per test, and keylessly with `cosign` when `JANUS_COSIGN` names one (CI).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -593,6 +599,8 @@ janus publish <contract-pact-or-shape>... [--consumer-app-version <v>] [--provid
               [--broker-username <u> --broker-password <p> | --broker-token <t>]   # pact-broker publish's spellings
 janus component push <component.wasm> <reference> [--output text|json]
 janus component pull <reference> [--digest <sha256:...>] [--output text|json]
+                     [--certificate-identity <id> | --certificate-identity-regexp <re>]
+                     [--certificate-oidc-issuer <url>] [--trusted-root <file>]   # who signed it (S5.1c, ADR 0099)
 janus completions <shell>
 janus version                      # every command also takes --log-level <level>, --no-colour, --error-chain
 ```
@@ -680,6 +688,9 @@ registry that tampers on request, and against a real one when `JANUS_OCI_REGISTR
 (`docker run -d -p 5000:5000 registry:2`, then `JANUS_OCI_REGISTRY=localhost:5000`; CI does this), and
 push with the Bytecode Alliance's `wkg` when `JANUS_WKG` names one (`cargo install wkg --locked --version
 0.16.2`; CI does this too), since the loader reads the CNCF Wasm layout `wkg` publishes (ADR 0098).
+Signatures (ADR 0099) are tested against a Sigstore each test makes (`tests/support/sigstore.rs`), and,
+with `JANUS_COSIGN` naming `cosign` and `JANUS_OCI_REGISTRY` a registry, signed keylessly against the
+public-good instance as the running GitHub workflow, which only CI can do (it pins `cosign` 3.1.4).
 
 `janus-engine` (the subprocess embedding, `cli/src/bin/janus_engine.rs` — ADR 0023, every SDK's primary embedding): built by the
 normal `cargo build`/`cargo test` above (`cargo build -p pact_janus_cli --bin janus-engine`

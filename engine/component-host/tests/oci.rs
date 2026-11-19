@@ -7,6 +7,7 @@ mod support;
 
 use pact_janus_component_host::WasmLoader;
 use pact_janus_component_host::oci::{self, Oci, Reference};
+use pact_janus_component_host::signature::Trust;
 use pact_janus_component_http::HttpTransport;
 use pact_janus_component_json::JsonContent;
 use pact_janus_kernel::component::{
@@ -35,6 +36,11 @@ fn fresh_cache(label: &str) -> PathBuf {
   dir
 }
 
+/// What `janus component pull` holds a pull to when it names no signer: nothing.
+fn any_signer() -> Trust {
+  Trust::new(None, None, None, None).unwrap()
+}
+
 fn csv_bytes() -> Vec<u8> {
   std::fs::read(csv_wasm()).unwrap()
 }
@@ -47,6 +53,7 @@ fn declaration(reference: &str, digest: Option<&str>) -> ComponentDeclaration {
       reference: Some(reference.to_string()),
       digest: digest.map(str::to_string),
       auth: None,
+      signature: None,
     },
     grants: Grants::default(),
     limits: Limits::default(),
@@ -127,8 +134,13 @@ fn a_component_declared_by_tag_is_resolved_and_answers() {
   assert_eq!(decoded, json!([{ "id": "66", "status": "PENDING" }]));
 
   // And the pull a person would run to find out what to pin says the same digest.
-  let (pulled, hello) = loader
-    .pull(&format!("oci://{}/janus-csv:1.0.0", registry.host), None, None)
+  let (pulled, hello, _) = loader
+    .pull(
+      &format!("oci://{}/janus-csv:1.0.0", registry.host),
+      None,
+      None,
+      &any_signer(),
+    )
     .unwrap();
   assert_eq!(pulled.digest, digest);
   assert_eq!(hello["component"]["version"], "1.0.0");
@@ -556,7 +568,7 @@ fn against_a_real_registry() {
   let loader = WasmLoader::with_cache(&cache).unwrap();
   let decoded = load_and_decode(&loader, &declaration(&reference, Some(&pushed.digest)));
   assert_eq!(decoded, json!([{ "id": "66", "status": "PENDING" }]));
-  let (by_tag, _) = loader.pull(&reference, None, None).unwrap();
+  let (by_tag, _, _) = loader.pull(&reference, None, None, &any_signer()).unwrap();
   assert_eq!(
     by_tag.digest, pushed.digest,
     "the registry resolves the tag to what was pushed"
@@ -597,7 +609,7 @@ fn a_component_published_in_the_cncf_wasm_layout_loads_pinned_by_its_digest() {
   let decoded = load_and_decode(&loader, &declaration(&reference, Some(&digest)));
   assert_eq!(decoded, json!([{ "id": "66", "status": "PENDING" }]));
   // With no name in the config, the handshake alone says which component it is.
-  let (pulled, hello) = loader.pull(&reference, None, None).unwrap();
+  let (pulled, hello, _) = loader.pull(&reference, None, None, &any_signer()).unwrap();
   assert_eq!(
     (pulled.layout, pulled.digest.as_str()),
     (oci::Layout::Wasm, digest.as_str())
@@ -664,6 +676,8 @@ fn a_component_pushed_with_wkg_loads() {
   let loader = WasmLoader::with_cache(fresh_cache("wkg")).unwrap();
   let decoded = load_and_decode(&loader, &declaration(&reference, Some(&digest)));
   assert_eq!(decoded, json!([{ "id": "66", "status": "PENDING" }]));
-  let (pulled, _) = loader.pull(&reference, Some(&digest), None).unwrap();
+  let (pulled, _, _) = loader
+    .pull(&reference, Some(&digest), None, &any_signer())
+    .unwrap();
   assert_eq!(pulled.layout, oci::Layout::Wasm);
 }

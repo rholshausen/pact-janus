@@ -306,6 +306,16 @@ export interface RecordedSource {
    * The digest a declaration would pin: an 'oci' source's manifest digest as the loader resolved it, or the SHA-256 of a 'file' source's bytes. Absent only when the loader could not say.
    */
   digest?: string;
+  signer?: RecordedSigner;
+  [k: string]: unknown;
+}
+
+/**
+ * The signer whose Sigstore signature the loader verified, when the component's declaration named one (component-interfaces spec §10.3, ADR 0099): the identity and OIDC issuer its certificate names. Absent when the declaration named no signer, whether or not the artifact was signed, since nothing was verified.
+ */
+export interface RecordedSigner {
+  identity: string;
+  issuer: string;
   [k: string]: unknown;
 }
 

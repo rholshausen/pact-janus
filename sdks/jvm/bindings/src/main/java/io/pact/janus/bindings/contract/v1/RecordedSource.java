@@ -27,7 +27,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({
     "kind",
     "reference",
-    "digest"
+    "digest",
+    "signer"
 })
 public class RecordedSource {
 
@@ -53,6 +54,15 @@ public class RecordedSource {
     @JsonProperty("digest")
     @JsonPropertyDescription("The digest a declaration would pin: an 'oci' source's manifest digest as the loader resolved it, or the SHA-256 of a 'file' source's bytes. Absent only when the loader could not say.")
     private String digest;
+    /**
+     * RecordedSigner
+     * <p>
+     * The signer whose Sigstore signature the loader verified, when the component's declaration named one (component-interfaces spec §10.3, ADR 0099): the identity and OIDC issuer its certificate names. Absent when the declaration named no signer, whether or not the artifact was signed, since nothing was verified.
+     * 
+     */
+    @JsonProperty("signer")
+    @JsonPropertyDescription("The signer whose Sigstore signature the loader verified, when the component's declaration named one (component-interfaces spec \u00a710.3, ADR 0099): the identity and OIDC issuer its certificate names. Absent when the declaration named no signer, whether or not the artifact was signed, since nothing was verified.")
+    private RecordedSigner signer;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -112,6 +122,28 @@ public class RecordedSource {
         this.digest = digest;
     }
 
+    /**
+     * RecordedSigner
+     * <p>
+     * The signer whose Sigstore signature the loader verified, when the component's declaration named one (component-interfaces spec §10.3, ADR 0099): the identity and OIDC issuer its certificate names. Absent when the declaration named no signer, whether or not the artifact was signed, since nothing was verified.
+     * 
+     */
+    @JsonProperty("signer")
+    public RecordedSigner getSigner() {
+        return signer;
+    }
+
+    /**
+     * RecordedSigner
+     * <p>
+     * The signer whose Sigstore signature the loader verified, when the component's declaration named one (component-interfaces spec §10.3, ADR 0099): the identity and OIDC issuer its certificate names. Absent when the declaration named no signer, whether or not the artifact was signed, since nothing was verified.
+     * 
+     */
+    @JsonProperty("signer")
+    public void setSigner(RecordedSigner signer) {
+        this.signer = signer;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -138,6 +170,10 @@ public class RecordedSource {
         sb.append('=');
         sb.append(((this.digest == null)?"<null>":this.digest));
         sb.append(',');
+        sb.append("signer");
+        sb.append('=');
+        sb.append(((this.signer == null)?"<null>":this.signer));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -157,6 +193,7 @@ public class RecordedSource {
         result = ((result* 31)+((this.digest == null)? 0 :this.digest.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.kind == null)? 0 :this.kind.hashCode()));
+        result = ((result* 31)+((this.signer == null)? 0 :this.signer.hashCode()));
         return result;
     }
 
@@ -169,7 +206,7 @@ public class RecordedSource {
             return false;
         }
         RecordedSource rhs = ((RecordedSource) other);
-        return (((((this.reference == rhs.reference)||((this.reference!= null)&&this.reference.equals(rhs.reference)))&&((this.digest == rhs.digest)||((this.digest!= null)&&this.digest.equals(rhs.digest))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))));
+        return ((((((this.reference == rhs.reference)||((this.reference!= null)&&this.reference.equals(rhs.reference)))&&((this.digest == rhs.digest)||((this.digest!= null)&&this.digest.equals(rhs.digest))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.kind == rhs.kind)||((this.kind!= null)&&this.kind.equals(rhs.kind))))&&((this.signer == rhs.signer)||((this.signer!= null)&&this.signer.equals(rhs.signer))));
     }
 
 }

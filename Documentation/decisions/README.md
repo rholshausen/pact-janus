@@ -115,6 +115,7 @@ superseding ADR instead.
 | [0096](0096-narrow-the-entries-a-check-tries-by-what-each-selector-fixes-and-a-prefix-an-operator-declares.md) | Narrow the entries a check tries by what each selector fixes, and a prefix an operator declares | accepted |
 | [0097](0097-record-each-declared-component-a-session-or-run-loaded-by-the-digest-a-declaration-would-pin.md) | Record each declared component a session or run loaded, by the digest a declaration would pin | accepted |
 | [0098](0098-accept-a-component-published-in-the-cncf-wasm-layout-recognised-by-the-pipe-its-config-says-it-exports.md) | Accept a component published in the CNCF Wasm layout, recognised by the pipe its config says it exports | accepted |
+| [0099](0099-verify-a-components-sigstore-signature-found-as-an-oci-referrer-against-the-signer-its-declaration-names.md) | Verify a component's Sigstore signature, found as an OCI referrer, against the signer its declaration names | accepted |
 
 ## Decision backlog
 

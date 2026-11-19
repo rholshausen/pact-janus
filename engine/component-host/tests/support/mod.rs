@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 pub mod registry;
+pub mod sigstore;
 
 use std::path::PathBuf;
 use std::process::Command;

@@ -84,6 +84,11 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
+    # ADR 0099: an OIDC token, so `cosign` can sign the CSV component keylessly as this workflow and
+    # tests/signature.rs can load it under a declaration naming it. Nothing else here writes anything.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -125,6 +130,18 @@ jobs:
         run: |
           cargo install wkg --locked --version 0.16.2
           echo "JANUS_WKG=$(command -v wkg)" >> "$GITHUB_ENV"
+      # ADR 0099: a component signed keylessly in CI loads under a declaration naming this workflow, and
+      # under no other. tests/signature.rs pushes the CSV component to the registry above and signs it
+      # with `cosign` when JANUS_COSIGN names one, against the Sigstore public-good instance. Pinned and
+      # checked against its release's checksum; Linux only, as the registry is; and not on a fork's pull
+      # request, which GitHub gives no OIDC token. Each run adds an entry to the public Rekor log.
+      - name: cosign (Linux)
+        if: runner.os == 'Linux' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/cosign" https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64
+          echo "424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa  $RUNNER_TEMP/cosign" | sha256sum -c
+          chmod +x "$RUNNER_TEMP/cosign"
+          echo "JANUS_COSIGN=$RUNNER_TEMP/cosign" >> "$GITHUB_ENV"
       # ADR 0092: a Pact Broker hosts the engine's WASM component, the Ruby broker with the wasmtime
       # gem. engine/component-host/tests/engine_wasm.rs holds that host (engine/wasm/hosts/ruby) to
       # the native engine when JANUS_RUBY names a Ruby with its gems. Linux only, as the broker's

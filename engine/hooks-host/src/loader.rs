@@ -118,8 +118,8 @@ pub fn resolve(document: &Value, base: &Path, env: &HashMap<String, String>) -> 
 }
 
 /// The project's `components` (component-interfaces spec §10.2), with step 3 applied: a `file`
-/// source's path is relative to the configuration file, and the engine — which reads no
-/// configuration — is handed it absolute. Each entry is checked against the kernel's own
+/// source's path, and a signature's `trusted-root`, are relative to the configuration file, and the
+/// engine — which reads no configuration — is handed them absolute. Each entry is checked against the kernel's own
 /// declaration model, so a malformed one fails here, naming its position, rather than at `verify`.
 fn resolve_components(components: &Value, base: &Path) -> Result<Value, LoadError> {
   let Some(entries) = components.as_array() else {
@@ -144,6 +144,14 @@ fn resolve_components(components: &Value, base: &Path) -> Result<Value, LoadErro
     {
       let full = resolve_path(reference, base);
       entry["source"]["reference"] = Value::String(full.display().to_string());
+    }
+    // ADR 0099: a signature's trusted root is a file the loader reads, so it is resolved alike.
+    if let Some(root) = entry
+      .pointer("/source/signature/trusted-root")
+      .and_then(Value::as_str)
+    {
+      let full = resolve_path(root, base);
+      entry["source"]["signature"]["trusted-root"] = Value::String(full.display().to_string());
     }
     resolved.push(entry);
   }
@@ -520,6 +528,39 @@ hooks:
           "grants": { "network": false }, "limits": { "deadline-ms": 500 } },
         { "name": "xml", "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-xml:1" } } ])
     );
+  }
+
+  /// ADR 0099: a signature's trusted root is a file, resolved as a `file` source's path is; the rest
+  /// of the signature passes as written.
+  #[test]
+  fn a_signatures_trusted_root_resolves_against_the_configuration_file() {
+    let document = json!({
+      "components": [
+        { "name": "csv", "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-csv:1",
+            "signature": { "identity": "https://github.com/acme/janus-csv/.github/workflows/release.yml@refs/heads/main",
+                           "issuer": "https://token.actions.githubusercontent.com", "trusted-root": "sigstore/root.json" } } } ]
+    });
+    let resolved = resolve(&document, Path::new("/projects/orders"), &env(&[])).expect("resolves");
+    assert_eq!(
+      resolved["components"][0]["source"]["signature"],
+      json!({ "identity": "https://github.com/acme/janus-csv/.github/workflows/release.yml@refs/heads/main",
+              "issuer": "https://token.actions.githubusercontent.com",
+              "trusted-root": joined("/projects/orders", "sigstore/root.json") })
+    );
+
+    let unknown = json!({ "components": [ { "name": "csv", "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-csv:1",
+      "signature": { "identity": "a", "issuer": "b", "repository": "acme/janus-csv" } } } ] });
+    match resolve(&unknown, Path::new("."), &env(&[])).expect_err("an unknown constraint") {
+      LoadError::Invalid(problems) => {
+        assert_eq!(problems[0].pointer, "/components/0");
+        assert!(
+          problems[0].message.contains("repository"),
+          "{}",
+          problems[0].message
+        );
+      }
+      other => panic!("expected an invalid document, got {other:?}"),
+    }
   }
 
   /// ADR 0052: a component's registry credential is declared, and interpolated like any other

@@ -45,6 +45,27 @@ pub struct Source {
   /// interpolated it: the only one a run's loader presents.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub auth: Option<SourceAuth>,
+  /// The signer an `oci` source's artifact must carry a Sigstore signature from (spec §10.3,
+  /// ADR 0099). Without one, nothing is verified and the digest is the only integrity there is.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub signature: Option<SignatureTrust>,
+}
+
+/// Who a component's signature must come from (spec §10.3, ADR 0099): the identity a Sigstore
+/// certificate names, exactly or by a pattern matching the whole of it, and the OIDC issuer that
+/// vouched for it. `trusted-root` is a Sigstore trusted root to verify against in place of the
+/// public-good instance's, which the loader carries; a path, which the host's loader resolves
+/// against the configuration file (lifecycle-hooks spec §7.1).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignatureTrust {
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub identity: Option<String>,
+  #[serde(rename = "identity-pattern", default, skip_serializing_if = "Option::is_none")]
+  pub identity_pattern: Option<String>,
+  pub issuer: String,
+  #[serde(rename = "trusted-root", default, skip_serializing_if = "Option::is_none")]
+  pub trusted_root: Option<String>,
 }
 
 /// A registry credential, in the broker descriptor's shape (engine-protocol spec §8.7): `basic` takes
@@ -154,6 +175,16 @@ pub struct Loaded {
 pub struct Fetched {
   pub reference: Option<String>,
   pub digest: String,
+  /// The signer the loader verified, when the declaration named one (ADR 0099).
+  pub signer: Option<Signer>,
+}
+
+/// A signer a loader verified (ADR 0099): the identity its Sigstore certificate names and the issuer
+/// that vouched for it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Signer {
+  pub identity: String,
+  pub issuer: String,
 }
 
 /// A way of loading components, which an embedding registers (ADR 0013: hosting is a capability of
@@ -402,6 +433,7 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
     source: RecordedSource {
       kind: declaration.source.kind.clone(),
       reference: fetched.as_ref().and_then(|f| f.reference.clone()),
+      signer: fetched.as_ref().and_then(|f| f.signer.clone()),
       digest: fetched.map(|f| f.digest),
     },
   })

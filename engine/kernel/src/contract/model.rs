@@ -184,7 +184,8 @@ pub struct RecordedComponent {
 
 /// Where a recorded component's bytes came from: the declaration's `kind`, an `oci` source's
 /// reference without its digest, and the digest a declaration would pin. Never a `file` source's
-/// path, which differs between machines, and never a credential.
+/// path, which differs between machines, and never a credential. `signer` is the signer the loader
+/// verified, when the declaration named one (ADR 0099).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecordedSource {
   pub kind: String,
@@ -192,6 +193,8 @@ pub struct RecordedSource {
   pub reference: Option<String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub digest: Option<String>,
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub signer: Option<crate::component::Signer>,
 }
 
 impl RecordedComponent {

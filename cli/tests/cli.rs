@@ -15,6 +15,8 @@
 
 #[path = "../../engine/component-host/tests/support/registry.rs"]
 mod registry;
+#[path = "../../engine/component-host/tests/support/sigstore.rs"]
+mod sigstore;
 
 use pact_janus_sample_order_service::{Config, Provider, start};
 use serde_json::{Value, json};
@@ -2899,4 +2901,107 @@ fn component_pull_says_what_to_pin_and_refuses_what_is_not_what_it_claims() {
   drop(registry);
   let unreachable = janus_cached(&tampered_cache, &["component", "pull", &reference]);
   assert_eq!(code(&unreachable), 2, "{}", stderr(&unreachable));
+}
+
+/// ADR 0099: `pull` reports who signed a component, verified against the trusted root, and prints a
+/// declaration naming that signer; held to a signer it names, it refuses another as the subject
+/// failing.
+#[test]
+fn component_pull_names_the_signer_it_verified() {
+  let registry = registry::Registry::start();
+  let reference = format!("{}/janus-csv:1.0.0", registry.host);
+  let pushed = janus_cached(
+    &temp("oci-signed-push-cache"),
+    &[
+      "component",
+      "push",
+      &csv_component(),
+      &reference,
+      "--output",
+      "json",
+    ],
+  );
+  assert_eq!(code(&pushed), 0, "{}", stderr(&pushed));
+  let digest = serde_json::from_slice::<Value>(&pushed.stdout).expect("JSON")["digest"]
+    .as_str()
+    .unwrap()
+    .to_string();
+  let sigstore = sigstore::Sigstore::new();
+  let root = temp("oci-signed-trusted-root.json");
+  std::fs::write(&root, sigstore.trusted_root()).unwrap();
+  let bundle = sigstore.sign(&digest, &sigstore::Signing::default());
+  let size = registry.manifest("janus-csv", &digest).unwrap().len();
+  let (manifest, blobs) = sigstore::referrer(&digest, size, &bundle);
+  registry.attach("janus-csv", &digest, &manifest, &blobs);
+  let (identity, issuer) = (
+    "https://github.com/acme/janus-csv/.github/workflows/release.yml@refs/heads/main",
+    "https://token.actions.githubusercontent.com",
+  );
+
+  let cache = temp("oci-signed-pull-cache");
+  let _ = std::fs::remove_dir_all(&cache);
+  let pulled = janus_cached(
+    &cache,
+    &["component", "pull", &reference, "--trusted-root", &root],
+  );
+  let text = stdout(&pulled);
+  assert_eq!(code(&pulled), 0, "{}", stderr(&pulled));
+  assert!(
+    text.contains(&format!("signed by: {identity} (issuer {issuer})")),
+    "{text}"
+  );
+  assert!(
+    text.contains(&format!(
+      "        signature: {{ identity: \"{identity}\", issuer: \"{issuer}\", trusted-root: {} }}",
+      Value::from(root.as_str())
+    )),
+    "{text}"
+  );
+  let json = janus_cached(
+    &cache,
+    &[
+      "component",
+      "pull",
+      &reference,
+      "--trusted-root",
+      &root,
+      "--output",
+      "json",
+    ],
+  );
+  let answer: Value = serde_json::from_slice(&json.stdout).expect("JSON");
+  assert_eq!(
+    answer["signers"],
+    json!([ { "identity": identity, "issuer": issuer } ])
+  );
+
+  let someone_else = janus_cached(
+    &cache,
+    &[
+      "component",
+      "pull",
+      &reference,
+      "--trusted-root",
+      &root,
+      "--certificate-identity",
+      "someone-else",
+      "--certificate-oidc-issuer",
+      issuer,
+    ],
+  );
+  assert_eq!(code(&someone_else), 1, "{}", stderr(&someone_else));
+  assert!(
+    stderr(&someone_else).contains("signature-untrusted"),
+    "{}",
+    stderr(&someone_else)
+  );
+
+  // Against the public-good instance's root, the test's Sigstore signed nothing.
+  let public = janus_cached(&cache, &["component", "pull", &reference]);
+  assert_eq!(code(&public), 0, "{}", stderr(&public));
+  assert!(
+    stdout(&public).contains("signed by: no signature that verifies"),
+    "{}",
+    stdout(&public)
+  );
 }

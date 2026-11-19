@@ -571,7 +571,8 @@ the engine there is exactly one transformation, performed by the loader, and it 
 1. **interpolate** every `${VAR}` reference from the environment (§7.2);
 2. **inline** every script: read `run.path`, transpile it if it is TypeScript, and put the JavaScript in
    `run.source`;
-3. **resolve** relative paths (`cwd`, component sources) against the configuration file's directory;
+3. **resolve** relative paths (`cwd`, component sources, a component signature's `trusted-root`) against
+   the configuration file's directory;
 4. **validate** the result against the resolved schema and reject anything left over.
 
 The engine therefore receives a document with no templates, no paths and no file references, and holds no

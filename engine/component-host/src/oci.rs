@@ -58,6 +58,11 @@ const ACCEPT_MANIFESTS: &str =
   "application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json";
 /// The OCI distribution spec's recommended ceiling on a manifest a registry will accept.
 const MAX_MANIFEST_BYTES: u64 = 4 * 1024 * 1024;
+/// A Sigstore bundle is a few kilobytes: a certificate, a signature, a log entry and its proof.
+const MAX_BUNDLE_BYTES: u64 = 1024 * 1024;
+/// How many referrers carrying a bundle a manifest's signatures are looked for among. Each is a
+/// manifest and a blob to fetch, and a component has a signature or two, not a hundred.
+const MAX_SIGNATURE_REFERRERS: usize = 16;
 
 /// A parsed artifact reference: `registry/repository[:tag][@sha256:…]`, with an optional `oci://`.
 #[derive(Debug, Clone, PartialEq)]
@@ -390,6 +395,166 @@ impl Oci {
       config,
       wasm,
     })
+  }
+
+  /// The Sigstore bundles attached to the manifest `digest` as OCI referrers (ADR 0099 decision 1):
+  /// listed by the referrers API, or, from a registry without one, by the referrers tag schema's
+  /// index (`sha256-<hex>`), which is where `cosign` writes them then. Each referrer manifest and
+  /// bundle is fetched by digest and checked as every blob is, and a referrer whose `subject` is not
+  /// `digest` is passed over, since a tag is anyone's to write. What was found is remembered in the
+  /// cache for [`Oci::cached_bundles`].
+  pub fn bundles(
+    &self,
+    reference: &Reference,
+    digest: &str,
+    auth: Option<&Credentials>,
+  ) -> Result<Vec<Attached>, ComponentError> {
+    let listing = format!("{}/referrers/{digest}", reference.api());
+    let response = self.send(
+      reference,
+      auth,
+      "GET",
+      &listing,
+      &[("accept", INDEX_MEDIA_TYPE)],
+      None,
+    )?;
+    // The distribution spec's answer from a registry without the API is a 404; some say 400 or 405.
+    let index = if matches!(response.status().as_u16(), 404 | 400 | 405) {
+      let tag = digest.replace(':', "-");
+      let url = format!("{}/manifests/{tag}", reference.api());
+      let response = self.send(
+        reference,
+        auth,
+        "GET",
+        &url,
+        &[("accept", INDEX_MEDIA_TYPE)],
+        None,
+      )?;
+      if response.status() == 404 {
+        None
+      } else {
+        Some(read_index(
+          reference,
+          expect(reference, response, &[200], "listing signatures")?,
+        )?)
+      }
+    } else {
+      Some(read_index(
+        reference,
+        expect(reference, response, &[200], "listing signatures")?,
+      )?)
+    };
+    let referrers: Vec<String> = index
+      .as_ref()
+      .and_then(|index| index.get("manifests"))
+      .and_then(Value::as_array)
+      .into_iter()
+      .flatten()
+      .filter(|descriptor| {
+        descriptor
+          .get("artifactType")
+          .and_then(Value::as_str)
+          .is_some_and(|t| t.starts_with(crate::signature::BUNDLE_MEDIA_TYPE_PREFIX))
+      })
+      .filter_map(|descriptor| check_digest(descriptor.get("digest")?.as_str()?).ok())
+      .take(MAX_SIGNATURE_REFERRERS)
+      .collect();
+    // One referrer that cannot be fetched is a reason it is no signature, not a reason the others
+    // are not: a deleted or oversized one must not hide the one that verifies.
+    let (mut attached, mut fetched) = (Vec::new(), Vec::new());
+    for referrer in &referrers {
+      match self.referrer_bundles(reference, auth, digest, referrer) {
+        Ok(bundles) => {
+          if bundles.iter().all(|bundle| bundle.bytes.is_ok()) {
+            fetched.push(referrer.clone());
+          }
+          attached.extend(bundles);
+        }
+        Err(err) => attached.push(Attached {
+          referrer: referrer.clone(),
+          bytes: Err(format!("it could not be fetched: {}", err.message)),
+        }),
+      }
+    }
+    self.remember_referrers(digest, &fetched);
+    Ok(attached)
+  }
+
+  /// The bundles a previous [`Oci::bundles`] found for `digest`, read from the cache alone, so a pinned
+  /// component whose signature verified once loads again without a request (spec §10.3 step 3). Each
+  /// is re-hashed, as every cached blob is, and is verified again by whoever asked: the cache decides
+  /// nothing. `None` when nothing was remembered, or something remembered is gone.
+  pub fn cached_bundles(&self, reference: &Reference, digest: &str) -> Option<Vec<Attached>> {
+    let listed = std::fs::read(self.referrers_path(digest)).ok()?;
+    let referrers: Vec<String> = serde_json::from_slice(&listed).ok()?;
+    let mut attached = Vec::new();
+    for referrer in &referrers {
+      let manifest = self.cached(referrer)?;
+      for (layer, size) in bundle_layers(&manifest, digest)? {
+        let bytes = self.cached(&layer)?;
+        if bytes.len() as u64 != size {
+          return None;
+        }
+        attached.push(Attached {
+          referrer: referrer.clone(),
+          bytes: Ok(bytes),
+        });
+      }
+    }
+    tracing::debug!(%reference, %digest, bundles = attached.len(), "signatures from the component cache");
+    Some(attached)
+  }
+
+  fn referrer_bundles(
+    &self,
+    reference: &Reference,
+    auth: Option<&Credentials>,
+    digest: &str,
+    referrer: &str,
+  ) -> Result<Vec<Attached>, ComponentError> {
+    let manifest = self.content(reference, auth, referrer, "manifests", MAX_MANIFEST_BYTES)?;
+    let Some(layers) = bundle_layers(&manifest, digest) else {
+      tracing::debug!(%reference, %referrer, "a referrer that is not a signature of {digest}; passed over");
+      return Ok(Vec::new());
+    };
+    let mut attached = Vec::new();
+    for (layer, size) in layers {
+      if size > MAX_BUNDLE_BYTES {
+        attached.push(Attached {
+          referrer: referrer.to_string(),
+          bytes: Err(format!(
+            "its bundle is {size} bytes, and a bundle is at most {MAX_BUNDLE_BYTES}"
+          )),
+        });
+        continue;
+      }
+      let bytes = self.content(reference, auth, &layer, "blobs", size)?;
+      check_size(reference, &Descriptor { digest: layer, size }, &bytes)?;
+      attached.push(Attached {
+        referrer: referrer.to_string(),
+        bytes: Ok(bytes),
+      });
+    }
+    Ok(attached)
+  }
+
+  fn referrers_path(&self, digest: &str) -> PathBuf {
+    let hex = digest.strip_prefix("sha256:").unwrap_or(digest);
+    self.cache.join("referrers").join("sha256").join(hex)
+  }
+
+  /// Best effort, as [`Oci::store`] is.
+  fn remember_referrers(&self, digest: &str, referrers: &[String]) {
+    let path = self.referrers_path(digest);
+    let write = || -> std::io::Result<()> {
+      std::fs::create_dir_all(path.parent().expect("a referrers path has a directory"))?;
+      let temporary = path.with_extension(format!("{}.partial", std::process::id()));
+      std::fs::write(&temporary, serde_json::to_vec(referrers)?)?;
+      std::fs::rename(&temporary, &path)
+    };
+    if let Err(err) = write() {
+      tracing::warn!(%digest, cache = %self.cache.display(), error = %err, "could not write the component cache");
+    }
   }
 
   /// Upload a component: its config blob, its layer, and a manifest naming both, tagged as the
@@ -756,6 +921,62 @@ fn challenge_params(text: &str) -> HashMap<String, String> {
 struct Descriptor {
   digest: String,
   size: u64,
+}
+
+/// A Sigstore bundle attached to a component's manifest, and the referrer manifest that carried it:
+/// its bytes, or why they could not be had.
+#[derive(Debug, Clone)]
+pub struct Attached {
+  pub referrer: String,
+  pub bytes: Result<Vec<u8>, String>,
+}
+
+fn read_index(
+  reference: &Reference,
+  mut response: ureq::http::Response<ureq::Body>,
+) -> Result<Value, ComponentError> {
+  let bytes = response
+    .body_mut()
+    .with_config()
+    .limit(MAX_MANIFEST_BYTES)
+    .read_to_vec()
+    .map_err(|err| unreachable_registry(reference, &format!("reading the list of signatures: {err}")))?;
+  serde_json::from_slice(&bytes).map_err(|err| {
+    unreachable_registry(
+      reference,
+      &format!("the registry listed signatures in something other than an image index: {err}"),
+    )
+  })
+}
+
+/// A referrer manifest's bundle layers, by digest and size, when its `subject` is `digest`: `None`
+/// when it is about something else, or is not a manifest.
+fn bundle_layers(manifest: &[u8], digest: &str) -> Option<Vec<(String, u64)>> {
+  let manifest: Value = serde_json::from_slice(manifest).ok()?;
+  let subject = manifest.pointer("/subject/digest").and_then(Value::as_str)?;
+  if subject != digest {
+    return None;
+  }
+  Some(
+    manifest
+      .get("layers")
+      .and_then(Value::as_array)
+      .into_iter()
+      .flatten()
+      .filter(|layer| {
+        layer
+          .get("mediaType")
+          .and_then(Value::as_str)
+          .is_some_and(|t| t.starts_with(crate::signature::BUNDLE_MEDIA_TYPE_PREFIX))
+      })
+      .filter_map(|layer| {
+        Some((
+          check_digest(layer.get("digest")?.as_str()?).ok()?,
+          layer.get("size")?.as_u64()?,
+        ))
+      })
+      .collect(),
+  )
 }
 
 /// A manifest is a Janus component's when it says so: `artifactType`, or — for a reader that

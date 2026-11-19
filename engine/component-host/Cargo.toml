@@ -17,6 +17,13 @@ tracing = "0.1"
 # push and a pull need. Already in the tree — the HTTP transport and the hooks host use it — and
 # blocking on purpose: a load is synchronous, and an async registry client would bring a runtime.
 ureq = "3"
+# Signature verification (S5.1c, ADR 0099): the Sigstore project's own Rust verifier, offline and
+# synchronous, without its default aws-lc provider, which this workspace does not build. `ring`, which
+# the TLS stack already uses (engine/http-client), is installed as its provider instead.
+sigstore-verify = { version = "0.16", default-features = false }
+ring = "0.17"
+# A declaration's `identity-pattern`, matched against the whole identity a certificate names.
+regex = "1"
 wasmtime = { version = "50", default-features = false, features = ["component-model", "cranelift", "runtime", "std", "parallel-compilation", "cache"] }
 wasmtime-wasi = { version = "50", default-features = false }
 
@@ -32,6 +39,10 @@ pact_janus_sample_order_service = { path = "../../samples/order-service" }
 # read, and able to misbehave on request — which a real registry cannot be asked to do. Already in
 # the tree, as the HTTP transport's server.
 tiny_http = "0.12"
+# The Sigstore the signature tests sign with (tests/support/sigstore.rs): a CA, a CT log and a Rekor
+# log made per test, in the certificate and TLS encodings the verifier reads. Both already in the tree,
+# beneath sigstore-verify.
+x509-cert = { version = "0.2", features = ["sct"] }
 
 [lints]
 workspace = true

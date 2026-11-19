@@ -44,7 +44,32 @@
           "type": "string",
           "description": "Expected manifest digest, e.g. 'sha256:...'. When present it MUST match before any bytes are instantiated. A tag is a name; a digest is the artifact — CI should pin (spec.md §10.3)."
         },
-        "auth": { "$ref": "#/$defs/SourceAuth" }
+        "auth": { "$ref": "#/$defs/SourceAuth" },
+        "signature": { "$ref": "#/$defs/SignatureTrust" }
+      }
+    },
+    "SignatureTrust": {
+      "title": "SignatureTrust",
+      "description": "The signer an 'oci' source's artifact must carry a Sigstore signature from: a bundle attached to its manifest as an OCI referrer, as 'cosign sign' writes one, verified offline against the trusted root (spec.md §10.3, ADR 0099). 'issuer' is required, with exactly one of 'identity', compared exactly, and 'identity-pattern', a regular expression matching the whole identity. A member a loader does not know fails the load: a trust constraint that is ignored is not enforced. A 'file' source takes none. Without one, nothing is verified and the digest is the only integrity.",
+      "type": "object",
+      "required": ["issuer"],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "description": "The identity the signing certificate names, exactly: for a GitHub workflow, 'https://github.com/<owner>/<repo>/.github/workflows/<file>@<ref>'."
+        },
+        "identity-pattern": {
+          "type": "string",
+          "description": "A regular expression the whole of the certificate's identity must match."
+        },
+        "issuer": {
+          "type": "string",
+          "description": "The OIDC issuer that vouched for the identity: for GitHub Actions, 'https://token.actions.githubusercontent.com'."
+        },
+        "trusted-root": {
+          "type": "string",
+          "description": "A Sigstore trusted root file to verify against in place of the public-good instance's, which the engine carries. A path, which the host's loader resolves against the configuration file (lifecycle-hooks spec §7.1)."
+        }
       }
     },
     "SourceAuth": {

@@ -60,6 +60,7 @@ fn declaration(network: bool, grants: Grants, deadline_ms: Option<u64>) -> Compo
       reference: Some(fixture(network)),
       digest: None,
       auth: None,
+      signature: None,
     },
     grants,
     limits: Limits {

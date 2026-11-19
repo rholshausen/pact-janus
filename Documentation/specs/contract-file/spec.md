@@ -269,7 +269,10 @@ a repository, say — SHOULD omit `created`, since a per-run timestamp defeats �
 §10.3, [ADR 0097](../../decisions/0097-record-each-declared-component-a-session-or-run-loaded-by-the-digest-a-declaration-would-pin.md)):
 its `name` and `version`, as its handshake gave them, and its `source` — the declaration's `kind`, an
 `oci` source's `reference` without its digest, and the `digest` a declaration would pin, which for a
-`file` source is the SHA-256 of its bytes. A `file` source's path is never written, since it differs
+`file` source is the SHA-256 of its bytes. When the declaration named the signer it trusts, `source`
+also has the `signer` the loader verified, its `identity` and `issuer`
+([ADR 0099](../../decisions/0099-verify-a-components-sigstore-signature-found-as-an-oci-referrer-against-the-signer-its-declaration-names.md)).
+A `file` source's path is never written, since it differs
 between machines, and nor is a credential. The embedding's own in-tree components are not listed, and
 the member is absent when the session declared none. Entries are sorted by `name`, then `version`,
 then the canonical bytes of `source`. A contract merged from several test files (§2.4) lists every

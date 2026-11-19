@@ -52,11 +52,11 @@ public class SessionConfig {
     @JsonProperty("provider")
     private Party provider;
     /**
-     * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
+     * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path, and a signature's 'trusted-root', made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
      * 
      */
     @JsonProperty("components")
-    @JsonPropertyDescription("The project's declared components, **resolved** by the host's loader (spec.md \u00a78.2, lifecycle-hooks spec \u00a77.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create \u2014 not the first interaction that needs one \u2014 when one cannot be loaded. A session's components are its own and end with it.")
+    @JsonPropertyDescription("The project's declared components, **resolved** by the host's loader (spec.md \u00a78.2, lifecycle-hooks spec \u00a77.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path, and a signature's 'trusted-root', made absolute. The engine loads them when the session is created and fails the create \u2014 not the first interaction that needs one \u2014 when one cannot be loaded. A session's components are its own and end with it.")
     private List<Map<String, Object>> components;
     /**
      * Redaction
@@ -119,7 +119,7 @@ public class SessionConfig {
     }
 
     /**
-     * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
+     * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path, and a signature's 'trusted-root', made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
      * 
      */
     @JsonProperty("components")
@@ -128,7 +128,7 @@ public class SessionConfig {
     }
 
     /**
-     * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
+     * The project's declared components, **resolved** by the host's loader (spec.md §8.2, lifecycle-hooks spec §7.1): each entry is design 2.6's ComponentDeclaration (component-interfaces component-config.schema.json) with a 'file' source's path, and a signature's 'trusted-root', made absolute. The engine loads them when the session is created and fails the create — not the first interaction that needs one — when one cannot be loaded. A session's components are its own and end with it.
      * 
      */
     @JsonProperty("components")

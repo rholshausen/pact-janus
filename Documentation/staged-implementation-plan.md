@@ -2949,9 +2949,30 @@ The component model, opened to the ecosystem.
     where the trust root comes from offline, and what an unsigned component does by default.
     *Exit:* a component signed keylessly in CI loads under a declaration naming that workflow's
     identity, and is refused under any other, or with its signature removed.
+    *Done 2026-11-19* ([ADR 0099](decisions/0099-verify-a-components-sigstore-signature-found-as-an-oci-referrer-against-the-signer-its-declaration-names.md)):
+    - An `oci` source's `signature` names an `issuer` and an `identity` or an `identity-pattern`, which
+      must match the whole identity. The loader lists the manifest's referrers (the referrers API, else
+      the referrers tag schema, as `registry:2` needs) and verifies each Sigstore bundle offline with
+      `sigstore-verify`. A bundle counts when it is a DSSE statement about the manifest digest, `cosign
+      sign`'s or SLSA provenance. The load fails as `signature-missing` or `signature-untrusted`
+      otherwise. This happens after the digest and before compiling, at load and at `janus component
+      pull`, which takes cosign's flag spellings and reports who signed.
+    - The verifier: `sigstore-verify` 0.16, the Sigstore project's own, on a `ring` provider, since the
+      workspace builds no aws-lc. The trust root: the public-good instance's, as that crate carries it,
+      or a declared `trusted-root` file, so a run fetches nothing from Sigstore. Unsigned is the
+      default: a declaration with no `signature` loads as before.
+    - The record S5.1a writes has `signer: { identity, issuer }` in a component's `source`.
+    - `tests/signature.rs` verifies against a Sigstore made per test (a CA with an SCT-issuing CT log
+      and a Rekor log, `tests/support/sigstore.rs`), declared as a trusted root, with nothing relaxed.
+      `signed_keylessly_in_ci` is the exit itself: CI's Linux job signs the CSV component with
+      `cosign` 3.1.4 as its own workflow and loads it, refused under another identity and with no
+      signature. It runs where GitHub mints an OIDC token, so not on a fork's pull request.
+    - Not foreseen: a pinned component whose signature verified loads again from the cache with no
+      request, which needed the referrers a load found remembered beside the blobs. Each bundle is
+      verified again on every load.
   - **S5.1d Generally available** — **S**, after S5.4 and S5.3: the component interfaces declared
-    stable, spec §10.3's "signature verification is not specified in v1" replaced, and a guide for a
-    component author. *Exit:* a component written from the guide alone is published with `wkg`,
+    stable, and a guide for a component author. Spec §10.3 specifies signature verification since
+    S5.1c. *Exit:* a component written from the guide alone is published with `wkg`,
     signed, declared, and recorded in a contract and a verification summary.
 - **S5.2 A bridge for today's pact-plugins** — **L**, at least the protobuf/gRPC one, so no existing
   user loses a plugin. A shim process speaking both wires is the smaller route (component-interfaces
@@ -3211,7 +3232,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.10 | No provider-shape plugin for Drift; waits on Drift publishing its plugin interfaces and SDK | provider-shape plugin proposal; 2026-11-18 |
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user | findings 12–14 |
-| S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing | findings 15–17 |
+| S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099) | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration | findings 21, 22, 24; gate F |
