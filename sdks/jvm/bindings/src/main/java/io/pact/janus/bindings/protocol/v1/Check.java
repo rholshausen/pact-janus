@@ -7,6 +7,7 @@
 package io.pact.janus.bindings.protocol.v1;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -27,6 +28,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonPropertyOrder({
     "contract",
     "provider-shape",
+    "components",
     "options"
 })
 public class Check {
@@ -47,6 +49,13 @@ public class Check {
     @JsonProperty("provider-shape")
     @JsonPropertyDescription("A provider shape (design 2.8 \u00a72), for the same provider the contract names.")
     private Map<String, Object> providerShape;
+    /**
+     * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0102). The walk compares each one's operators as its handshake declares their comparability, running an operator's own action against a finite provider and asking its matcher/compare for anything wider. Absent or empty, a declared component's operators are opaque.
+     * 
+     */
+    @JsonProperty("components")
+    @JsonPropertyDescription("The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md \u00a78.3, ADR 0102). The walk compares each one's operators as its handshake declares their comparability, running an operator's own action against a finite provider and asking its matcher/compare for anything wider. Absent or empty, a declared component's operators are opaque.")
+    private List<Map<String, Object>> components;
     @JsonProperty("options")
     private Map<String, Object> options;
     @JsonIgnore
@@ -92,6 +101,24 @@ public class Check {
         this.providerShape = providerShape;
     }
 
+    /**
+     * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0102). The walk compares each one's operators as its handshake declares their comparability, running an operator's own action against a finite provider and asking its matcher/compare for anything wider. Absent or empty, a declared component's operators are opaque.
+     * 
+     */
+    @JsonProperty("components")
+    public List<Map<String, Object>> getComponents() {
+        return components;
+    }
+
+    /**
+     * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0102). The walk compares each one's operators as its handshake declares their comparability, running an operator's own action against a finite provider and asking its matcher/compare for anything wider. Absent or empty, a declared component's operators are opaque.
+     * 
+     */
+    @JsonProperty("components")
+    public void setComponents(List<Map<String, Object>> components) {
+        this.components = components;
+    }
+
     @JsonProperty("options")
     public Map<String, Object> getOptions() {
         return options;
@@ -124,6 +151,10 @@ public class Check {
         sb.append('=');
         sb.append(((this.providerShape == null)?"<null>":this.providerShape));
         sb.append(',');
+        sb.append("components");
+        sb.append('=');
+        sb.append(((this.components == null)?"<null>":this.components));
+        sb.append(',');
         sb.append("options");
         sb.append('=');
         sb.append(((this.options == null)?"<null>":this.options));
@@ -145,6 +176,7 @@ public class Check {
         int result = 1;
         result = ((result* 31)+((this.options == null)? 0 :this.options.hashCode()));
         result = ((result* 31)+((this.providerShape == null)? 0 :this.providerShape.hashCode()));
+        result = ((result* 31)+((this.components == null)? 0 :this.components.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.contract == null)? 0 :this.contract.hashCode()));
         return result;
@@ -159,7 +191,7 @@ public class Check {
             return false;
         }
         Check rhs = ((Check) other);
-        return (((((this.options == rhs.options)||((this.options!= null)&&this.options.equals(rhs.options)))&&((this.providerShape == rhs.providerShape)||((this.providerShape!= null)&&this.providerShape.equals(rhs.providerShape))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))));
+        return ((((((this.options == rhs.options)||((this.options!= null)&&this.options.equals(rhs.options)))&&((this.providerShape == rhs.providerShape)||((this.providerShape!= null)&&this.providerShape.equals(rhs.providerShape))))&&((this.components == rhs.components)||((this.components!= null)&&this.components.equals(rhs.components))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.contract == rhs.contract)||((this.contract!= null)&&this.contract.equals(rhs.contract))));
     }
 
 }

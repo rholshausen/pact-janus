@@ -727,6 +727,11 @@ pub struct CheckArgs {
   #[arg(long, value_name = "FILE")]
   pub policy: Option<PathBuf>,
 
+  /// A verifier configuration (verifier.janus.yaml) whose components to load, as janus verify
+  /// loads them, so their operators are compared as their handshakes declare
+  #[arg(long, value_name = "FILE")]
+  pub config: Option<PathBuf>,
+
   /// Override the policy for findings the check decided: warn reports them, block also exits 1
   #[arg(long, value_enum, value_name = "SEVERITY")]
   pub on_finding: Option<Severity>,

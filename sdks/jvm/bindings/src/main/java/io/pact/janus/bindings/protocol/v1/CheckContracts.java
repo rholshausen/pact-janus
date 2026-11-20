@@ -30,7 +30,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "contracts",
     "provider-version",
     "provider-branch",
-    "publish-reports"
+    "publish-reports",
+    "components"
 })
 public class CheckContracts {
 
@@ -51,21 +52,21 @@ public class CheckContracts {
      */
     @JsonProperty("contracts")
     @JsonPropertyDescription("Janus contracts or v1\u2013v4 pacts, each the document or its text, read as a file is (ADR 0063).")
-    private List<Object> contracts;
+    private List<java.lang.Object> contracts;
     /**
      * Check against the shape published for this provider version.
      * 
      */
     @JsonProperty("provider-version")
     @JsonPropertyDescription("Check against the shape published for this provider version.")
-    private String providerVersion;
+    private java.lang.String providerVersion;
     /**
      * Check against the latest shape published on this provider branch.
      * 
      */
     @JsonProperty("provider-branch")
     @JsonPropertyDescription("Check against the latest shape published on this provider branch.")
-    private String providerBranch;
+    private java.lang.String providerBranch;
     /**
      * Publish each report to the link the shape's document gives for it, with the contract it is about.
      * 
@@ -73,8 +74,15 @@ public class CheckContracts {
     @JsonProperty("publish-reports")
     @JsonPropertyDescription("Publish each report to the link the shape's document gives for it, with the contract it is about.")
     private Boolean publishReports;
+    /**
+     * The project's declared components, as subsumption/check takes them (ADR 0102): loaded before the check starts, and their operators compared as their handshakes declare.
+     * 
+     */
+    @JsonProperty("components")
+    @JsonPropertyDescription("The project's declared components, as subsumption/check takes them (ADR 0102): loaded before the check starts, and their operators compared as their handshakes declare.")
+    private List<Map<String, Object>> components;
     @JsonIgnore
-    private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
+    private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
     /**
      * BrokerDescriptor
@@ -106,7 +114,7 @@ public class CheckContracts {
      * 
      */
     @JsonProperty("contracts")
-    public List<Object> getContracts() {
+    public List<java.lang.Object> getContracts() {
         return contracts;
     }
 
@@ -116,7 +124,7 @@ public class CheckContracts {
      * 
      */
     @JsonProperty("contracts")
-    public void setContracts(List<Object> contracts) {
+    public void setContracts(List<java.lang.Object> contracts) {
         this.contracts = contracts;
     }
 
@@ -125,7 +133,7 @@ public class CheckContracts {
      * 
      */
     @JsonProperty("provider-version")
-    public String getProviderVersion() {
+    public java.lang.String getProviderVersion() {
         return providerVersion;
     }
 
@@ -134,7 +142,7 @@ public class CheckContracts {
      * 
      */
     @JsonProperty("provider-version")
-    public void setProviderVersion(String providerVersion) {
+    public void setProviderVersion(java.lang.String providerVersion) {
         this.providerVersion = providerVersion;
     }
 
@@ -143,7 +151,7 @@ public class CheckContracts {
      * 
      */
     @JsonProperty("provider-branch")
-    public String getProviderBranch() {
+    public java.lang.String getProviderBranch() {
         return providerBranch;
     }
 
@@ -152,7 +160,7 @@ public class CheckContracts {
      * 
      */
     @JsonProperty("provider-branch")
-    public void setProviderBranch(String providerBranch) {
+    public void setProviderBranch(java.lang.String providerBranch) {
         this.providerBranch = providerBranch;
     }
 
@@ -174,18 +182,36 @@ public class CheckContracts {
         this.publishReports = publishReports;
     }
 
+    /**
+     * The project's declared components, as subsumption/check takes them (ADR 0102): loaded before the check starts, and their operators compared as their handshakes declare.
+     * 
+     */
+    @JsonProperty("components")
+    public List<Map<String, Object>> getComponents() {
+        return components;
+    }
+
+    /**
+     * The project's declared components, as subsumption/check takes them (ADR 0102): loaded before the check starts, and their operators compared as their handshakes declare.
+     * 
+     */
+    @JsonProperty("components")
+    public void setComponents(List<Map<String, Object>> components) {
+        this.components = components;
+    }
+
     @JsonAnyGetter
-    public Map<String, Object> getAdditionalProperties() {
+    public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
     }
 
     @JsonAnySetter
-    public void setAdditionalProperty(String name, Object value) {
+    public void setAdditionalProperty(java.lang.String name, java.lang.Object value) {
         this.additionalProperties.put(name, value);
     }
 
     @Override
-    public String toString() {
+    public java.lang.String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(CheckContracts.class.getName()).append('@').append(Integer.toHexString(System.identityHashCode(this))).append('[');
         sb.append("broker");
@@ -208,6 +234,10 @@ public class CheckContracts {
         sb.append('=');
         sb.append(((this.publishReports == null)?"<null>":this.publishReports));
         sb.append(',');
+        sb.append("components");
+        sb.append('=');
+        sb.append(((this.components == null)?"<null>":this.components));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -224,6 +254,7 @@ public class CheckContracts {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.providerVersion == null)? 0 :this.providerVersion.hashCode()));
+        result = ((result* 31)+((this.components == null)? 0 :this.components.hashCode()));
         result = ((result* 31)+((this.publishReports == null)? 0 :this.publishReports.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.broker == null)? 0 :this.broker.hashCode()));
@@ -233,7 +264,7 @@ public class CheckContracts {
     }
 
     @Override
-    public boolean equals(Object other) {
+    public boolean equals(java.lang.Object other) {
         if (other == this) {
             return true;
         }
@@ -241,7 +272,7 @@ public class CheckContracts {
             return false;
         }
         CheckContracts rhs = ((CheckContracts) other);
-        return (((((((this.providerVersion == rhs.providerVersion)||((this.providerVersion!= null)&&this.providerVersion.equals(rhs.providerVersion)))&&((this.publishReports == rhs.publishReports)||((this.publishReports!= null)&&this.publishReports.equals(rhs.publishReports))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.broker == rhs.broker)||((this.broker!= null)&&this.broker.equals(rhs.broker))))&&((this.contracts == rhs.contracts)||((this.contracts!= null)&&this.contracts.equals(rhs.contracts))))&&((this.providerBranch == rhs.providerBranch)||((this.providerBranch!= null)&&this.providerBranch.equals(rhs.providerBranch))));
+        return ((((((((this.providerVersion == rhs.providerVersion)||((this.providerVersion!= null)&&this.providerVersion.equals(rhs.providerVersion)))&&((this.components == rhs.components)||((this.components!= null)&&this.components.equals(rhs.components))))&&((this.publishReports == rhs.publishReports)||((this.publishReports!= null)&&this.publishReports.equals(rhs.publishReports))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.broker == rhs.broker)||((this.broker!= null)&&this.broker.equals(rhs.broker))))&&((this.contracts == rhs.contracts)||((this.contracts!= null)&&this.contracts.equals(rhs.contracts))))&&((this.providerBranch == rhs.providerBranch)||((this.providerBranch!= null)&&this.providerBranch.equals(rhs.providerBranch))));
     }
 
 }

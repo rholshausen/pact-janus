@@ -11,7 +11,7 @@
 
 use super::content::ContentComponent;
 use super::error::ComponentError;
-use super::matcher::MatcherComponent;
+use super::matcher::{Comparability, MatcherComponent};
 use super::transport::TransportComponent;
 use crate::common::Requirement;
 use crate::contract::{RecordedComponent, RecordedSource};
@@ -218,6 +218,10 @@ pub struct Resolved {
   /// What its actions stand for under each content type it declares (spec §6.3, ADR 0100), in the
   /// order its handshake lists the types.
   pub substitutions: Vec<ContentSubstitutions>,
+  /// The comparability class each operator its handshake contributes declares (spec §7.5): what the
+  /// subsumption walk may do with it. An operator declaring none, or one this engine does not know,
+  /// is opaque, and is not here.
+  pub comparabilities: BTreeMap<String, Comparability>,
   /// Where its bytes came from, as a contract and a verification summary record it (ADR 0097).
   pub source: RecordedSource,
 }
@@ -433,6 +437,7 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
     None
   };
   let substitutions = substitutions(declared, hello, &actions, matcher.is_some()).map_err(invalid)?;
+  let comparabilities = comparabilities(declared, hello, &actions, matcher.is_some()).map_err(invalid)?;
   let fetched = loaded.fetched;
   Ok(Resolved {
     name: declared.clone(),
@@ -444,6 +449,7 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
     matcher,
     actions,
     substitutions,
+    comparabilities,
     source: RecordedSource {
       kind: declaration.source.kind.clone(),
       reference: fetched.as_ref().and_then(|f| f.reference.clone()),
@@ -451,6 +457,45 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
       digest: fetched.map(|f| f.digest),
     },
   })
+}
+
+/// Each `operators` entry's `comparability` (spec §7.5, ADR 0102). An `exact` or `conservative`
+/// operator is decided by running its own action, so the component must contribute an action of the
+/// operator's name and implement `matcher`, whose `apply` runs it and whose `compare` decides the rest;
+/// one that cannot is refused when it loads, as `component-invalid`, rather than asked and found
+/// wanting in the middle of a check. A class this engine does not know is opaque.
+fn comparabilities(
+  declared: &str,
+  hello: &Value,
+  actions: &[String],
+  matcher: bool,
+) -> Result<BTreeMap<String, Comparability>, String> {
+  let mut classes = BTreeMap::new();
+  for entry in hello
+    .pointer("/contributes/operators")
+    .and_then(Value::as_array)
+    .into_iter()
+    .flatten()
+  {
+    let operator = entry.get("name").and_then(Value::as_str).unwrap_or_default();
+    let class = match entry.get("comparability").and_then(Value::as_str) {
+      Some("exact") => Comparability::Exact,
+      Some("conservative") => Comparability::Conservative,
+      _ => continue,
+    };
+    if !matcher {
+      return Err(format!(
+        "component '{declared}' declares the operator '{operator}' comparable, and does not implement 'matcher', whose 'compare' would decide it"
+      ));
+    }
+    if !actions.iter().any(|action| action == operator) {
+      return Err(format!(
+        "component '{declared}' declares the operator '{operator}' comparable, and contributes no action '{operator}' to run it with"
+      ));
+    }
+    classes.insert(operator.to_string(), class);
+  }
+  Ok(classes)
 }
 
 /// Each `content-types` entry's `substitutions`, checked (ADR 0100 decision 3): every one names an
@@ -607,6 +652,67 @@ mod tests {
     let message = declaration(auth).expect_err("refused").to_string();
     assert!(message.contains(says), "{message}");
     assert!(!message.contains("s3cret"), "{message}");
+  }
+
+  /// A matcher that answers nothing: what a handshake test needs bound.
+  struct Silent;
+
+  impl MatcherComponent for Silent {
+    fn apply(&self, _: super::super::Apply) -> Result<super::super::ApplyResult, ComponentError> {
+      Err(ComponentError::operation_unsupported("matcher/apply"))
+    }
+  }
+
+  fn handshake(interfaces: Value, actions: Value, operators: Value) -> Result<Resolved, Unavailable> {
+    let declaration: ComponentDeclaration =
+      serde_json::from_value(json!({ "name": "csv", "source": { "kind": "file", "reference": "csv.wasm" } }))
+        .unwrap();
+    check_handshake(
+      &declaration,
+      Loaded {
+        hello: json!({ "component": { "name": "csv", "version": "1.0.0" }, "interfaces": interfaces,
+                       "contributes": { "actions": actions, "operators": operators } }),
+        content: None,
+        transport: None,
+        matcher: Some(Arc::new(Silent)),
+        fetched: None,
+      },
+    )
+  }
+
+  /// ADR 0102: an operator's comparability is read from the handshake, and one declared comparable is
+  /// refused when nothing could decide it: no `matcher`, or no action of its name to run.
+  #[test]
+  fn an_operators_comparability_is_read_from_the_handshake_and_checked() {
+    let column = json!([ { "name": "csv:column" } ]);
+    let resolved = handshake(
+      json!(["matcher"]),
+      column.clone(),
+      json!([ { "name": "csv:column", "comparability": "exact" },
+              { "name": "csv:cell", "comparability": "someday" } ]),
+    )
+    .expect("loads");
+    assert_eq!(
+      resolved.comparabilities,
+      BTreeMap::from([("csv:column".to_string(), Comparability::Exact)]),
+      "a class this engine does not know is opaque"
+    );
+
+    let exact = json!([ { "name": "csv:column", "comparability": "exact" } ]);
+    for (interfaces, actions, says) in [
+      (json!(["content"]), column, "does not implement 'matcher'"),
+      (
+        json!(["matcher"]),
+        json!([]),
+        "contributes no action 'csv:column'",
+      ),
+    ] {
+      let refused = handshake(interfaces, actions, exact.clone())
+        .err()
+        .expect("refused");
+      assert_eq!(refused.details["reason"], "component-invalid");
+      assert!(refused.message.contains(says), "{}", refused.message);
+    }
   }
 
   /// A kind this engine does not know is the loader's to refuse, not the reader's: `kind` is open.

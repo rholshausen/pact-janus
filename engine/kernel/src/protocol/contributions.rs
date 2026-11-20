@@ -31,6 +31,9 @@ struct Contributor {
   matcher: Option<Arc<dyn MatcherComponent>>,
   actions: Vec<String>,
   substitutions: Vec<ContentSubstitutions>,
+  /// What a declared component's handshake says of each operator's comparability (spec §7.5);
+  /// `None` for an in-tree matcher, which answers in code.
+  comparabilities: Option<BTreeMap<String, crate::component::Comparability>>,
 }
 
 #[derive(Default)]
@@ -48,6 +51,7 @@ impl Contributions {
       matcher: component.matcher.clone(),
       actions: component.actions.clone(),
       substitutions: component.substitutions.clone(),
+      comparabilities: Some(component.comparabilities.clone()),
     });
     let in_tree = in_tree.iter().map(|component| Contributor {
       name: component.name.clone(),
@@ -55,6 +59,7 @@ impl Contributions {
       matcher: Some(Arc::clone(&component.matcher)),
       actions: component.actions.clone(),
       substitutions: Vec::new(),
+      comparabilities: None,
     });
     Contributions {
       contributors: declared.chain(in_tree).collect(),
@@ -160,20 +165,18 @@ pub fn in_tree_actions(matchers: &[InTreeMatcher]) -> impl crate::subsumption::O
   Contributions::from_resolved(&[], matchers)
 }
 
-/// [`in_tree_actions`], with `content` decoding what a selector names (ADR 0090 decision 2): what
-/// `subsumption/check` runs a selector with.
-pub fn check_components<'a>(
-  matchers: &[InTreeMatcher],
+/// A scope's contributions, with `content` decoding what a selector names (ADR 0090 decision 2): what
+/// `subsumption/check` runs a selector with and asks about component operators. The scope's are the
+/// components a check was given (ADR 0102) and the embedding's own matchers.
+pub(crate) fn check_components<'a>(
+  operators: Arc<Contributions>,
   content: &'a dyn ContentComponent,
 ) -> impl crate::subsumption::OperatorComparer + use<'a> {
-  CheckComponents {
-    operators: Contributions::from_resolved(&[], matchers),
-    content,
-  }
+  CheckComponents { operators, content }
 }
 
 struct CheckComponents<'a> {
-  operators: Contributions,
+  operators: Arc<Contributions>,
   content: &'a dyn ContentComponent,
 }
 
@@ -209,11 +212,18 @@ impl crate::subsumption::OperatorComparer for CheckComponents<'_> {
 /// What the subsumption walk asks about a component's operators (component-interfaces spec §7.5,
 /// ADR 0087): the matcher of the component whose namespace the operator is in.
 impl crate::subsumption::OperatorComparer for Contributions {
+  /// A declared component's class is the one its handshake declares (spec §7.5, ADR 0102), whatever
+  /// binding loaded it; an in-tree matcher answers in code (ADR 0087).
   fn comparability(&self, operator: &str) -> crate::component::Comparability {
-    self
-      .matcher_for(operator)
-      .map(|matcher| matcher.comparability(operator))
-      .unwrap_or(crate::component::Comparability::Opaque)
+    let opaque = crate::component::Comparability::Opaque;
+    let Some(contributor) = self.contributor_of(operator) else {
+      return opaque;
+    };
+    match (&contributor.comparabilities, &contributor.matcher) {
+      (Some(declared), _) => declared.get(operator).copied().unwrap_or(opaque),
+      (None, Some(matcher)) => matcher.comparability(operator),
+      (None, None) => opaque,
+    }
   }
 
   fn compare(
@@ -253,17 +263,17 @@ impl crate::subsumption::OperatorComparer for Contributions {
 }
 
 impl Contributions {
+  /// The component that contributes `operator`'s action, by its namespace.
+  fn contributor_of(&self, operator: &str) -> Option<&Contributor> {
+    let (namespace, _) = operator.split_once(':')?;
+    self.contributors.iter().find(|contributor| {
+      contributor.name == namespace && contributor.actions.iter().any(|action| action == operator)
+    })
+  }
+
   /// The matcher of the component that contributes `operator`, by its namespace.
   fn matcher_for(&self, operator: &str) -> Option<&Arc<dyn MatcherComponent>> {
-    let (namespace, _) = operator.split_once(':')?;
-    self
-      .contributors
-      .iter()
-      .find(|contributor| {
-        contributor.name == namespace && contributor.actions.iter().any(|action| action == operator)
-      })?
-      .matcher
-      .as_ref()
+    self.contributor_of(operator)?.matcher.as_ref()
   }
 }
 

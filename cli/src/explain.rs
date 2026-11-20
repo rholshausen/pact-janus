@@ -54,11 +54,7 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
 
   let mut request = json!({ "interaction": subject, "options": { "plan": args.plan } });
   if let Some(path) = &args.config {
-    let config = pact_janus_hooks_host::loader::load(path)
-      .map_err(|err| format!("reading {}: {}", path.display(), crate::engine::sentence(&err)))?;
-    if let Some(components) = config.get("components") {
-      request["components"] = components.clone();
-    }
+    request["components"] = io::config_components(path)?;
   }
   if let Some(path) = &args.executed {
     let values = io::read_json(path)?;

@@ -971,7 +971,7 @@ operations with `operation-unsupported`.
 
 | Operation | Body → Result |
 |---|---|
-| `subsumption/check` | `{ contract, provider-shape }` → `{ report, format }` |
+| `subsumption/check` | `{ contract, provider-shape, components? }` → `{ report, format }` |
 | `subsumption/decide` | `{ pairs, verification?, policy?, as-of? }` → `{ report, text }` |
 
 Session-less, like `upgrade/*`: pure document-in, document-out.
@@ -982,7 +982,11 @@ Session-less, like `upgrade/*`: pure document-in, document-out.
   design 2.5's rules when it is the latter — the pact a consumer published years ago is the
   document a provider actually has, and a check only reachable by teams who had already migrated
   would be the wrong way round. `format` says which it was. A contract and a shape naming
-  different providers is `document-mismatched` (§10.2), not an empty report.
+  different providers is `document-mismatched` (§10.2), not an empty report. `components` are the project's
+  declared components, loaded as `verify`'s `target.components` are: the walk compares each one's
+  operators as its handshake declares their comparability, and without them a declared component's
+  operators are opaque ([ADR 0102](../../decisions/0102-a-check-loads-the-components-a-project-declares-and-compares-their-operators-as-their-handshakes-declare.md)). A component that cannot be loaded is
+  `component-unavailable`; a contract's `requires` is not checked, since a check runs nothing.
 - **`decide`** answers the RFC's `can-i-deploy` question over documents that already exist: the
   reports `check` produced, the verification summaries a run reported (§9.6), and the policy
   layers design 2.8 §7.1 resolves. The host names the `pairs`; the engine never infers one from a
@@ -1076,7 +1080,7 @@ client — the offline WASM artifact — knows these operations and answers each
 |---|---|
 | `broker/publish-contracts` | `{ broker, consumer-version, contracts, branch?, tags?, build-url? }` → `{ session, stream }` |
 | `broker/publish-provider-shape` | `{ broker, provider-version, provider-shape, branch?, tags?, build-url? }` → `{ session, stream }` |
-| `broker/check-contracts` | `{ broker, contracts, provider-version? \| provider-branch?, publish-reports? }` → `{ session, stream }` |
+| `broker/check-contracts` | `{ broker, contracts, provider-version? \| provider-branch?, publish-reports?, components? }` → `{ session, stream }` |
 
 - **The broker descriptor** is what every broker-facing member takes: `url`, `auth` (`bearer` with
   a `token`, or `basic` with a `username` and `password`) and `client`, the HTTP client options the
@@ -1129,6 +1133,9 @@ client — the offline WASM artifact — knows these operations and answers each
     without a report, and `decide` answers it as `provider-shape-missing`;
   - `failed`, with an `error`: the fetch failed, or the pair could not be checked (a fetched shape
     that is not one, or is about another provider, carries `subsumption/check`'s own error).
+
+  The walk compares component operators with the `components` given, as `subsumption/check` does
+  ([ADR 0102](../../decisions/0102-a-check-loads-the-components-a-project-declares-and-compares-their-operators-as-their-handshakes-declare.md)).
 
   With `publish-reports`, each `checked` report is published to the link the shape's own document
   gave for it (`pb:publish-subsumption-report`), with the contract it is about, and the event says

@@ -74,6 +74,11 @@ impl Scope {
     (!self.content.is_empty()).then(|| Arc::new(self.content.clone()) as Arc<dyn ContentComponent>)
   }
 
+  /// The content components this scope decodes with: its declared ones, then the embedding's.
+  pub fn registry(&self) -> &ContentRegistry {
+    &self.content
+  }
+
   pub fn contributions(&self) -> Arc<Contributions> {
     Arc::clone(&self.contributions)
   }

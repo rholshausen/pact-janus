@@ -3050,6 +3050,17 @@ The component model, opened to the ecosystem.
   *Exit:* `third-party/janus-csv` declares `csv:column` `exact` and implements `compare`, and
   `janus check --config` decides two contracts' `csv:column` nodes `yes` and `no` where, without
   `--config`, both are reviews.
+  *Done 2026-11-20* ([ADR 0102](decisions/0102-a-check-loads-the-components-a-project-declares-and-compares-their-operators-as-their-handshakes-declare.md)):
+  - `subsumption/check` and `broker/check-contracts` take `components`, loaded as a run loads them, and
+    the walk compares with the scope's contributions. A contract's `requires` is not checked: a check
+    runs nothing, and an operator nothing loaded is still a review.
+  - The engine reads a declared component's comparability from its handshake, whatever the binding; an
+    operator declared comparable with no action of its name, or by a component with no `matcher`, fails
+    the load as `component-invalid`. The WASM binding forwards `matcher/compare` and `matcher/prefix`.
+  - `janus check --config` reads a verifier configuration's `components`, through the function
+    `explain --config` now shares.
+  - `third-party/janus-csv` contributes `csv:column`, declared `exact`, whose `compare` decides two
+    columns by type and answers `unknown` where the slot's content type would decide.
 
 **Done when** a protobuf plugin runs through either the bridge or a native component, and a second
 content component exists written by someone outside the core team.
@@ -3278,7 +3289,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration (done: ADR 0100) | findings 21, 22, 24; gate F |
-| S5.7 | A declared component's operators are opaque to `janus check`, which loads none | ADR 0087 |
+| S5.7 | A declared component's operators are opaque to `janus check`, which loads none (done: ADR 0102) | ADR 0087 |
 | S6.6 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12; moved from S3.7 |
 | S6.7 | A recorder reads no framework's own test response, and the test writes its operation's template by hand | ADR 0086 decision 8 |
 | S6.8 | No shape is recorded from verification traffic (`observed`) | ADR 0086 decision 9 |

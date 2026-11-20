@@ -162,6 +162,12 @@ export interface CheckContracts {
    * Publish each report to the link the shape's document gives for it, with the contract it is about.
    */
   "publish-reports"?: boolean;
+  /**
+   * The project's declared components, as subsumption/check takes them (ADR 0102): loaded before the check starts, and their operators compared as their handshakes declare.
+   */
+  components?: {
+    [k: string]: unknown;
+  }[];
   [k: string]: unknown;
 }
 
@@ -985,6 +991,12 @@ export interface Check {
   "provider-shape": {
     [k: string]: unknown;
   };
+  /**
+   * The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0102). The walk compares each one's operators as its handshake declares their comparability, running an operator's own action against a finite provider and asking its matcher/compare for anything wider. Absent or empty, a declared component's operators are opaque.
+   */
+  components?: {
+    [k: string]: unknown;
+  }[];
   options?: {
     [k: string]: unknown;
   };

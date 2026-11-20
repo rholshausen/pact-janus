@@ -15,6 +15,10 @@
 //! published no shape there is a pair with no report, replay-only, as a provider with no
 //! `--provider-shape` file is.
 //!
+//! `--config` names the verifier configuration whose `components` a run would load (ADR 0102): the walk
+//! compares a declared component's operators as its handshake declares, and asks its `compare`, where
+//! without it they are opaque and every comparison of one is a review.
+//!
 //! Three flags, three layers, in design 2.8 §7.1's own order: the specification's defaults live
 //! in the engine, `--policy` is the project's document, and `--on-finding`/`--on-review` are the
 //! per-run override. They are two flags rather than the plan's single `--policy warn|block`
@@ -67,6 +71,10 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
   }
 
   let as_of = args.as_of.clone().unwrap_or_else(crate::date::today);
+  let components = match &args.config {
+    Some(path) => io::config_components(path)?,
+    None => json!([]),
+  };
 
   let mut engine = engine::start(match args.output {
     Output::Text => engine::Prints::Text,
@@ -87,7 +95,7 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
   // What the broker said of each contract, in the order given, when the shapes came from one.
   let mut from_broker = Vec::new();
   if let Some(url) = &args.broker_url {
-    from_broker = broker_check(&mut engine, args, url, &contracts)?;
+    from_broker = broker_check(&mut engine, args, url, &contracts, &components)?;
   }
   for (index, (path, contract)) in contracts.iter().enumerate() {
     let mut pair = json!({
@@ -103,7 +111,7 @@ pub fn run(args: &CheckArgs) -> Result<Outcome, Error> {
       let result = engine::call(
         &mut engine,
         "subsumption/check",
-        json!({ "contract": contract, "provider-shape": shape }),
+        json!({ "contract": contract, "provider-shape": shape, "components": components }),
       )
       .map_err(|err| format!("{path} against {shape_path}: {err}"))?;
       pair["subsumption"] = result["report"].clone();
@@ -184,6 +192,7 @@ fn broker_check(
   args: &CheckArgs,
   url: &str,
   contracts: &[(String, Value)],
+  components: &Value,
 ) -> Result<Vec<Value>, Error> {
   let broker = crate::publish::descriptor(
     url,
@@ -195,6 +204,7 @@ fn broker_check(
     "broker": broker,
     "contracts": contracts.iter().map(|(_, contract)| contract).collect::<Vec<_>>(),
     "publish-reports": args.publish,
+    "components": components,
   });
   if let Some(version) = &args.provider_version {
     body["provider-version"] = json!(version);

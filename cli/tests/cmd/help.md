@@ -199,6 +199,9 @@ Options:
       --verification <FILE>    A run summary written by `janus verify --output json`; repeatable
       --policy <FILE>          A subsumption policy (YAML or JSON): when to warn and when to block,
                                and any exemptions
+      --config <FILE>          A verifier configuration (verifier.janus.yaml) whose components to
+                               load, as janus verify loads them, so their operators are compared as
+                               their handshakes declare
       --on-finding <SEVERITY>  Override the policy for findings the check decided: warn reports
                                them, block also exits 1 [possible values: warn, block]
       --on-review <SEVERITY>   Override the policy for comparisons the check could not decide: warn

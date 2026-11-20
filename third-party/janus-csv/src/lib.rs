@@ -3,7 +3,8 @@
 //! Written against the published component interfaces (component-interfaces spec v1, the WIT world in
 //! `wit/component.wit`) and nothing else. It implements the `content` interface: `decode`, `encode`,
 //! `compile` and `detect` (which it declines); and the `matcher` interface's `apply`, for the actions
-//! its handshake substitutes for the value operators whose meaning CSV changes ([`actions`]).
+//! its handshake substitutes for the value operators whose meaning CSV changes ([`actions`]), and for
+//! its one operator, `csv:column`, which it declares `exact` and decides with `compare`.
 //!
 //! CSV is lossy, and this component says so instead of pretending (spec §6.4). Every field decodes as a
 //! string: CSV has no numeric type, no boolean and no null, so `12.50`, `true` and an empty field are
@@ -96,6 +97,7 @@ impl Component {
       "content/encode" => encode(body),
       "content/compile" => compile(body),
       "matcher/apply" => apply(body),
+      "matcher/compare" => compare(body),
       _ => Err(error(
         "operation-unsupported",
         "protocol",
@@ -126,6 +128,7 @@ impl Component {
       "interfaces": ["content", "matcher"],
       "contributes": {
         "actions": actions::ACTIONS.iter().map(|name| json!({ "name": name })).collect::<Vec<_>>(),
+        "operators": [ { "name": actions::OPERATOR, "comparability": "exact" } ],
         "content-types": [ {
           "media-type": MEDIA_TYPE,
           "substitutions": actions::substitutions(),
@@ -174,6 +177,29 @@ fn apply(body: &Value) -> OpResult {
     .iter()
     .map(|value| actions::apply(action, &value["content"], &arguments))
     .collect::<Vec<_>>() }))
+}
+
+/// `matcher/compare` (spec §7.5): `csv:column` is declared `exact`, so a subsumption check asks this
+/// for a pair one side of which is one.
+fn compare(body: &Value) -> OpResult {
+  let operator = body.get("operator").and_then(Value::as_str).unwrap_or_default();
+  if operator != actions::OPERATOR {
+    return Err(error(
+      "unknown-operator",
+      "document",
+      &format!("the csv component has no operator '{operator}'"),
+      Some(json!({ "operator": operator })),
+    ));
+  }
+  let (Some(provider), Some(consumer)) = (body.get("provider"), body.get("consumer")) else {
+    return Err(error(
+      "malformed-frame",
+      "protocol",
+      "matcher/compare needs 'provider' and 'consumer'",
+      None,
+    ));
+  };
+  Ok(actions::compare(provider, consumer))
 }
 
 /// `content/decode`: octets to document (spec §6.1).

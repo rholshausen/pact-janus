@@ -898,7 +898,14 @@ operator is not handed to `compare`: the checker runs the operator's own action 
 spec §8 decides one against a conservative core operator. Anything wider goes to `compare`, for the
 consumer's operator first, then the provider's
 ([ADR 0087](../../decisions/0087-compare-the-built-in-components-operators-by-their-own-matchers-and-a-compare-each-declares.md)).
-The native binding answers the class and `compare` in code (§9.1). The built-in HTTP component declares:
+The native binding answers the class and `compare` in code (§9.1). For a declared component, whatever
+its binding, the engine reads each operator's class from the handshake, and the binding forwards
+`compare` over the pipe. An operator declared `exact` or `conservative` is decided by running its own
+action, so a handshake that declares one comparable without contributing an action of its name, or
+without implementing `matcher`, fails the load as `component-invalid`. A check loads the components a
+project declares when it is given them, as `subsumption/check`'s `components` and `janus check --config`
+([ADR 0102](../../decisions/0102-a-check-loads-the-components-a-project-declares-and-compares-their-operators-as-their-handshakes-declare.md)).
+The built-in HTTP component declares:
 
 | Operator | Class | What its `compare` decides |
 |---|---|---|

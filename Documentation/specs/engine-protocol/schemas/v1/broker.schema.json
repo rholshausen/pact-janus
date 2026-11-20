@@ -153,6 +153,11 @@
           "type": "boolean",
           "default": false,
           "description": "Publish each report to the link the shape's document gives for it, with the contract it is about."
+        },
+        "components": {
+          "type": "array",
+          "description": "The project's declared components, as subsumption/check takes them (ADR 0102): loaded before the check starts, and their operators compared as their handshakes declare.",
+          "items": { "type": "object" }
         }
       }
     },

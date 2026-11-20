@@ -1051,13 +1051,17 @@ impl Engine {
         EngineError::broker_unavailable("check contracts against a broker"),
       );
     };
+    let scope = match self.scope(&req.components) {
+      Ok(scope) => scope,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
     let check = match req.prepare() {
       Ok(check) => check,
       Err(err) => return ResponseFrame::err(id, err),
     };
     let comparers = broker_ops::Comparers {
-      matchers: self.matchers.clone(),
-      content: self.content.clone(),
+      contributions: scope.contributions(),
+      content: scope.registry().clone(),
     };
     self.start_broker_session(id, "check contracts against a broker", |stream, background| {
       broker_ops::start_check(client, check, comparers, stream, background)
@@ -1312,7 +1316,12 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    match subsumption_ops::check(&req, &check_components(&self.matchers, &self.content)) {
+    // The components the project declares (ADR 0102), loaded as a run loads them.
+    let scope = match self.scope(&req.components) {
+      Ok(scope) => scope,
+      Err(err) => return ResponseFrame::err(id, err),
+    };
+    match subsumption_ops::check(&req, &check_components(scope.contributions(), scope.registry())) {
       Ok((report, format)) => {
         let report = serde_json::to_value(&report).expect("a report always serializes");
         ResponseFrame::ok(id, json!({ "report": report, "format": format }))

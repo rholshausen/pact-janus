@@ -20,6 +20,11 @@
           "type": "object",
           "description": "A provider shape (design 2.8 §2), for the same provider the contract names."
         },
+        "components": {
+          "type": "array",
+          "description": "The project's declared components, resolved by the host's loader exactly as verification/verify's target.components (spec.md §8.3, ADR 0102). The walk compares each one's operators as its handshake declares their comparability, running an operator's own action against a finite provider and asking its matcher/compare for anything wider. Absent or empty, a declared component's operators are opaque.",
+          "items": { "type": "object" }
+        },
         "options": {
           "type": "object"
         }

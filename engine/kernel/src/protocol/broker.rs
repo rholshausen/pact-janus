@@ -32,7 +32,7 @@ use crate::broker::{
   BrokerClient, BrokerDescriptor, ContractToPublish, ContractsToPublish, FetchedShape, ReportToPublish,
   ShapeAt, ShapeRequest, ShapeToPublish,
 };
-use crate::component::{ComponentError, ContentRegistry, InTreeMatcher};
+use crate::component::{ComponentError, ContentRegistry};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -346,6 +346,9 @@ pub(crate) struct CheckContracts {
   provider_branch: Option<String>,
   #[serde(default)]
   publish_reports: bool,
+  /// The project's declared components, as `subsumption/check` takes them (ADR 0102).
+  #[serde(default)]
+  pub components: Vec<Value>,
 }
 
 /// One contract to check: its document, the bytes a report about it is published with, and who it
@@ -410,10 +413,10 @@ impl CheckContracts {
   }
 }
 
-/// What the walk compares component operators with: the embedding's in-tree matchers and content
-/// components, as `subsumption/check` has them (ADR 0087).
+/// What the walk compares component operators with: the check's scope, its declared components and
+/// the embedding's own, as `subsumption/check` has them (ADR 0087, ADR 0102).
 pub(crate) struct Comparers {
-  pub matchers: Vec<InTreeMatcher>,
+  pub contributions: Arc<super::contributions::Contributions>,
   pub content: ContentRegistry,
 }
 
@@ -431,7 +434,7 @@ pub(crate) fn start_check(
     "janus broker check",
     Box::new(move || {
       let stream = thread_stream;
-      let components = super::contributions::check_components(&comparers.matchers, &comparers.content);
+      let components = super::contributions::check_components(comparers.contributions, &comparers.content);
       let mut shapes: HashMap<String, Result<Option<FetchedShape>, Value>> = HashMap::new();
       let mut results = Vec::with_capacity(check.contracts.len());
       for contract in &check.contracts {
@@ -460,6 +463,7 @@ pub(crate) fn start_check(
                 &super::subsumption::Check {
                   contract: contract.document.clone(),
                   provider_shape: fetched.document.clone(),
+                  components: Vec::new(),
                 },
                 &components,
               )

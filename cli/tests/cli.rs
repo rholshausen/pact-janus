@@ -3005,3 +3005,110 @@ fn component_pull_names_the_signer_it_verified() {
     stdout(&public)
   );
 }
+
+/// A contract whose CSV body's `items` column is `csv:column` of `kind`, from `consumer`.
+fn csv_column_contract(consumer: &str, kind: &str) -> String {
+  let mut contract: Value =
+    serde_json::from_str(&std::fs::read_to_string(csv_contract()).expect("the contract")).expect("JSON");
+  contract["consumer"]["name"] = json!(consumer);
+  contract["interactions"][0]["parts"]["response"]["body"]["items"]["members"]["items"] =
+    json!({ "shape": "csv:column", "type": kind, "example": "1" });
+  let path = temp(&format!("{consumer}.janus.json"));
+  std::fs::write(&path, contract.to_string()).expect("writing the contract");
+  path
+}
+
+/// The orders export as the provider publishes it: its `items` column spells an integer.
+fn csv_column_shape() -> String {
+  let path = temp("order-service-csv.provider-shape.json");
+  let shape = json!({ "$format": "janus-provider-shape/1", "provider": { "name": "order-service" },
+    "provenance": "declared",
+    "interactions": [ {
+      "description": "GET /orders.csv",
+      "selector": {
+        "request": { "method": { "shape": "equality", "example": "GET" },
+                     "path": { "shape": "equality", "example": "/orders.csv" } },
+        "response": { "status": { "shape": "equality", "example": 200 } } },
+      "content-types": { "response": { "body": "text/csv" } },
+      "parts": { "response": { "body": { "shape": "each-like", "min": 1, "max": 1,
+        "items": { "shape": "object", "members": {
+          "id": { "shape": "string", "example": "66" },
+          "status": { "shape": "string", "example": "PENDING" },
+          "items": { "shape": "csv:column", "type": "integer", "example": "1" } } } } } } } ] });
+  std::fs::write(&path, shape.to_string()).expect("writing the shape");
+  path
+}
+
+/// Staged plan S5.7, ADR 0102, the exit: `csv:column` is a third party's operator, which its handshake
+/// declares `exact`. With `--config`, `janus check` loads the component, and its `compare` decides a
+/// consumer's `number` column `yes` against the provider's `integer` one, and a `boolean` column `no`.
+/// Without it, the operator is opaque and both are reviews.
+#[test]
+fn check_with_config_decides_a_components_operator_that_is_otherwise_reviewed() {
+  let yes = csv_column_contract("reporting-numbers", "number");
+  let no = csv_column_contract("reporting-flags", "boolean");
+  let shape = csv_column_shape();
+  let config = temp("check-csv.yaml");
+  let reference = pathdiff(&csv_component(), &std::env::temp_dir());
+  std::fs::write(
+    &config,
+    format!(
+      "version: 1\ncomponents:\n  - name: csv\n    source: {{ kind: file, reference: '{reference}' }}\n"
+    ),
+  )
+  .expect("writing the config");
+  let check = |extra: &[&str]| {
+    let mut args = vec!["check", &yes, &no, "--provider-shape", &shape, "--output", "json"];
+    args.extend_from_slice(extra);
+    let output = janus(&args);
+    assert_eq!(code(&output), 0, "{}\n{}", stdout(&output), stderr(&output));
+    serde_json::from_str::<Value>(&stdout(&output)).expect("a report")
+  };
+  // Each pair's findings at the column, as (consumer, severity, verdict, reason).
+  let at_column = |report: &Value| -> Vec<(String, String, String, String)> {
+    let mut found = Vec::new();
+    for pair in report["pairs"].as_array().expect("pairs") {
+      for entry in pair["findings"].as_array().into_iter().flatten() {
+        let finding = &entry["finding"];
+        if finding["path"] == "response.body[*].items" {
+          found.push((
+            pair["consumer"]["name"].as_str().unwrap_or_default().to_string(),
+            finding["severity"].as_str().unwrap_or_default().to_string(),
+            finding["verdict"].as_str().unwrap_or_default().to_string(),
+            finding["reason"].as_str().unwrap_or_default().to_string(),
+          ));
+        }
+      }
+    }
+    found
+  };
+
+  let opaque = at_column(&check(&[]));
+  assert_eq!(opaque.len(), 2, "{opaque:?}");
+  for (consumer, severity, verdict, _) in &opaque {
+    assert_eq!(
+      (severity.as_str(), verdict.as_str()),
+      ("review", "unknown"),
+      "{consumer}: an operator nothing loaded is opaque"
+    );
+  }
+
+  let decided = check(&["--config", &config]);
+  assert_eq!(
+    at_column(&decided),
+    [(
+      "reporting-flags".to_string(),
+      "finding".to_string(),
+      "no".to_string(),
+      "a field that spells integer need not spell boolean".to_string()
+    )],
+    "the number column is decided yes, so it is no finding: {decided:#}"
+  );
+  let numbers = decided["pairs"]
+    .as_array()
+    .unwrap()
+    .iter()
+    .find(|pair| pair["consumer"]["name"] == "reporting-numbers")
+    .unwrap();
+  assert_eq!(numbers["subsumption"]["verdict"], "yes", "{numbers:#}");
+}

@@ -316,6 +316,9 @@ Three sources are the source of truth and take precedence over this file when th
 > header row. A slot a component cannot decode fails once, at the slot, in the component's words, and no
 > node reading it runs; a component that died decoding a reply is `component-failed`; a decode's
 > degradations and a declared slot labelled otherwise are `verification/warning`s.
+> S5.7 (ADR 0102): `subsumption/check` and `broker/check-contracts` take `components`, and `janus check
+> --config` loads a project's, so a declared component's operators are compared as its handshake declares
+> (read by the engine; the WASM binding forwards `matcher/compare`). `janus-csv`'s `csv:column` is `exact`.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -594,7 +597,7 @@ janus verify --broker-url <url> --provider-name <name> --provider-url <url>
 janus verify --url <pact-url>... | --webhook-callback-url <pact-url>   # pacts by URL, published when a broker served them
 janus check <contract-or-pact>... [--provider-shape <path>]... [--verification <file>]...
             [--policy <file>] [--on-finding warn|block] [--on-review warn|block]
-            [--as-of <YYYY-MM-DD>] [--output text|json]
+            [--as-of <YYYY-MM-DD>] [--output text|json] [--config verifier.janus.yaml]   # declared components (S5.7, ADR 0102)
             [--broker-url <url> (--provider-version <v> | --provider-branch <b>) [--publish]
              [--broker-username <u> --broker-password <p> | --broker-token <t>]]   # shapes from a broker (S4.3b, ADR 0093)
 janus explain <document.json> [--index N | --description <text>] [--variant <id>] [--spec] [--plan] [--executed <values.json>]

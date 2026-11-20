@@ -118,6 +118,7 @@ superseding ADR instead.
 | [0099](0099-verify-a-components-sigstore-signature-found-as-an-oci-referrer-against-the-signer-its-declaration-names.md) | Verify a component's Sigstore signature, found as an OCI referrer, against the signer its declaration names | accepted |
 | [0100](0100-a-content-component-says-what-a-value-operator-means-for-its-type-and-the-engine-compiles-every-slot.md) | A content component says what a value operator means for its type, and the engine compiles every slot | accepted |
 | [0101](0101-a-slot-that-cannot-be-decoded-fails-at-the-slot-a-decodes-losses-are-warnings-and-encode-is-given-the-shape.md) | A slot that cannot be decoded fails at the slot, a decode's losses are warnings, and encode is given the shape | accepted |
+| [0102](0102-a-check-loads-the-components-a-project-declares-and-compares-their-operators-as-their-handshakes-declare.md) | A check loads the components a project declares, and compares their operators as their handshakes declare | accepted |
 
 ## Decision backlog
 

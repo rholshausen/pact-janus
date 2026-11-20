@@ -138,3 +138,17 @@ pub fn read_all_documents(paths: &[std::path::PathBuf]) -> Result<Vec<(String, V
   }
   Ok(documents)
 }
+
+/// The `components` a verifier configuration declares, read as `janus verify --config` reads it (the
+/// hook loader, which interpolates and resolves it): what `explain --config` and `check --config` hand
+/// the engine, so they load what a run loads (ADR 0050, ADR 0102). None declared is an empty list.
+pub fn config_components(path: &std::path::Path) -> Result<serde_json::Value, crate::error::Error> {
+  let config = pact_janus_hooks_host::loader::load(path)
+    .map_err(|err| format!("reading {}: {}", path.display(), crate::engine::sentence(&err)))?;
+  Ok(
+    config
+      .get("components")
+      .cloned()
+      .unwrap_or_else(|| serde_json::json!([])),
+  )
+}

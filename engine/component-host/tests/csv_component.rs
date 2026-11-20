@@ -755,7 +755,7 @@ fn a_degradation_a_decode_reports_is_a_warning_located_in_the_reply() {
     ..Default::default()
   })
   .unwrap();
-  let (summary, events) = verify_events(&mut engine, &contract, provider.base_url().as_str());
+  let (summary, events) = verify_events(&mut engine, &contract, provider.base_url());
   assert_eq!(summary["status"], "verified", "{summary}");
   let warnings = of_kind(&events, "verification/warning");
   let degraded = warnings

@@ -29,6 +29,10 @@ pub struct Check {
   pub contract: Value,
   #[serde(rename = "provider-shape")]
   pub provider_shape: Value,
+  /// The project's declared components, resolved as `verify`'s `target.components` are, whose
+  /// operators the walk compares as their handshakes declare (ADR 0102).
+  #[serde(default)]
+  pub components: Vec<Value>,
 }
 
 #[derive(Debug, Deserialize)]

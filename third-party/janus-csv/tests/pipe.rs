@@ -40,7 +40,12 @@ fn hello_declares_the_content_type_and_its_degradations() {
   assert_eq!(
     ok["contributes"]["actions"],
     json!([ { "name": "csv:integer" }, { "name": "csv:number" }, { "name": "csv:boolean" },
-            { "name": "csv:equality" } ])
+            { "name": "csv:equality" }, { "name": "csv:column" } ])
+  );
+  assert_eq!(
+    ok["contributes"]["operators"],
+    json!([ { "name": "csv:column", "comparability": "exact" } ]),
+    "an exact operator, which compare decides"
   );
   let content_types = ok["contributes"]["content-types"].as_array().unwrap();
   assert_eq!(content_types[0]["media-type"], "text/csv");
@@ -86,9 +91,9 @@ fn every_operation_before_hello_is_refused() {
 fn an_unknown_operation_is_named() {
   let mut component = greeted();
   // An op of an interface it declared (matcher) but does not implement: spec §3.1 says named.
-  let result = call(&mut component, "matcher/compare", json!({}));
+  let result = call(&mut component, "matcher/prefix", json!({}));
   assert_eq!(result["error"]["code"], "operation-unsupported");
-  assert_eq!(result["error"]["details"]["op"], "matcher/compare");
+  assert_eq!(result["error"]["details"]["op"], "matcher/prefix");
   let detect = call(
     &mut component,
     "content/detect",
@@ -389,4 +394,54 @@ fn apply_reads_text_as_the_type_it_spells() {
     json!({ "action": "csv:date", "values": [ { "content": "x" } ] }),
   );
   assert_eq!(unknown["error"]["code"], "unknown-action");
+}
+
+fn column(kind: &str) -> Value {
+  json!({ "shape": "csv:column", "type": kind, "example": "1" })
+}
+
+/// A `csv:column` is a field that spells a value of its type, and runs as its own action with its
+/// members as the one argument (spec §7.2).
+#[test]
+fn a_column_admits_the_fields_that_spell_its_type() {
+  let mut component = greeted();
+  for (kind, field, holds) in [
+    ("integer", "12", true),
+    ("integer", "1.5", false),
+    ("number", "1.5", true),
+    ("boolean", "true", true),
+    ("boolean", "yes", false),
+    ("text", "anything", true),
+  ] {
+    let applied = call(
+      &mut component,
+      "matcher/apply",
+      json!({ "action": "csv:column", "values": [ { "content": field } ],
+              "config": { "arguments": [ { "type": kind } ] } }),
+    );
+    let status = &applied["ok"]["results"][0]["status"];
+    assert_eq!(status == "ok", holds, "{kind} of '{field}': {applied}");
+  }
+}
+
+/// Spec §7.5: an `exact` operator's `compare` decides two of them, and answers `unknown` where the
+/// answer depends on what it is not told.
+#[test]
+fn compare_decides_two_columns_by_their_types() {
+  let mut component = greeted();
+  let mut verdict = |provider: Value, consumer: Value| {
+    let compared = call(
+      &mut component,
+      "matcher/compare",
+      json!({ "operator": "csv:column", "provider": provider, "consumer": consumer }),
+    );
+    compared["ok"]["verdict"].as_str().unwrap_or_else(|| panic!("{compared}")).to_string()
+  };
+  assert_eq!(verdict(column("integer"), column("number")), "yes");
+  assert_eq!(verdict(column("number"), column("integer")), "no");
+  assert_eq!(verdict(column("boolean"), column("text")), "yes");
+  assert_eq!(verdict(column("boolean"), column("integer")), "no");
+  assert_eq!(verdict(column("integer"), json!({ "shape": "string" })), "yes");
+  assert_eq!(verdict(json!({ "shape": "string" }), column("integer")), "no");
+  assert_eq!(verdict(json!({ "shape": "integer" }), column("integer")), "unknown");
 }

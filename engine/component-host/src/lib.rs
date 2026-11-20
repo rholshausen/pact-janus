@@ -27,9 +27,10 @@ pub mod signature;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::{
-  Apply, ApplyResult, Compile, CompileResult, ComponentDeclaration, ComponentError, ComponentLoader,
-  ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult, Fetched, Grants, Label,
-  LabelResult, Loaded, MatcherComponent, Signer, SlotValue, media_type_matches,
+  Apply, ApplyResult, Compare, CompareResult, Compile, CompileResult, ComponentDeclaration, ComponentError,
+  ComponentLoader, ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult,
+  Fetched, Grants, Label, LabelResult, Loaded, MatcherComponent, Prefix, PrefixResult, Signer, SlotValue,
+  media_type_matches,
 };
 use pact_janus_kernel::persisted::Persisted;
 use pact_janus_kernel::plan::RuntimeValue;
@@ -834,7 +835,9 @@ impl ContentComponent for WasmComponent {
   }
 }
 
-/// `matcher/apply` over the pipe (spec §7.1): the one matcher operation anything calls yet.
+/// The matcher interface over the pipe: `apply` (spec §7.1), and the two operations the subsumption
+/// walk asks (ADR 0102), `compare` (§7.5) and `prefix` (§7.6). An operator's comparability is not asked
+/// here: the engine reads it from the handshake, whichever binding loaded the component.
 impl MatcherComponent for WasmComponent {
   fn apply(&self, req: Apply) -> Result<ApplyResult, ComponentError> {
     let mut body = json!({ "action": req.action, "values": req.values });
@@ -848,6 +851,31 @@ impl MatcherComponent for WasmComponent {
       .cloned()
       .ok_or_else(|| ComponentError::synthesised("component-malformed", "apply returned no results"))?;
     Ok(ApplyResult { results })
+  }
+
+  fn compare(&self, req: Compare) -> Result<CompareResult, ComponentError> {
+    let result = self.instance_call(
+      "matcher/compare",
+      json!({ "operator": req.operator, "provider": req.provider, "consumer": req.consumer }),
+    )?;
+    let verdict = result
+      .get("verdict")
+      .and_then(Value::as_str)
+      .ok_or_else(|| ComponentError::synthesised("component-malformed", "compare returned no verdict"))?;
+    Ok(CompareResult {
+      verdict: verdict.to_string(),
+      reason: result.get("reason").and_then(Value::as_str).map(str::to_string),
+    })
+  }
+
+  fn prefix(&self, req: Prefix) -> Result<PrefixResult, ComponentError> {
+    let result = self.instance_call(
+      "matcher/prefix",
+      json!({ "operator": req.operator, "node": req.node }),
+    )?;
+    Ok(PrefixResult {
+      prefix: result.get("prefix").and_then(Value::as_str).map(str::to_string),
+    })
   }
 }
 

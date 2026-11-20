@@ -57,7 +57,7 @@ names a body that would not parse.
           { "code": "no-null",
             "message": "An empty field decodes as the empty string; CSV cannot distinguish it from an absent value." } ] } ],
     "actions": [ { "name": "csv:integer" }, { "name": "csv:number" }, { "name": "csv:boolean" },
-                 { "name": "csv:equality" } ],
+                 { "name": "csv:equality" }, { "name": "csv:columns" }, { "name": "csv:header-style" } ],
     "operators": [
       { "name": "csv:columns", "comparability": "exact" },
       { "name": "csv:header-style", "comparability": "exact", "variant-facet": "header-style" } ],
@@ -235,6 +235,14 @@ And the answer a component is most tempted to get wrong:
 
 `unknown` is a first-class answer (shape spec §8). A component that guessed `yes` here would be the
 reason a team stopped trusting `can-i-deploy`, and no amount of correctness elsewhere buys that back.
+
+The engine reads `exact` from the handshake, and decides a provider that admits a finite set of values
+by running the operator's own action, so a comparable operator needs an action of its name: a handshake
+without one fails to load (§7.5). `janus check` asks `compare` only for the components a project
+declares, with `--config`
+([ADR 0102](../../../decisions/0102-a-check-loads-the-components-a-project-declares-and-compares-their-operators-as-their-handshakes-declare.md)).
+The component built from this page, `third-party/janus-csv`, contributes one comparable operator,
+`csv:column`, a field that spells a value of its `type`, whose `compare` decides two columns by type.
 
 ## 8. When it cannot be loaded
 
