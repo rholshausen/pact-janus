@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795134722492,
+  "lastUpdate": 1795134725066,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -61710,6 +61710,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 78.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "948e5e01c9393c328adcd25e8125af5a73d1f55a",
+          "message": "feat: S5.7, a check loads the components a project declares and compares their operators as their handshakes declare (ADR 0102)\n\nA third party's comparable operator was opaque to the subsumption walk:\nsubsumption/check loaded no declared component, and the WASM binding\nanswered neither an operator's class nor compare.\n\n- subsumption/check and broker/check-contracts take components, loaded\n  as a run loads them; the walk compares with the scope's contributions.\n- The engine reads a declared component's comparability from its\n  handshake, whatever the binding. An operator declared exact or\n  conservative without an action of its name, or by a component with no\n  matcher, fails the load as component-invalid.\n- The WASM binding forwards matcher/compare and matcher/prefix.\n- janus check --config reads a verifier configuration's components,\n  through the reader explain --config now shares.\n- janus-csv contributes csv:column, declared exact, whose compare\n  decides two columns by type.\n- Fixes csv_component.rs from the S5.3 commit, which did not compile.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T11:24:22+11:00",
+          "tree_id": "cf57921409149e71cef2a3fc38f1f7e046f95e6e",
+          "url": "https://github.com/rholshausen/pact-janus/commit/948e5e01c9393c328adcd25e8125af5a73d1f55a"
+        },
+        "date": 1795134724326,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 29416,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 25396,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 53.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 38.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 135.5,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 96.9,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
