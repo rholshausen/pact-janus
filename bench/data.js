@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795305136336,
+  "lastUpdate": 1795305138583,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -62244,6 +62244,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 96.9,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "38309842+rholshausen@users.noreply.github.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c43ee3a006592f004817184ba41adfad54ade282",
+          "message": "chore(CI): Remove rust format check as a hard gate",
+          "timestamp": "2026-11-22T10:33:59+11:00",
+          "tree_id": "9fb269df2eb9ee7bb4be4304d6d56767a8261ff1",
+          "url": "https://github.com/rholshausen/pact-janus/commit/c43ee3a006592f004817184ba41adfad54ade282"
+        },
+        "date": 1795305137924,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 40527,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 38504,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 41.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 33.8,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 106.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 78.7,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
