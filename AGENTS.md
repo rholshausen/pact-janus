@@ -334,6 +334,10 @@ Three sources are the source of truth and take precedence over this file when th
 > cases, `corpora/components/<component>/`, run through the native binding and a serialising in-process
 > one that reaches them through that code. `janus component check <component.wasm> <cases>...` runs a
 > component's own cases through the WASM binding (`third-party/janus-csv/conformance/`).
+> S5.2 is split into eight (ADR 0106): today's pact-plugins are bridged by `janus-plugin-bridge`, a child
+> process in its own workspace (`plugin-bridge/`), built on `pact-plugin-driver`, so gRPC and protobuf stay
+> out of every Janus binary. It speaks the subprocess binding (S5.2b builds the loader), one process and
+> one component, `pact-plugin-<name>`, per plugin.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout

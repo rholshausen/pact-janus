@@ -2471,7 +2471,7 @@ once there are shapes to publish.
   writes the document, outside the engine and the component model (§5, option c), and an array with no
   `minItems` makes no cardinality claim (§4.2). An undiscriminated `oneOf` or `anyOf` becomes `any`, and
   the importer reports each mapping that loses something, since a silent widening is how a derived shape
-  misleads. A protobuf shape is useful only to a contract with a protobuf body, which S5.2 makes
+  misleads. A protobuf shape is useful only to a contract with a protobuf body, which S5.12 makes
   possible, so the protobuf half may land after it.
   *Exit:* spike 7.3's hand-authored OpenAPI document imports into a shape that `janus check` matches by
   selector and that reproduces the recorded shape's findings, and the generator-emitted one's lossy
@@ -2497,7 +2497,8 @@ once there are shapes to publish.
   - Not foreseen: a header's schema describes the text of a field line, so an `integer` header is a
     `regex` of digits and a `boolean` one `'true' | 'false'`, or no recorded or consumer value would be
     admitted.
-  - The protobuf half is S5.2's (ADR 0088 decision 8).
+  - The protobuf half is S5.12's (ADR 0088 decision 8; moved from S5.2 by ADR 0106, since a plugin
+    cannot decode).
 - **S4.3 The broker PR series** (broker notes §10, rows 1–8) — **XL**, as S4.3a–f: a resource for
   provider shapes, decisions computed on read, subsumption reasons in `can-i-deploy`, stored policy, and
   rendering from the report's own words. On this side, `janus publish` learns provider shapes (S1.3)
@@ -2794,7 +2795,7 @@ once there are shapes to publish.
     (`const`, or an `enum` of one). A reply's selector is its request's. The address selects only where
     a header fixes it, as pact-js's example's provider documents its `queue`. A message that fixes
     nothing is `selector-empty`, two entries one message could select are each `selector-ambiguous`,
-    and a payload in Avro or protobuf is `schema-format-unread` until S5.2 and S6.9.
+    and a payload in Avro or protobuf is `schema-format-unread` until S5.12 and S6.9.
   - `cli/tests/derive.rs` is the exit: an AsyncAPI 3.0 document and a 2.6 one for pact-js's message
     example's provider (`cli/tests/cmd/fixtures/asyncapi/order-provider.asyncapi-*.yaml`) derive
     byte-identical shapes, which `janus check` matches to the example's pact by its queue and which find
@@ -2997,9 +2998,58 @@ The component model, opened to the ecosystem.
       signer, and recorded with its digest and signer in the contract and the summary. CI holds the
       component to clippy and its own tests, as it does `janus-csv`.
 - **S5.2 A bridge for today's pact-plugins** — **L**, at least the protobuf/gRPC one, so no existing
-  user loses a plugin. A shim process speaking both wires is the smaller route (component-interfaces
-  spec §9). This closes S1.8's refusal. With it, S4.2's protobuf half: `janus derive` reads a `.proto`
-  into a shape whose bodies the protobuf component decodes (ADR 0088 decision 8).
+  user loses a plugin. This closes S1.8's refusal. Split 2026-11-23 into eight by
+  [ADR 0106](decisions/0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md):
+  the bridge is `janus-plugin-bridge`, a child process in a workspace of its own, built on
+  `pact-plugin-driver`, so gRPC, protobuf and the driver stay out of every Janus binary. It speaks the
+  subprocess binding to the engine, one process and one component (`pact-plugin-<name>`) per plugin.
+  S4.2's protobuf half is not the bridge's, because a plugin cannot decode: it is S5.12.
+  - **S5.2a Where the bridge runs, and what it bridges** — decision. *Done 2026-11-23* (ADR 0106).
+  - **S5.2b The subprocess loader** — **M**, moved from S5.5. Spec §9.3, built: spawn a `subprocess`
+    source, frames over stdio with `Content-Length`, a deadline per call that ends in a kill,
+    `component-exited` when stdout closes, an empty environment plus the `env` grant, and the process
+    exiting on stdin EOF. It decides finding 20 (what a source's command is: an `args` array beside
+    `reference`, resolved against the configuration's directory, is the leading option) and finding 18
+    (out of process the unit of recreation is the process, and the loader says which instances went with
+    it). Spike 8.3's loader is at `b8d5010`. `janus component check` takes a subprocess declaration as
+    well as a `.wasm`, so the S5.10 runner holds this binding too.
+    *Exit:* a component written in another language loads in `janus-engine` and `janus` on Linux, macOS and
+    Windows, passes its conformance cases through the `subprocess` binding, and passes spike 8.3's
+    containment tests.
+  - **S5.2c The bridge and its handshake** — **M**. `plugin-bridge/` with its own lockfile, loading one
+    plugin through `pact-plugin-driver` and answering `component/hello` with its catalogue translated
+    (ADR 0106 decision 4), and `matcher/apply` of `compare-contents` with `CompareContents`. CI runs it
+    against plugin binaries pinned by digest and cached, never installed from the index during a test.
+    *Exit:* `janus component check` passes the bridge's cases against pact-plugins' CSV plugin and the
+    protobuf plugin.
+  - **S5.2d Verifying a v1–v4 pact's plugin content** — **M**. The legacy compiler compiles a body whose
+    content type a plugin claims to `compare-contents`, and an ADR decides how one action reports
+    several located mismatches (plan grammar §2.3). `janus verify` adds a bridge declaration for each
+    plugin a pact names (ADR 0106 decision 5), a request body is generated through `GenerateContent` as
+    today, and ADR 0045's refusal stays for an engine with no bridge.
+    *Exit:* S1.1 fixtures for pact-plugins' CSV example (HTTP) and protobuf example (a message), whose
+    verdicts agree with today's verifier's. This is stage 5's "a protobuf plugin runs through the bridge".
+  - **S5.2e Plugin transports in verification** — **M**. A plugin's `transport` entry as a Janus
+    transport kind, driven through `PrepareInteractionForVerification` and `VerifyInteraction`, and an ADR
+    deciding how a verdict the plugin reached becomes a verification result without the engine comparing
+    the same parts again.
+    *Exit:* an S1.1 fixture for pact-plugins' gRPC area calculator, agreeing with today's verifier.
+  - **S5.2f The consumer side** — **L**. The facades' plugin DSLs (pact-js's `usingPlugin` and
+    `withPluginContents`, pact-jvm's), reaching `ConfigureInteraction` through `add-pact-interaction`; a
+    mock that serves plugin content and starts a plugin's own (`StartMockServer`); and a form in a Janus
+    contract for an interaction a plugin configured (contract-file spec), so the facades' contracts keep
+    it. `janus upgrade` then carries such an interaction where ADR 0045 drops it.
+    *Exit:* pact-js's plugin example, refused by name in S2.5a, runs on the facade and records a contract
+    that verifies through the bridge.
+  - **S5.2g Matcher-only plugins, and version 2's field operations** — **S**. A plugin that contributes
+    only a matcher (pact-plugins' `creditcard`), and `MatchField` and `GenerateField`, which a plugin of
+    interface version 2 answers.
+    *Exit:* the credit-card example verifies through the bridge, agreeing with today's verifier.
+  - **S5.2h Releasing the bridge** — **S**. Its files, for the five target triples, built and attested as
+    the engine's are, and how `janus` finds an installed one. An ADR on whether they are assets of the
+    engine's release (ADR 0030's names) or a release of their own (as ADR 0060 made the SDKs').
+    *Exit:* a provider with no Rust toolchain installs the bridge from a release and verifies a protobuf
+    pact.
 - **S5.3 Content components that are not JSON** — **M**: `encode` seeing the shape (finding 12), and
   decode errors and degradations reaching the user as their own finding kind, not as "expected a
   value" (findings 13, 14). Member order moved to S1.20.
@@ -3048,9 +3098,10 @@ The component model, opened to the ecosystem.
     them, and it now covers any structure a CSV body has. `engine/kernel/tests/substitutions.rs`
     replaces `fragments.rs`. The grammar-version rules still govern every plan document the engine
     reads (`plan/versions.rs`).
-- **S5.5 Out-of-process components**, if the community wants them beyond the bridge — **M**: the
-  containment rules of findings 18 and 20 (recreation in a shared process; what a `subprocess`
-  source's command is).
+- **S5.5 Out-of-process components**, if the community wants them beyond the bridge — **S**. The loader
+  and findings 18 and 20 moved to S5.2b (ADR 0106). What is left is opening the `subprocess` binding to
+  third parties: transports out of process (spike 8.3's case), the author guide's section on it, and the
+  general-availability statement ADR 0104 left out.
 - **S5.6 A multipart part reaches the registry's components** — **M**. The built-in multipart component
   decodes and encodes each part's body through the built-in JSON, XML, text and form components it holds
   itself, and any other part is bytes (ADR 0040 decision 3). Stage 1a needs nothing more, because today's
@@ -3167,6 +3218,14 @@ The component model, opened to the ecosystem.
   the loader's own handshake checks (spec §2.4, §3.3).
   *Exit:* each built-in's `component/hello` is a case under `corpora/components/`, and `engine/hello`'s
   in-tree list is read from those handshakes.
+- **S5.12 A native protobuf content component, and `janus derive` from a `.proto`** — **M**. Added
+  2026-11-23 by ADR 0106, out of S5.2. A pact-plugins plugin cannot decode, so the bridge gives no
+  protobuf document for a shape to describe. A WASM content component that decodes protobuf by a message
+  type, read from descriptors a declaration grants it, gives a Janus contract protobuf bodies of its own.
+  With it, S4.2's protobuf half: `janus derive` reads a `.proto` into a shape whose bodies that component
+  decodes (ADR 0088 decision 8).
+  *Exit:* a Janus contract with a protobuf body verifies against the protobuf example's provider, and
+  `janus derive` writes the shape that checks it.
 
 **Done when** a protobuf plugin runs through either the bridge or a native component, and a second
 content component exists written by someone outside the core team.
@@ -3239,7 +3298,7 @@ content component exists written by someone outside the core team.
   *Exit:* `janus verify` with the option writes a shape with provenance `observed` that `janus check`
   matches by description to every contract the run verified.
 - **S6.9 Avro bodies, and AsyncAPI payloads in Avro** — **M**. Added 2026-11-13, out of S4.8 to keep
-  its scope down: protobuf (S5.2) proves the importer and the walk handle a format that is not JSON, and
+  its scope down: protobuf (S5.12) proves the importer and the walk handle a format that is not JSON, and
   Avro follows the same path. A content component for Avro decodes a body into a document by its
   schema, whose source it has to be told: the AsyncAPI document's, or a schema registry's (a Kafka
   message carries the registry's id ahead of the octets). S4.8's importer then maps an Avro
@@ -3392,12 +3451,14 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user (done: ADR 0101) | findings 12–14 |
 | S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099); generally available, with a guide (done: S5.1d, ADR 0104) | findings 15–17 |
-| S5.5 | Out-of-process containment and command form | findings 18, 20 |
+| S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 | S1.8 |
+| S5.5 | Out-of-process containment and command form (moved to S5.2b by ADR 0106) | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components (done: ADR 0103) | ADR 0040 decision 3 |
 | S5.8 | A component's substitutions do not reach content embedded in a slot | ADR 0103 |
 | S5.9 | A declared component's generators and variant dimensions are refused at load: nothing calls them | ADR 0104 |
 | S5.10 | No component conformance corpus exists, though spec §9.4 specifies one (done: ADR 0105) | ADR 0104 |
 | S5.11 | An in-tree component has no `component/hello` document, so nothing indexes a built-in as spec §9.1 says | ADR 0105 |
+| S5.12 | No protobuf body has a document, so a Janus contract cannot shape one and `janus derive` reads no `.proto` | ADR 0106; ADR 0088 decision 8 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration (done: ADR 0100) | findings 21, 22, 24; gate F |
 | S5.7 | A declared component's operators are opaque to `janus check`, which loads none (done: ADR 0102) | ADR 0087 |
 | S6.6 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12; moved from S3.7 |

@@ -122,6 +122,7 @@ superseding ADR instead.
 | [0103](0103-a-content-component-asks-for-embedded-content-in-its-answer-and-the-registry-decodes-it.md) | A content component asks for embedded content in its answer, and the registry decodes it | accepted |
 | [0104](0104-the-component-interface-is-generally-available-for-content-and-matcher-components-over-wasm.md) | The component interface is generally available for content and matcher components over WASM | accepted |
 | [0105](0105-run-each-components-conformance-cases-through-every-binding-it-is-reached-by.md) | Run each component's conformance cases through every binding it is reached by | accepted |
+| [0106](0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md) | Bridge pact-plugins through a child process that speaks the subprocess binding | accepted |
 
 ## Decision backlog
 
