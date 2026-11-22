@@ -1,3 +1,38 @@
+## 0.2.5 (2026-11-22)
+
+### Fixes
+
+#### The generated bindings carry the broker's provider-shape operations
+
+The protocol bindings have `PublishProviderShape`, `CheckContracts` and their results, and the event
+vocabulary has `broker/checked` (ADR 0093). Nothing in the SDK reads them.
+
+#### The generated protocol bindings carry `components` on `subsumption/check` and `broker/check-contracts`
+
+Both operations take the project's declared components (ADR 0102), whose operators the walk compares as
+their handshakes declare. The bindings gain the optional member; nothing an SDK does changes.
+
+#### The generated contract bindings read `metadata.components`
+
+A contract's metadata may list the declared components its writer loaded, as `RecordedComponent`
+entries with a `RecordedSource` (ADR 0097). The bindings type them. Nothing an SDK does changes.
+
+#### The generated protocol bindings describe `verification/explain`'s components as they are now used
+
+`verification/explain`'s `components` description no longer mentions plan fragments, which the engine
+withdrew (ADR 0100): a content component's substitutions are compiled in instead. Only the generated
+documentation changes, and nothing an SDK does.
+
+#### The generated contract bindings read a recorded component's `signer`
+
+A recorded component's source may name the signer whose Sigstore signature the engine verified, as a
+`RecordedSigner` (ADR 0099). The bindings type it. Nothing an SDK does changes.
+
+#### The generated bindings describe what a recording's `kind` is read through
+
+`StartRecording.kind`'s description says that a kind's declarations may be held by an embedding with
+no transport for it, as the WASM engine holds `http`'s (ADR 0094). Only the documentation changed.
+
 ## 0.2.4 (2026-11-13)
 
 The SDK runs janus-engine 0.7.0, where it ran 0.6.0: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.7.0) says what changed.
