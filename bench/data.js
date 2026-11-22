@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795390470482,
+  "lastUpdate": 1795390472485,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -63846,6 +63846,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 122.1,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "82ccb2df48762638a05374463e703309760d18b0",
+          "message": "feat: S5.10, the built-in components' conformance cases run through two bindings, and janus component check runs a component's own (ADR 0105)\n\n- The engine's half of the WASM binding moved into the kernel as component::wire:\n  PipeClient writes and reads the content and matcher documents over any pipe, and\n  serve/serve_frame are a native component's end. A serialising in-process binding\n  (PipeClient over InProcess) reaches a built-in through frame bytes by the same code.\n- corpora/components/ holds 36 cases for json, text, form, xml, multipart and the HTTP\n  matcher, run natively and serialised by tools/corpus, checked against the schema.\n- janus component check <component.wasm> <cases>... runs a component's cases through the\n  WASM binding; third-party/janus-csv/conformance/ is the CSV component's 12.\n- Found by the corpus: decode-failed and unsupported-content-type now have category\n  document (spec §11.1), and the HTTP matcher answers an unknown action with\n  unknown-action.\n- conformance-case.schema.json: an expected error needs only its code; serialising is a\n  known binding. janus-spec.tar.gz carries the component-interfaces schemas.\n- S5.11 added: in-tree components answer component/hello.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T10:15:14+11:00",
+          "tree_id": "7cb69d126e101590bcbf3aab04511635f76c68e2",
+          "url": "https://github.com/rholshausen/pact-janus/commit/82ccb2df48762638a05374463e703309760d18b0"
+        },
+        "date": 1795390472029,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 19990,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20339,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 44.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 31.4,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 105.2,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 71.1,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
