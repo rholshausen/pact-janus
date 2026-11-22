@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795311646263,
+  "lastUpdate": 1795311648235,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -63312,6 +63312,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 127.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "d4396a65fcd3464ff0136c78a5ffd72d51379f70",
+          "message": "feat: S5.1d, the component interface is generally available for content and matcher components over WASM, with a guide (ADR 0104)\n\nGenerally available: the WIT world, the component/*, content/* and\nmatcher/{apply,compare,prefix} documents, the declaration, both OCI layouts,\nsigning and the record of what was loaded, evolving only additively within\ncomponent protocol v1.\n\nA declared component whose handshake declares what no binding calls (the hook\ninterface, a WASM transport, generators, an operator's variant-facet) now fails\nto load as component-invalid instead of loading with that part silently unused.\nThe spec says so where each is described; generators and variant dimensions are\nS5.9, and the conformance corpus spec §9.4 describes is S5.10.\n\nDocumentation/component-author-guide.md takes an author from an empty directory\nto a published, signed, declared and recorded component. third-party/janus-ndjson\nwas written by an author who read only the guide and what it links; its 17\nfindings are answered in the guide. ndjson_component.rs pushes it with wkg, signs\nit, declares it by digest and signer, serves and verifies it, and finds it\nrecorded in the contract and the summary. CI holds it to clippy and its tests.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T12:34:28+11:00",
+          "tree_id": "0023b7cfdc8c07c5dd274856dc3c57061ca82adc",
+          "url": "https://github.com/rholshausen/pact-janus/commit/d4396a65fcd3464ff0136c78a5ffd72d51379f70"
+        },
+        "date": 1795311647692,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 68391,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 46605,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 64.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 46.5,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 164.1,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 122.1,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
