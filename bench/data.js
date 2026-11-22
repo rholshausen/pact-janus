@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795307529983,
+  "lastUpdate": 1795307532202,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -62778,6 +62778,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 78.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "3cbc993d32478970472f72f76b1674914c4cbe0b",
+          "message": "feat: S5.6, a content component asks for embedded content in its answer, and a multipart part reaches a declared component (ADR 0103)\n\nA content/decode or content/encode result may carry `embedded`, the slots or\ndocuments of another type the component needs first. The registry resolves\neach through the session's components, declared ones first, and repeats the\nrequest with the answers by id, so the engine stays the only caller and the\nWIT world is unchanged. One round per request; content more than eight levels\ndeep is `embedding-too-deep`. An embedded document is encoded with the part of\nthe request's shape at its `at`. The engine's handshake advertises\n`embedded-content`.\n\nThe multipart component holds no component any more: it asks for every typed\npart's body (superseding ADR 0040 decision 3), so the CSV component decodes a\ntext/csv part into rows a contract shapes. With only the built-ins, every\ndocument is what it was. S5.8 is added for substitutions in embedded content.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T11:25:55+11:00",
+          "tree_id": "d4c0de689e46bc80c7962fc4f4da9d6ae6269e0d",
+          "url": "https://github.com/rholshausen/pact-janus/commit/3cbc993d32478970472f72f76b1674914c4cbe0b"
+        },
+        "date": 1795307531477,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 67543,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 39015,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 69.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 51,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 168.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 127.6,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
