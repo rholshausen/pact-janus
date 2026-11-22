@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795391580066,
+  "lastUpdate": 1795391582445,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -64380,6 +64380,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 71.1,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "2258cf447e9395b9bc19b8ac513f89ccae03468c",
+          "message": "docs: S5.2a, today's pact-plugins are bridged by a child process that speaks the subprocess binding, and S5.2 is split into eight (ADR 0106)\n\n- janus-plugin-bridge: a child process in its own workspace (plugin-bridge/), built on\n  pact-plugin-driver, so gRPC, protobuf and the driver stay out of every Janus binary.\n- One process and one component (pact-plugin-<name>) per plugin; a content matcher becomes\n  a compare-contents action on a whole slot, a transport a Janus transport kind.\n- janus verify adds a bridge declaration for each plugin a pact names; without a bridge,\n  ADR 0045's refusal stands.\n- S5.2b-h added; the subprocess loader moves from S5.5 to S5.2b; S4.2's protobuf half\n  moves to a new S5.12, a native protobuf content component.\n\nNo-Changeset: documentation only\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T10:45:42+11:00",
+          "tree_id": "fc78cc8cff4f51d379310e3ba60dda677928e070",
+          "url": "https://github.com/rholshausen/pact-janus/commit/2258cf447e9395b9bc19b8ac513f89ccae03468c"
+        },
+        "date": 1795391581679,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 29520,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 21024,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 56,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 39.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 142.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 99.6,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
