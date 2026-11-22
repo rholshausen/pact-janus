@@ -51,7 +51,7 @@ pub fn native_engine() -> Engine {
   engine.declare_in_tree("content", "text", "1.0.0");
   engine.register_content(Arc::new(pact_janus_component_form::FormContent::new()));
   engine.declare_in_tree("content", "form", "1.0.0");
-  // A part's body goes to the built-in components it holds itself (ADR 0040 decision 3).
+  // A part's body is decoded through the registry, declared components first (ADR 0103).
   engine.register_content(Arc::new(pact_janus_component_multipart::MultipartContent::new()));
   engine.declare_in_tree("content", "multipart", "1.0.0");
   match pact_janus_component_host::WasmLoader::new() {

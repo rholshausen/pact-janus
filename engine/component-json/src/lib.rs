@@ -91,6 +91,7 @@ impl ContentComponent for JsonContent {
     Ok(DecodeResult {
       document,
       degradations: Vec::new(),
+      embedded: Vec::new(),
     })
   }
 
@@ -104,6 +105,7 @@ impl ContentComponent for JsonContent {
         encoded: Some("base64".to_string()),
         content_type: Some("application/json".to_string()),
       },
+      embedded: Vec::new(),
     })
   }
 

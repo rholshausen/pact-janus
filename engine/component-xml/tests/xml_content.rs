@@ -268,6 +268,7 @@ fn it_decodes_a_slot_and_encodes_a_document_back() {
         content_type: Some("application/xml".to_string()),
       },
       options: None,
+      embedded: None,
     })
     .expect("decodes");
   assert_eq!(
@@ -281,6 +282,7 @@ fn it_decodes_a_slot_and_encodes_a_document_back() {
       document: decoded.document,
       options: None,
       shape: None,
+      embedded: None,
     })
     .expect("encodes");
   assert_eq!(encoded.value.content_type.as_deref(), Some("text/xml"));
@@ -303,6 +305,7 @@ fn a_slot_that_does_not_parse_fails_to_decode() {
       content_type: None,
     },
     options: None,
+    embedded: None,
   });
   assert!(failed.is_err());
 }

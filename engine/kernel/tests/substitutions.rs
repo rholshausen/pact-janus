@@ -36,6 +36,7 @@ impl ContentComponent for Stub {
     Ok(DecodeResult {
       document: RuntimeValue::from_json(&req.value.content),
       degradations: Vec::new(),
+      embedded: Vec::new(),
     })
   }
   fn encode(&self, req: Encode) -> Result<EncodeResult, ComponentError> {
@@ -45,6 +46,7 @@ impl ContentComponent for Stub {
         encoded: None,
         content_type: Some(req.content_type),
       },
+      embedded: Vec::new(),
     })
   }
   fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {

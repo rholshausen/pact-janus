@@ -173,7 +173,8 @@ Three rules are specific to this pipe:
 - **The engine is the only caller.** A component never initiates a call into the engine. Everything it
   needs arrives in a request body. This is what makes the WASM binding possible at all — spike 1.4
   showed how loudly wasmtime polices instance re-entry — and it is why inbound wire traffic is polled
-  rather than pushed (§5.3).
+  rather than pushed (§5.3). A content component that needs the engine's help, to decode content of
+  another type inside its own, asks in its answer and is asked again with the engine's (§6.6).
 - **There are no event frames.** Streams and events belong to the host-facing protocol (protocol §9);
   the engine is their only producer. Component activity that a host should see — hook outcomes,
   transport progress — reaches the host as engine-emitted events built from operation results.
@@ -588,8 +589,8 @@ Schema: [`schemas/v1/content.schema.json`](schemas/v1/content.schema.json).
 
 | Operation | Body → Result |
 |---|---|
-| `content/decode` | `{ content-type, value, options? }` → `{ document, degradations? }` |
-| `content/encode` | `{ content-type, document, options?, shape? }` → `{ value }` |
+| `content/decode` | `{ content-type, value, options?, embedded? }` → `{ document, degradations?, embedded? }` |
+| `content/encode` | `{ content-type, document, options?, shape?, embedded? }` → `{ value, embedded? }` |
 | `content/compile` | `{ content-type, shape, path }` → `{}` |
 | `content/detect` | `{ value, hint? }` → `{ media-type?, confidence? }` |
 | `content/label` | `{ content-type, value, at }` → `{ media-type? }` |
@@ -665,14 +666,16 @@ A part is an object of:
 - `headers`, each lower-cased header name with its value as a string;
 - `filename`, the file name its `Content-Disposition` gives, when it gives one;
 - `body`, its content after a `base64` `Content-Transfer-Encoding` is undone, decoded by the part's own
-  `Content-Type` through the built-in JSON, XML, text and form components. A part with no type is text,
-  or bytes when it is not UTF-8; a part of any other type is bytes. It is absent when the part's
-  component cannot decode it.
+  `Content-Type` through the session's registry, as embedded content (§6.6): by a component the project
+  declares for that type, else the built-in one. A part with no type is text, or bytes when it is not
+  UTF-8; a part that is itself multipart is bytes, and so is a part of a type no component claims. It is
+  absent when the part's component cannot decode it, except that text a text type cannot decode is bytes
+  ([ADR 0103](../../decisions/0103-a-content-component-asks-for-embedded-content-in-its-answer-and-the-registry-decodes-it.md)).
 
-A part never reaches a component a project declares: the multipart component holds the built-in ones
-itself (staged plan S5.6 lifts this). Its `encode` writes the boundary its content type names, or chooses
-one no part holds and labels the slot with it, and gives a named part with no `Content-Disposition` one
-of `form-data`. The order between differently named parts is not part of the document.
+Its `encode` writes each part's body through the registry the same way, writes the boundary its content
+type names, or chooses one no part holds and labels the slot with it, and gives a named part with no
+`Content-Disposition` one of `form-data`. The order between differently named parts is not part of the
+document.
 
 ### 6.2 Encoding is how variants become traffic
 
@@ -781,6 +784,76 @@ read, and detects from the member as it stands only when it has none
 ([ADR 0077](../../decisions/0077-match-a-multipart-parts-content-type-against-its-own-label.md)). A
 v1–v4 `contentType` matcher still sniffs. `label` is optional: a component whose documents carry no
 labels of their own answers `operation-unsupported`, which means the member has none.
+
+### 6.6 Embedded content
+
+Some content holds content of another type: a multipart part's body is JSON, XML or CSV by the part's
+own `Content-Type`. The component that decodes the outer octets should not hold a decoder for every type
+it may find inside them, and cannot hold one a project declares. So it asks the engine, which decodes
+the inner content through the session's registry, every component in the scope, declared ones first
+([ADR 0103](../../decisions/0103-a-content-component-asks-for-embedded-content-in-its-answer-and-the-registry-decodes-it.md)).
+
+It asks **in its answer**, never by a call (§3.1):
+
+1. The engine sends `content/decode` as usual.
+2. The component answers with `embedded`, a list of the slots it needs decoded, each with an `id` of its
+   own choosing, unique in the list, a `content-type` and a `value`. A result carrying `embedded` is a
+   question: the engine does not read its `document`, which the component writes as `null`.
+3. The engine decodes each through the registry exactly as it decodes a slot whose declared type is that
+   `content-type` (§6.3): the first component in the scope that handles it, or the octets themselves,
+   as bytes, when none does (§6.1). Each answer is that decode's result, or `{ error }` when the
+   component refused or failed.
+4. The engine repeats the original request with `embedded`, an object of the answers by id. The
+   component answers this one with its result. Asking again is `component-malformed`.
+
+```json decode-result
+{ "document": null,
+  "embedded": [
+    { "id": "0", "content-type": "text/csv",
+      "value": { "content": "aWQsc3RhdHVzCjY2LFBFTkRJTkcK", "encoded": "base64", "content-type": "text/csv" } } ] }
+```
+
+```json decode
+{ "content-type": "multipart/form-data; boundary=b",
+  "value": { "content": "LS1iDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9InJvd3MiDQpDb250ZW50LVR5cGU6IHRleHQvY3N2DQoNCmlkLHN0YXR1cwo2NixQRU5ESU5HCg0KLS1iLS0NCg==", "encoded": "base64" },
+  "embedded": {
+    "0": { "document": [ { "id": "66", "status": "PENDING" } ],
+           "degradations": [ { "code": "string-only", "path": "$[0].id", "message": "CSV fields are text." } ] } } }
+```
+
+What an answer means for the document is the asking component's to say. The multipart component puts a
+decoded document where the part's `body` goes, leaves `body` out when the part's component refused it,
+and reports an answer's degradations as its own, located where it put the document (§6.4).
+
+`content/encode` asks the same way. Its `embedded` entries carry a `document` (tagged by `encoded`, as
+any document is) and an optional `at`, a JSON pointer to where the document sits in the one being
+encoded. When the request has a `shape`, the engine encodes each embedded document with the part of that
+shape describing the value at `at` (§6.2), found through objects, arrays and the modifiers that wrap
+them, and with no shape where no one part does. So an empty CSV part is written as the header row its
+shape declares. Octets need no component and are answered as they are. A document of a type no
+component writes is answered `unsupported-content-type`. A question's `value` is `{ "content": null }`.
+
+Normative points:
+
+- **The capability.** An engine that answers embedded content says so in `component/hello`'s
+  `capabilities`, as `embedded-content: {}`. A component asks only of one that does. An engine without
+  it would read a question's placeholder as the answer.
+- **Once per request.** One round answers every embedded slot, because each is independent of the
+  others. Content inside embedded content is the embedded decode's own business: the component asked to
+  decode a part's body asks for what is inside it, in its own round.
+- **A bound.** Content embedded more than eight levels below its slot is answered with `{ error }`,
+  code `embedding-too-deep` with `source: "engine"`, so a component that finds its own type inside
+  itself without end stops.
+- **Nothing is retained between the two requests.** The repeated request carries everything the first
+  did, so a component may be on a fresh instance (§3.4) and works out again what it asked for. Ids are
+  what tie each answer to the question.
+- **Every binding, unchanged.** The question and the answers are members of the operation's documents, so
+  the WASM world stays as it is (§9.2), the subprocess pipe needs no reverse frame (§9.3), and the
+  native binding carries the same members as values (§9.1).
+
+The shape language's substitutions (§6.3) are the slot's: a CSV component's `csv:integer` applies in a
+`text/csv` slot, and not to the rows of a `text/csv` part inside a multipart slot, where `integer` is the
+engine's own. Staged plan S5.8 is whether they should reach embedded content.
 
 ## 7. The matcher interface
 
@@ -1331,7 +1404,9 @@ carries the grant it wanted.
 A trap, a timeout, a crashed process or a panic in an in-tree component is still a failure that must
 reach the caller as a value. The binding synthesises a `ComponentError` on the component's behalf, and
 marks it: `source: "engine"`, with `code` one of `component-trapped`, `component-timeout`,
-`component-exited`. The engine **MUST NOT translate** an error the component *did* produce — protocol
+`component-exited`, or `component-malformed` for an answer that is not one (a frame that is not JSON, a
+question asked twice, §6.6). The engine also answers embedded content too deep with an error of its
+own, `embedding-too-deep` (§6.6), which reaches the component that asked, not the caller. The engine **MUST NOT translate** an error the component *did* produce — protocol
 §10.2 is explicit that the kernel does not understand component error interiors — and MUST distinguish
 the two cases, because "the component said no" and "the component died" send a reader to different
 places.

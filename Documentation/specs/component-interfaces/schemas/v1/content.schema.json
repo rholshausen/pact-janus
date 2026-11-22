@@ -11,7 +11,12 @@
       "properties": {
         "content-type": { "type": "string" },
         "value": { "$ref": "parts.schema.json#/$defs/SlotValue" },
-        "options": { "type": "object" }
+        "options": { "type": "object" },
+        "embedded": {
+          "type": "object",
+          "description": "On the request the engine repeats after this component asked for embedded content (spec.md §6.6, ADR 0103): what the session's content registry made of each slot it asked for, by the id it gave each. Absent on the first request.",
+          "additionalProperties": { "$ref": "#/$defs/EmbeddedDecodeAnswer" }
+        }
       }
     },
     "DecodeResult": {
@@ -33,6 +38,11 @@
           "type": "array",
           "description": "Value-dependent distinctions this decode could not preserve, each with the path where the loss occurred (spec.md §6.4). Static ones are declared in the handshake instead.",
           "items": { "$ref": "handshake.schema.json#/$defs/Degradation" }
+        },
+        "embedded": {
+          "type": "array",
+          "description": "Content of another type inside these octets, such as a multipart part's body, which this component asks the engine to decode through the session's content registry before it answers (spec.md §6.6, ADR 0103). A result that carries any is a question, not an answer: the engine does not read its 'document', which the component writes as null, and repeats the request with 'embedded' answered. A component asks once per request, and only of an engine whose handshake declared the 'embedded-content' capability.",
+          "items": { "$ref": "#/$defs/EmbeddedDecode" }
         }
       }
     },
@@ -55,6 +65,11 @@
         "options": { "type": "object" },
         "shape": {
           "description": "The shape the document was produced from, as the interaction declares it for the slot, in the form content/compile is given it: present when the engine produced the document from a shape (a mock's reply, a verifier's request), absent otherwise. A component writes from it only what the document cannot say, such as a CSV header for a document with no rows; it never changes what the document is, and decode(encode(d)) must still equal d (spec.md §6.2, ADR 0101)."
+        },
+        "embedded": {
+          "type": "object",
+          "description": "On the request the engine repeats after this component asked for embedded content (spec.md §6.6, ADR 0103): what the session's content registry wrote of each document it asked for, by the id it gave each. Absent on the first request.",
+          "additionalProperties": { "$ref": "#/$defs/EmbeddedEncodeAnswer" }
         }
       }
     },
@@ -63,7 +78,83 @@
       "type": "object",
       "required": ["value"],
       "properties": {
+        "value": { "$ref": "parts.schema.json#/$defs/SlotValue" },
+        "embedded": {
+          "type": "array",
+          "description": "Documents of another type inside this one, such as a multipart part's body, which this component asks the engine to encode through the session's content registry before it answers (spec.md §6.6, ADR 0103). A result that carries any is a question: the engine does not read its 'value', which the component writes as '{ \"content\": null }', and repeats the request with 'embedded' answered.",
+          "items": { "$ref": "#/$defs/EmbeddedEncode" }
+        }
+      }
+    },
+    "EmbeddedDecode": {
+      "title": "EmbeddedDecode",
+      "description": "Octets of another type inside a slot's, which a component asks the engine to decode (spec.md §6.6).",
+      "type": "object",
+      "required": ["id", "content-type", "value"],
+      "properties": {
+        "id": { "type": "string", "description": "The component's own name for it, unique within one result. The answer comes back under it." },
+        "content-type": { "type": "string", "description": "The type the octets are decoded as, routed as a slot's declared type is (spec.md §6.3)." },
         "value": { "$ref": "parts.schema.json#/$defs/SlotValue" }
+      }
+    },
+    "EmbeddedDecodeAnswer": {
+      "title": "EmbeddedDecodeAnswer",
+      "description": "What the registry made of one embedded slot: the DecodeResult of the component that handles its type, the octets themselves ('encoded: base64') when no component claims it, or 'error' when its component refused the octets, failed, or the content is embedded too deeply (spec.md §6.6). What an error means for the document is the asking component's to say: the multipart component leaves the part's body out.",
+      "type": "object",
+      "properties": {
+        "document": {
+          "x-tagged-by": "encoded",
+          "description": "The decoded document, as DecodeResult's."
+        },
+        "encoded": {
+          "type": "string",
+          "x-known-values": ["json", "text", "base64"],
+          "default": "json"
+        },
+        "degradations": {
+          "type": "array",
+          "description": "The losses the decode reported, located in the embedded document. The asking component reports them as its own, located where it put the document (spec.md §6.4).",
+          "items": { "$ref": "handshake.schema.json#/$defs/Degradation" }
+        },
+        "error": {
+          "$ref": "component-error.schema.json",
+          "description": "Present instead of 'document' when the slot could not be decoded."
+        }
+      }
+    },
+    "EmbeddedEncode": {
+      "title": "EmbeddedEncode",
+      "description": "A document of another type inside the one a component is encoding, which it asks the engine to encode (spec.md §6.6).",
+      "type": "object",
+      "required": ["id", "content-type", "document"],
+      "properties": {
+        "id": { "type": "string", "description": "The component's own name for it, unique within one result. The answer comes back under it." },
+        "content-type": { "type": "string" },
+        "document": {
+          "x-tagged-by": "encoded",
+          "description": "The document to encode."
+        },
+        "encoded": {
+          "type": "string",
+          "x-known-values": ["json", "text", "base64"],
+          "default": "json"
+        },
+        "at": {
+          "type": "string",
+          "description": "Where the document sits in the one being encoded, as a JSON pointer (RFC 6901). When the request had a 'shape', the engine encodes the embedded document with the part of that shape describing the value there, found through objects, arrays and the modifiers that wrap them, and with none where no one part does."
+        }
+      }
+    },
+    "EmbeddedEncodeAnswer": {
+      "title": "EmbeddedEncodeAnswer",
+      "description": "What the registry wrote of one embedded document: the EncodeResult of the component that handles its type, or 'error'. Octets need no component and are answered as they are (spec.md §6.6).",
+      "type": "object",
+      "properties": {
+        "value": { "$ref": "parts.schema.json#/$defs/SlotValue" },
+        "error": {
+          "$ref": "component-error.schema.json",
+          "description": "Present instead of 'value' when the document could not be encoded: 'unsupported-content-type' when no component writes its type."
+        }
       }
     },
     "Compile": {

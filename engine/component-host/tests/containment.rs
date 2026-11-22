@@ -83,6 +83,7 @@ fn decode(
         content_type: None,
       },
       options: None,
+      embedded: None,
     })
     .map(|result| result.document.to_json())
 }

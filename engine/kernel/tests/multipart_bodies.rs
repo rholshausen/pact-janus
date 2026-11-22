@@ -4,10 +4,34 @@
 //! (`engine/component-multipart`), each with `multer`, so this holds them to each other over every
 //! multipart body this repository has, and a few that reach every part type.
 
+use base64::Engine;
+use pact_janus_kernel::component::{ContentComponent, ContentRegistry, Decode, SlotValue};
 use pact_janus_kernel::legacy::{multipart, pact as legacy_pact};
+use pact_janus_kernel::plan::RuntimeValue;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+/// `body` as the multipart component decodes it, a part's body through the built-in components every
+/// embedding registers (ADR 0103).
+fn component_document(body: &[u8], content_type: &str) -> Result<RuntimeValue, String> {
+  let registry = ContentRegistry::new()
+    .with(Arc::new(pact_janus_component_json::JsonContent::new()))
+    .with(Arc::new(pact_janus_component_xml::XmlContent::new()))
+    .with(Arc::new(pact_janus_component_text::TextContent::new()))
+    .with(Arc::new(pact_janus_component_form::FormContent::new()))
+    .with(Arc::new(pact_janus_component_multipart::MultipartContent::new()));
+  let value = SlotValue {
+    content: Value::String(base64::engine::general_purpose::STANDARD.encode(body)),
+    encoded: Some("base64".to_string()),
+    content_type: Some(content_type.to_string()),
+  };
+  registry
+    .decode(Decode::of(content_type, value))
+    .map(|result| result.document)
+    .map_err(|err| err.message)
+}
 
 /// Every (body, content type) in `value` whose `headers` name a multipart type.
 fn multipart_bodies(value: &Value, out: &mut Vec<(String, String)>) {
@@ -89,7 +113,7 @@ fn the_legacy_reader_and_the_multipart_component_read_every_body_alike() {
 
   for (body, content_type) in &bodies {
     let legacy = legacy_pact::read_multipart(body.as_bytes(), content_type);
-    let component = pact_janus_component_multipart::parse(body.as_bytes(), content_type);
+    let component = component_document(body.as_bytes(), content_type);
     match (legacy, component) {
       (Ok(parts), Ok(component)) => assert_eq!(multipart::document(&parts), component, "{body}"),
       (legacy, component) => panic!("{body}: {legacy:?} / {component:?}"),

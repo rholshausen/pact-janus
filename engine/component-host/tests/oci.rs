@@ -82,6 +82,7 @@ fn load_and_decode(loader: &WasmLoader, declaration: &ComponentDeclaration) -> V
         content_type: None,
       },
       options: None,
+      embedded: None,
     })
     .unwrap()
     .document

@@ -75,6 +75,7 @@ impl ContentComponent for TextContent {
     Ok(DecodeResult {
       document: RuntimeValue::String(slot_text(&req.content_type, &req.value)?),
       degradations: Vec::new(),
+      embedded: Vec::new(),
     })
   }
 
@@ -92,6 +93,7 @@ impl ContentComponent for TextContent {
         encoded: Some("base64".to_string()),
         content_type: Some(req.content_type),
       },
+      embedded: Vec::new(),
     })
   }
 

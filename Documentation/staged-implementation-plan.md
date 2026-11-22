@@ -3040,6 +3040,31 @@ The component model, opened to the ecosystem.
   §9). The multipart document does not change.
   *Exit:* the worked CSV component (`third-party/janus-csv`) decodes a `text/csv` part of a multipart
   body into rows a contract shapes, in each binding; and an ADR supersedes ADR 0040 decision 3.
+  *Done 2026-11-22* ([ADR 0103](decisions/0103-a-content-component-asks-for-embedded-content-in-its-answer-and-the-registry-decodes-it.md),
+  superseding ADR 0040 decision 3):
+  - Not the callback this item named. A component asks in its answer: a `content/decode` or
+    `content/encode` result may carry `embedded`, the slots or documents of another type it needs, and the
+    engine resolves each through the session's registry and repeats the request with the answers. The
+    engine stays the only caller (spec §3.1), so a part of the asking component's own type does not
+    re-enter an instance at work, and no binding changes: the WIT world is as it was, the subprocess pipe
+    needs no reverse frame, and the native binding carries the same members. One round per request, and
+    content more than eight levels deep is `embedding-too-deep`. An engine says it answers in its
+    handshake's `capabilities` (`embedded-content`).
+  - The registry, which is itself a content component, does the resolving, so every path that decodes or
+    encodes a slot gets it. An embedded document is encoded with the part of the request's `shape` found
+    at the pointer the component gives, so an empty CSV part is written as its header row.
+  - The multipart component holds no component. It asks for every part whose type is not multipart, by
+    its index, and reports an answer's degradations at the part's body. With only the built-ins
+    registered, every document is what it was (`multipart_bodies.rs` still holds the legacy reader to it).
+  - `csv_component.rs` is the exit: a mock serves a `text/csv` part the CSV component wrote from the
+    part's shape, and a verification reads a provider's part as rows, failing at the column inside it. The
+    multipart component is native and the CSV component WASM. `tests/embedded.rs` drives a WASM component
+    that asks (`tests/fixtures/wrapping`), its payload answered by native JSON, by the WASM CSV component,
+    and by itself, and encoded with its shape. The subprocess binding carries the same members, and is
+    loaded by nothing until S5.5.
+  - The schema's `required` sets cannot change within v1, so a question carries placeholders the engine
+    does not read: `document: null`, `value: { content: null }`.
+  - Not done, on purpose: substitutions reach the slot, not content embedded in it. That is S5.8.
 
 - **S5.7 The subsumption check with a project's declared components** — **S**. Added 2026-11-12 by
   ADR 0087. `janus check` and `subsumption/check` load no declared component, so an operator a third
@@ -3061,6 +3086,16 @@ The component model, opened to the ecosystem.
     `explain --config` now shares.
   - `third-party/janus-csv` contributes `csv:column`, declared `exact`, whose `compare` decides two
     columns by type and answers `unknown` where the slot's content type would decide.
+
+- **S5.8 Substitutions in embedded content** — **S**. Added 2026-11-22 by ADR 0103. A content
+  component's substitutions (ADR 0100) apply in a slot whose declared type it decodes, so `integer` of a
+  column in a `text/csv` body is `csv:integer`, but in a `text/csv` part of a multipart body it is the
+  engine's `match:integer`, which CSV's text fails. The engine would need to know at compile time which
+  part of a shape is decoded as which type, and a multipart shape says so only in a part's header
+  example. An ADR decides whether a shape may declare an embedded document's type (a `content-type` on a
+  part's `body`, read as `content-types` is read for a slot) and whether `content/compile` is asked for
+  it. Wait for a contract that needs it: `regex` of a column does today what `integer` would.
+  *Exit:* `integer` of a column in a CSV part compiles to `csv:integer` and verifies against a provider.
 
 **Done when** a protobuf plugin runs through either the bridge or a native component, and a second
 content component exists written by someone outside the core team.
@@ -3287,7 +3322,8 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user (done: ADR 0101) | findings 12–14 |
 | S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099) | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
-| S5.6 | A multipart part's body reaches only the built-in content components | ADR 0040 decision 3 |
+| S5.6 | A multipart part's body reaches only the built-in content components (done: ADR 0103) | ADR 0040 decision 3 |
+| S5.8 | A component's substitutions do not reach content embedded in a slot | ADR 0103 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration (done: ADR 0100) | findings 21, 22, 24; gate F |
 | S5.7 | A declared component's operators are opaque to `janus check`, which loads none (done: ADR 0102) | ADR 0087 |
 | S6.6 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12; moved from S3.7 |

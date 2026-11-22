@@ -319,6 +319,11 @@ Three sources are the source of truth and take precedence over this file when th
 > S5.7 (ADR 0102): `subsumption/check` and `broker/check-contracts` take `components`, and `janus check
 > --config` loads a project's, so a declared component's operators are compared as its handshake declares
 > (read by the engine; the WASM binding forwards `matcher/compare`). `janus-csv`'s `csv:column` is `exact`.
+> S5.6 (ADR 0103): a content component asks for content of another type inside its own in its answer
+> (`embedded` on `content/decode` and `content/encode`), and the registry decodes or encodes each through
+> the scope's components before asking it again, so the engine stays the only caller and the WIT is
+> unchanged. The multipart component asks for every typed part's body, so a declared CSV component reads
+> a `text/csv` part; an embedded document is encoded with the part of the shape at its `at`.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -340,8 +345,8 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  component-xml, the built-in one for XML (ADR 0039, S1.22), registered after
                  component-json and before component-text, so `text/xml` reaches it;
                  component-multipart, the built-in one for `multipart/*` (ADR 0040, S1.23),
-                 registered after component-form, which decodes each part through the built-in
-                 JSON, XML, text and form components it holds itself;
+                 registered after component-form, which asks the registry for each part's body
+                 as embedded content (ADR 0103, S5.6), so a declared component reads a part too;
                  and wasm, the engine itself as a WASM component — the offline artifact a release
                  ships (ADR 0023 decision 2, S0.4), a member that is empty on any target but wasm32,
                  holding the HTTP component's matchers and kind declarations but no transport (ADR 0094);

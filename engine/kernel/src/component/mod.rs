@@ -26,7 +26,7 @@ mod transport;
 
 pub use content::{
   Compile, CompileResult, ContentComponent, ContentDetection, Decode, DecodeResult, Detect, DetectResult,
-  Encode, EncodeResult, Label, LabelResult,
+  Embedded, EmbeddedDecode, EmbeddedEncode, Encode, EncodeResult, Label, LabelResult,
 };
 pub use error::ComponentError;
 pub use generator::{Generate, GenerateResult, GeneratorComponent, PactGenerators};
@@ -40,7 +40,7 @@ pub use matcher::{
   PrefixResult,
 };
 pub use parts::{Part, Parts, SlotValue};
-pub use registry::{ContentRegistry, media_type_matches};
+pub use registry::{ContentRegistry, EMBEDDING_DEPTH, media_type_matches};
 pub use transport::{
   ContentSlots, Dispose, DisposeResult, ExchangeParts, Inbound, KindDeclarations, OutcomeSlots, PollInbound,
   PollInboundResult, Reply, ReplyResult, Send, SendResult, Start, StartResult, Stop, StopResult,

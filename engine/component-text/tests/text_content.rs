@@ -25,6 +25,7 @@ fn decode(content_type: &str, value: SlotValue) -> Result<RuntimeValue, String> 
       content_type: content_type.to_string(),
       value,
       options: None,
+      embedded: None,
     })
     .map(|result| result.document)
     .map_err(|error| error.code)
@@ -101,6 +102,7 @@ fn a_string_encodes_as_utf8_octets_labelled_as_asked_and_decodes_back() {
       document: RuntimeValue::String("Hello Wörld!".to_string()),
       options: None,
       shape: None,
+      embedded: None,
     })
     .expect("a string encodes")
     .value;
@@ -122,6 +124,7 @@ fn a_document_that_is_not_a_string_does_not_encode() {
       document: RuntimeValue::from_json(&json!({ "a": 1 })),
       options: None,
       shape: None,
+      embedded: None,
     })
     .expect_err("an object is not text");
   assert_eq!(error.code, "encode-failed");
@@ -188,6 +191,7 @@ fn a_component_registered_before_it_wins_its_type() {
       Ok(pact_janus_kernel::component::DecodeResult {
         document: RuntimeValue::String("csv".to_string()),
         degradations: Vec::new(),
+        embedded: Vec::new(),
       })
     }
     fn encode(
@@ -221,6 +225,7 @@ fn a_component_registered_before_it_wins_its_type() {
         content_type: content_type.to_string(),
         value: base64_slot("YWJj", content_type),
         options: None,
+        embedded: None,
       })
       .map(|result| result.document)
       .ok()

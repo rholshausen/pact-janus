@@ -374,6 +374,7 @@ impl ContentComponent for XmlContent {
     Ok(DecodeResult {
       document: slot_document(&req.content_type, &req.value)?,
       degradations: Vec::new(),
+      embedded: Vec::new(),
     })
   }
 
@@ -387,6 +388,7 @@ impl ContentComponent for XmlContent {
         encoded: Some("base64".to_string()),
         content_type: Some(req.content_type),
       },
+      embedded: Vec::new(),
     })
   }
 

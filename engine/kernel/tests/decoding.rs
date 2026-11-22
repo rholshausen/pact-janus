@@ -42,6 +42,7 @@ impl ContentComponent for Stub {
       _ => Ok(DecodeResult {
         document: RuntimeValue::from_json(&req.value.content),
         degradations: vec![json!({ "code": "numeric-lexical", "path": "$.n", "message": "n is text" })],
+        embedded: Vec::new(),
       }),
     }
   }
@@ -52,7 +53,10 @@ impl ContentComponent for Stub {
       content_type: Some(req.content_type.clone()),
     };
     self.encoded.lock().unwrap().push(req);
-    Ok(EncodeResult { value })
+    Ok(EncodeResult {
+      value,
+      embedded: Vec::new(),
+    })
   }
   fn compile(&self, _: Compile) -> Result<CompileResult, ComponentError> {
     Ok(CompileResult::default())

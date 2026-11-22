@@ -56,7 +56,7 @@ superseding ADR instead.
 | [0037](0037-carry-member-order-through-the-engine-and-decide-nothing-by-it.md) | Carry member order through the engine, and decide nothing by it | accepted |
 | [0038](0038-read-form-bodies-as-a-query-string-through-a-built-in-form-component.md) | Read form bodies as a query string, through a built-in form component | accepted |
 | [0039](0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md) | Read XML bodies by element name, through a built-in XML component | accepted; decision 2 amended by 0075 |
-| [0040](0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md) | Read multipart bodies by part name, through a built-in multipart component | accepted |
+| [0040](0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md) | Read multipart bodies by part name, through a built-in multipart component | accepted (decision 3 superseded by 0103) |
 | [0041](0041-refuse-a-filter-that-names-no-recorded-variant-and-report-a-narrowed-run-as-filtered.md) | Refuse a filter that names no recorded variant, and report a narrowed run as filtered | accepted |
 | [0042](0042-compile-the-collection-rules-of-a-v1-v4-pact-as-todays-verifier-applies-them.md) | Compile the collection rules of a v1–v4 pact as today's verifier applies them | accepted |
 | [0043](0043-check-a-pacts-content-type-once-on-the-header.md) | Check a pact's Content-Type once, on the header | accepted |
@@ -119,6 +119,7 @@ superseding ADR instead.
 | [0100](0100-a-content-component-says-what-a-value-operator-means-for-its-type-and-the-engine-compiles-every-slot.md) | A content component says what a value operator means for its type, and the engine compiles every slot | accepted |
 | [0101](0101-a-slot-that-cannot-be-decoded-fails-at-the-slot-a-decodes-losses-are-warnings-and-encode-is-given-the-shape.md) | A slot that cannot be decoded fails at the slot, a decode's losses are warnings, and encode is given the shape | accepted |
 | [0102](0102-a-check-loads-the-components-a-project-declares-and-compares-their-operators-as-their-handshakes-declare.md) | A check loads the components a project declares, and compares their operators as their handshakes declare | accepted |
+| [0103](0103-a-content-component-asks-for-embedded-content-in-its-answer-and-the-registry-decodes-it.md) | A content component asks for embedded content in its answer, and the registry decodes it | accepted |
 
 ## Decision backlog
 

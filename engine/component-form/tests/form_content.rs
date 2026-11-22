@@ -26,6 +26,7 @@ fn decode(value: SlotValue) -> Result<Value, String> {
       content_type: FORM.to_string(),
       value,
       options: None,
+      embedded: None,
     })
     .map(|result| result.document.to_json())
     .map_err(|error| error.code)
@@ -38,6 +39,7 @@ fn encode(document: Value) -> Result<String, String> {
       document: RuntimeValue::from_json(&document),
       options: None,
       shape: None,
+      embedded: None,
     })
     .map(|result| {
       let bytes = BASE64.decode(result.value.content.as_str().unwrap()).unwrap();

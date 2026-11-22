@@ -63,6 +63,7 @@ fn time(component: &dyn ContentComponent, content_type: &str, text: &str) -> f64
       content_type: None,
     },
     options: None,
+    embedded: None,
   };
   component.decode(request()).expect("decodes"); // warm
   let calls = 200;

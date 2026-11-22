@@ -26,6 +26,7 @@ fn decode_parses_a_json_document() {
       content_type: "application/json".to_string(),
       value: json_slot(r#"{"id":42,"tags":["a","b"]}"#),
       options: None,
+      embedded: None,
     })
     .expect("well-formed JSON decodes");
   assert_eq!(
@@ -43,6 +44,7 @@ fn decode_reports_malformed_json_as_decode_failed() {
       content_type: "application/json".to_string(),
       value: json_slot("{not json"),
       options: None,
+      embedded: None,
     })
     .expect_err("malformed JSON must not decode");
   assert_eq!(err.code, "decode-failed");
@@ -57,6 +59,7 @@ fn decode_rejects_a_content_type_it_does_not_handle() {
       content_type: "application/xml".to_string(),
       value: json_slot("<a/>"),
       options: None,
+      embedded: None,
     })
     .expect_err("this component only speaks JSON");
   assert_eq!(err.code, "unsupported-content-type");
@@ -72,6 +75,7 @@ fn decode_then_encode_round_trips() {
       document: document.clone(),
       options: None,
       shape: None,
+      embedded: None,
     })
     .expect("a RuntimeValue always encodes to JSON");
   let decoded = component
@@ -79,6 +83,7 @@ fn decode_then_encode_round_trips() {
       content_type: "application/json".to_string(),
       value: encoded.value,
       options: None,
+      embedded: None,
     })
     .expect("what this component just encoded, it can decode");
   assert_eq!(
@@ -96,6 +101,7 @@ fn encode_produces_base64_octets_with_the_declared_content_type() {
       document: RuntimeValue::from_json(&json!({"a": 1})),
       options: None,
       shape: None,
+      embedded: None,
     })
     .unwrap();
   assert_eq!(encoded.value.encoded.as_deref(), Some("base64"));

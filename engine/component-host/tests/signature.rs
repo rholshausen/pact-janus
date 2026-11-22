@@ -113,6 +113,7 @@ fn load(loader: &WasmLoader, declaration: &ComponentDeclaration) -> Option<Signe
         content_type: None,
       },
       options: None,
+      embedded: None,
     })
     .unwrap()
     .document

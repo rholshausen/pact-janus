@@ -34,6 +34,8 @@ rstest = "0.28"
 # it, and the sample provider a CSV consumer's contract is verified against (plan task 8.1).
 pact_janus_component_http = { path = "../component-http" }
 pact_janus_component_json = { path = "../component-json" }
+# A CSV part of a multipart body reaches the CSV component through the registry (S5.6, ADR 0103).
+pact_janus_component_multipart = { path = "../component-multipart" }
 pact_janus_sample_order_service = { path = "../../samples/order-service" }
 # The registry the OCI tests push to and pull from (tests/support/registry.rs): small enough to
 # read, and able to misbehave on request — which a real registry cannot be asked to do. Already in

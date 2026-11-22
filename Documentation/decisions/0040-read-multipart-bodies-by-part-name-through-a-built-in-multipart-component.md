@@ -1,6 +1,6 @@
 # 0040 — Read multipart bodies by part name, through a built-in multipart component
 
-- **Status**: accepted
+- **Status**: accepted; decision 3 superseded by [ADR 0103](0103-a-content-component-asks-for-embedded-content-in-its-answer-and-the-registry-decodes-it.md), which decodes each part through the registry
 - **Date**: 2026-10-22
 - **Plan tasks**: S1.23 (the build); S1.25 (`janus upgrade`, which this leaves as it was); S5.6 (a
   part reaching a declared component)

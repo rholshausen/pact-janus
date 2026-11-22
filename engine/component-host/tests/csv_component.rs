@@ -562,6 +562,11 @@ fn a_csv_body_is_pinned_to_its_variant() {
 /// Serve every variant of `interaction` from a consumer session and return each one's body as the
 /// mock served it, by variant id, then finalise.
 fn served_bodies(engine: &mut Engine, interaction: Value) -> Vec<(String, String)> {
+  served(engine, interaction).0
+}
+
+/// [`served_bodies`], and the contract the session wrote.
+fn served(engine: &mut Engine, interaction: Value) -> (Vec<(String, String)>, Value) {
   let created = send(
     engine,
     "consumer-session/create",
@@ -598,8 +603,8 @@ fn served_bodies(engine: &mut Engine, interaction: Value) -> Vec<(String, String
     assert_eq!(status, 200, "{body}");
     bodies.push((variant["id"].as_str().unwrap().to_string(), body));
   }
-  send(engine, "consumer-session/finalise", json!({ "session": session }));
-  bodies
+  let finalised = send(engine, "consumer-session/finalise", json!({ "session": session }));
+  (bodies, finalised["ok"]["contract"].clone())
 }
 
 /// Phase 9 finding 12, closed. A list that may be empty has an empty variant (ADR 0079), whose
@@ -767,5 +772,112 @@ fn a_degradation_a_decode_reports_is_a_warning_located_in_the_reply() {
   assert!(
     degraded["message"].as_str().unwrap().contains("numeric-lexical"),
     "{degraded}"
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// A CSV part of a multipart body (S5.6, ADR 0103): the multipart component asks the engine for each
+// part's body, and the engine decodes and encodes it through the session's registry, so the declared
+// CSV component reads it. The multipart component is native and the CSV component is WASM.
+
+/// [`engine`], with the multipart component every embedding registers.
+fn engine_with_multipart() -> Engine {
+  let mut engine = engine();
+  engine.register_content(Arc::new(pact_janus_component_multipart::MultipartContent::new()));
+  engine
+}
+
+/// An upload's acknowledgement as `multipart/form-data`: a `rows` part of orders as CSV, shaped as rows
+/// with the columns this consumer reads, and a `summary` part of JSON.
+fn multipart_csv_interaction() -> Value {
+  json!({
+    "description": "every order, as a CSV part",
+    "transport": { "kind": "http", "mode": "passive" },
+    "requires": [ { "component": "content/csv", "min-version": 1 } ],
+    "content-types": { "response": { "body": "multipart/form-data" } },
+    "parts": {
+      "request": { "method": { "shape": "equality", "example": "GET" },
+                   "path": { "shape": "equality", "example": "/orders.csv" } },
+      "response": {
+        "status": { "shape": "equality", "example": 200 },
+        "body": { "shape": "object", "members": {
+          "rows": { "shape": "array", "entries": [ { "shape": "object", "members": {
+            "headers": { "shape": "object", "members": {
+              "content-type": { "shape": "equality", "example": "text/csv" } } },
+            "body": { "shape": "each-like", "min": 1, "max": 1,
+                      "items": { "shape": "object", "members": {
+                        "id": { "shape": "string", "example": "66" },
+                        "status": { "shape": "string", "example": "PENDING" },
+                        "items": { "shape": "regex", "pattern": "^[0-9]+$", "example": "1" } } } } } } ] },
+          "summary": { "shape": "array", "entries": [ { "shape": "object", "members": {
+            "headers": { "shape": "object", "members": {
+              "content-type": { "shape": "equality", "example": "application/json" } } },
+            "body": { "shape": "object", "members": {
+              "count": { "shape": "integer", "example": 1 } } } } } ] } } } } }
+  })
+}
+
+/// The exit's first half: the mock serves the CSV part as CSV, written by the CSV component from the
+/// part of the shape that describes it, so its header names the columns the consumer declared.
+#[test]
+fn a_mock_serves_a_csv_part_the_csv_component_wrote() {
+  let mut engine = engine_with_multipart();
+  let (bodies, contract) = served(&mut engine, multipart_csv_interaction());
+  assert_eq!(bodies.len(), 1, "{bodies:?}");
+  let body = &bodies[0].1;
+  assert!(
+    body.contains("content-type: text/csv\r\n\r\nid,status,items\r\n66,PENDING,1\r\n"),
+    "the part's body is CSV, its header from the shape: {body}"
+  );
+  assert!(
+    body.contains("content-type: application/json\r\n\r\n{\"count\":1}\r\n"),
+    "{body}"
+  );
+  assert_eq!(contract["metadata"]["components"], recorded(), "{contract:#}");
+}
+
+/// A provider that answers with a multipart body whose `rows` part is `csv`.
+fn multipart_provider(csv: &'static str) -> String {
+  let body: &'static str = Box::leak(
+    format!(
+      "--b\r\nContent-Disposition: form-data; name=\"rows\"; filename=\"orders.csv\"\r\nContent-Type: text/csv\r\n\r\n{csv}\r\n\
+--b\r\nContent-Disposition: form-data; name=\"summary\"\r\nContent-Type: application/json\r\n\r\n{{\"count\": 1}}\r\n--b--\r\n"
+    )
+    .into_boxed_str(),
+  );
+  fixed_provider("multipart/form-data; boundary=b", body)
+}
+
+/// The exit's second half: a verification decodes the provider's CSV part into rows through the CSV
+/// component, so the contract's row shapes hold it, and a row that breaks a column's shape fails at
+/// that column, inside the part.
+#[test]
+fn a_verification_reads_a_csv_part_as_rows_through_the_csv_component() {
+  let mut engine = engine_with_multipart();
+  let (_, contract) = served(&mut engine, multipart_csv_interaction());
+
+  let (summary, events) = verify_events(
+    &mut engine,
+    &contract,
+    &multipart_provider("id,status,items\r\n66,PENDING,3"),
+  );
+  assert_eq!(summary["status"], "verified", "{summary:#}\n{events:#?}");
+  assert_eq!(summary["components"], recorded());
+
+  let (summary, events) = verify_events(
+    &mut engine,
+    &contract,
+    &multipart_provider("id,status,items\r\n66,PENDING,many"),
+  );
+  assert_eq!(summary["status"], "failed", "{summary:#}");
+  let mismatches: Vec<String> = of_kind(&events, "verification/interaction-result")
+    .iter()
+    .flat_map(|result| result["mismatches"].as_array().cloned().unwrap_or_default())
+    .map(|mismatch| mismatch["path"].as_str().unwrap_or_default().to_string())
+    .collect();
+  assert_eq!(
+    mismatches,
+    ["$.response.body.rows[0].body[0].items"],
+    "the column, inside the part's rows: {events:#?}"
   );
 }

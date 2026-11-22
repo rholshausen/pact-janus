@@ -1,6 +1,6 @@
 [package]
 name = "pact_janus_component_multipart"
-description = "The built-in multipart content component (component-interfaces spec §6, ADR 0040): decode/encode for multipart/* bodies, each part through the built-in JSON, XML, text and form components, native binding."
+description = "The built-in multipart content component (component-interfaces spec §6, ADR 0040): decode/encode for multipart/* bodies, each part through the session's content registry (ADR 0103), native binding."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,11 +9,6 @@ authors.workspace = true
 
 [dependencies]
 pact_janus_kernel = { path = "../kernel" }
-# A part's body is decoded and encoded by the built-in component for its type (ADR 0040 decision 3).
-pact_janus_component_json = { path = "../component-json" }
-pact_janus_component_xml = { path = "../component-xml" }
-pact_janus_component_text = { path = "../component-text" }
-pact_janus_component_form = { path = "../component-form" }
 serde_json = "1"
 base64 = "0.23"
 indexmap = "2"
@@ -25,6 +20,12 @@ futures-util = { version = "0.3", default-features = false }
 mime = "0.3"
 
 [dev-dependencies]
+# A part's body is decoded through the registry (ADR 0103); the tests register the built-in components
+# every embedding registers.
+pact_janus_component_json = { path = "../component-json" }
+pact_janus_component_xml = { path = "../component-xml" }
+pact_janus_component_text = { path = "../component-text" }
+pact_janus_component_form = { path = "../component-form" }
 pretty_assertions = "1"
 rstest = "0.28"
 

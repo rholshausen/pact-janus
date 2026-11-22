@@ -28,9 +28,9 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::{
   Apply, ApplyResult, Compare, CompareResult, Compile, CompileResult, ComponentDeclaration, ComponentError,
-  ComponentLoader, ContentComponent, Decode, DecodeResult, Detect, DetectResult, Encode, EncodeResult,
-  Fetched, Grants, Label, LabelResult, Loaded, MatcherComponent, Prefix, PrefixResult, Signer, SlotValue,
-  media_type_matches,
+  ComponentLoader, ContentComponent, Decode, DecodeResult, Detect, DetectResult, EmbeddedDecode,
+  EmbeddedEncode, Encode, EncodeResult, Fetched, Grants, Label, LabelResult, Loaded, MatcherComponent,
+  Prefix, PrefixResult, Signer, SlotValue, media_type_matches,
 };
 use pact_janus_kernel::persisted::Persisted;
 use pact_janus_kernel::plan::RuntimeValue;
@@ -674,7 +674,8 @@ fn hello_body(grants: &Grants) -> Value {
     // No `plan-grammar-versions`: a component writes no plan (ADR 0100 decision 5).
     "engine": { "name": "janus-engine", "version": pact_janus_kernel::ENGINE_VERSION },
     "grants": grants,
-    "capabilities": {},
+    // The engine answers a content component's embedded content (spec §6.6, ADR 0103).
+    "capabilities": { "embedded-content": {} },
   })
 }
 
@@ -736,26 +737,25 @@ impl ContentComponent for WasmComponent {
     if let Some(options) = req.options {
       body["options"] = options;
     }
+    // What the registry made of the content it asked for (spec §6.6, ADR 0103), on the repeated request.
+    if let Some(embedded) = req.embedded {
+      body["embedded"] = answers_json(embedded, |result| {
+        let mut answer = tagged_document(&result.document, "document");
+        if !result.degradations.is_empty() {
+          answer["degradations"] = Value::Array(result.degradations);
+        }
+        Ok(answer)
+      })?;
+    }
     let result = self.instance_call("content/decode", body)?;
-    let document = match result.get("encoded").and_then(Value::as_str) {
-      Some("base64") => {
-        let text = result.get("document").and_then(Value::as_str).unwrap_or_default();
-        RuntimeValue::Bytes(BASE64.decode(text).map_err(|err| {
-          ComponentError::synthesised(
-            "component-malformed",
-            format!("decode returned bad base64: {err}"),
-          )
-        })?)
-      }
-      Some("text") => RuntimeValue::String(
-        result
-          .get("document")
-          .and_then(Value::as_str)
-          .unwrap_or_default()
-          .to_string(),
-      ),
-      _ => RuntimeValue::from_json(result.get("document").unwrap_or(&Value::Null)),
+    let embedded = match result.get("embedded") {
+      None => Vec::new(),
+      Some(embedded) => embedded_decodes(embedded)?,
     };
+    if !embedded.is_empty() {
+      return Ok(DecodeResult::asking(embedded));
+    }
+    let document = document_of(&result, "document", "decode")?;
     let degradations = result
       .get("degradations")
       .and_then(Value::as_array)
@@ -767,16 +767,13 @@ impl ContentComponent for WasmComponent {
     Ok(DecodeResult {
       document,
       degradations,
+      embedded: Vec::new(),
     })
   }
 
   fn encode(&self, req: Encode) -> Result<EncodeResult, ComponentError> {
-    let mut body = match &req.document {
-      RuntimeValue::Bytes(bytes) => {
-        json!({ "content-type": req.content_type, "document": BASE64.encode(bytes), "encoded": "base64" })
-      }
-      document => json!({ "content-type": req.content_type, "document": document.to_json() }),
-    };
+    let mut body = tagged_document(&req.document, "document");
+    body["content-type"] = json!(req.content_type);
     if let Some(options) = req.options {
       body["options"] = options;
     }
@@ -784,13 +781,25 @@ impl ContentComponent for WasmComponent {
     if let Some(shape) = req.shape {
       body["shape"] = shape;
     }
+    if let Some(embedded) = req.embedded {
+      body["embedded"] = answers_json(embedded, |result| {
+        Ok(json!({ "value": slot_json(&result.value)? }))
+      })?;
+    }
     let result = self.instance_call("content/encode", body)?;
+    let embedded = match result.get("embedded") {
+      None => Vec::new(),
+      Some(embedded) => embedded_encodes(embedded)?,
+    };
+    if !embedded.is_empty() {
+      return Ok(EncodeResult::asking(embedded));
+    }
     let value = result
       .get("value")
       .cloned()
       .and_then(|value| serde_json::from_value::<SlotValue>(value).ok())
       .ok_or_else(|| ComponentError::synthesised("component-malformed", "encode returned no slot value"))?;
-    Ok(EncodeResult { value })
+    Ok(EncodeResult::of(value))
   }
 
   fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {
@@ -883,6 +892,113 @@ fn slot_json(slot: &SlotValue) -> Result<Value, ComponentError> {
   serde_json::to_value(slot).map_err(|err| ComponentError::internal(err.to_string()))
 }
 
+/// A document under `member`, tagged as the content schema tags one: octets as `encoded: base64`,
+/// anything else as its JSON value.
+fn tagged_document(document: &RuntimeValue, member: &str) -> Value {
+  let mut body = json!({});
+  match document {
+    RuntimeValue::Bytes(bytes) => {
+      body[member] = json!(BASE64.encode(bytes));
+      body["encoded"] = json!("base64");
+    }
+    document => body[member] = document.to_json(),
+  }
+  body
+}
+
+/// The document under `member` of a frame tagged as [`tagged_document`] writes one, `text` included.
+fn document_of(frame: &Value, member: &str, op: &str) -> Result<RuntimeValue, ComponentError> {
+  let text = || frame.get(member).and_then(Value::as_str).unwrap_or_default();
+  Ok(match frame.get("encoded").and_then(Value::as_str) {
+    Some("base64") => RuntimeValue::Bytes(BASE64.decode(text()).map_err(|err| {
+      ComponentError::synthesised("component-malformed", format!("{op} returned bad base64: {err}"))
+    })?),
+    Some("text") => RuntimeValue::String(text().to_string()),
+    _ => RuntimeValue::from_json(frame.get(member).unwrap_or(&Value::Null)),
+  })
+}
+
+/// The registry's answers to what a component asked for, as the repeated request carries them (spec
+/// §6.6): by id, each the operation's result or `{ error }`.
+fn answers_json<T>(
+  answers: pact_janus_kernel::component::Embedded<T>,
+  result: impl Fn(T) -> Result<Value, ComponentError>,
+) -> Result<Value, ComponentError> {
+  let mut json = serde_json::Map::new();
+  for (id, answer) in answers {
+    let answer = match answer {
+      Ok(answer) => result(answer)?,
+      Err(error) => json!({ "error": error }),
+    };
+    json.insert(id, answer);
+  }
+  Ok(Value::Object(json))
+}
+
+fn malformed_embedded(op: &str, why: &str) -> ComponentError {
+  ComponentError::synthesised(
+    "component-malformed",
+    format!("the component asked for embedded content in '{op}' with {why}"),
+  )
+}
+
+/// `content/decode`'s `embedded`: each `{ id, content-type, value }` the component asks the engine to
+/// decode.
+fn embedded_decodes(embedded: &Value) -> Result<Vec<EmbeddedDecode>, ComponentError> {
+  let entries = embedded
+    .as_array()
+    .ok_or_else(|| malformed_embedded("content/decode", "a value that is not an array"))?;
+  entries
+    .iter()
+    .map(|entry| {
+      let id = entry.get("id").and_then(Value::as_str);
+      let content_type = entry.get("content-type").and_then(Value::as_str);
+      let value = entry
+        .get("value")
+        .cloned()
+        .and_then(|value| serde_json::from_value::<SlotValue>(value).ok());
+      match (id, content_type, value) {
+        (Some(id), Some(content_type), Some(value)) => Ok(EmbeddedDecode {
+          id: id.to_string(),
+          content_type: content_type.to_string(),
+          value,
+        }),
+        _ => Err(malformed_embedded(
+          "content/decode",
+          "an entry missing its id, content-type or value",
+        )),
+      }
+    })
+    .collect()
+}
+
+/// `content/encode`'s `embedded`: each `{ id, content-type, document, encoded?, at? }` the component
+/// asks the engine to encode.
+fn embedded_encodes(embedded: &Value) -> Result<Vec<EmbeddedEncode>, ComponentError> {
+  let entries = embedded
+    .as_array()
+    .ok_or_else(|| malformed_embedded("content/encode", "a value that is not an array"))?;
+  entries
+    .iter()
+    .map(|entry| {
+      let id = entry.get("id").and_then(Value::as_str);
+      let content_type = entry.get("content-type").and_then(Value::as_str);
+      match (id, content_type, entry.get("document")) {
+        (Some(id), Some(content_type), Some(_)) => Ok(EmbeddedEncode {
+          id: id.to_string(),
+          content_type: content_type.to_string(),
+          document: document_of(entry, "document", "content/encode")?,
+          at: entry.get("at").and_then(Value::as_str).map(str::to_string),
+        }),
+        _ => Err(malformed_embedded(
+          "content/encode",
+          "an entry missing its id, content-type or document",
+        )),
+      }
+    })
+    .collect()
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -894,5 +1010,12 @@ mod tests {
     let hello = hello_body(&Grants::default());
     assert_eq!(hello.get("plan-grammar-versions"), None, "{hello}");
     assert_eq!(hello["component-protocol-versions"], json!([1]));
+  }
+
+  /// ADR 0103 decision 5: the engine says it answers embedded content, so a component may ask.
+  #[test]
+  fn component_hello_says_the_engine_answers_embedded_content() {
+    let hello = hello_body(&Grants::default());
+    assert_eq!(hello["capabilities"], json!({ "embedded-content": {} }));
   }
 }

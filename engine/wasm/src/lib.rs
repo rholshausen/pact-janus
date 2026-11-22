@@ -62,7 +62,7 @@ fn engine() -> Engine {
   engine.declare_in_tree("content", "text", "1.0.0");
   engine.register_content(Arc::new(FormContent::new()));
   engine.declare_in_tree("content", "form", "1.0.0");
-  // A part's body goes to the built-in components it holds itself (ADR 0040 decision 3).
+  // A part's body is decoded through the registry, declared components first (ADR 0103).
   engine.register_content(Arc::new(MultipartContent::new()));
   engine.declare_in_tree("content", "multipart", "1.0.0");
   engine

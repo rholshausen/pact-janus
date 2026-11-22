@@ -12,12 +12,32 @@ use super::ComponentError;
 use super::parts::SlotValue;
 use crate::plan::RuntimeValue;
 use serde_json::Value;
+use std::collections::BTreeMap;
+
+/// The engine's answers to the embedded content a component asked for (spec §6.6, ADR 0103), by the
+/// id the component gave each: what the session's registry made of it, or why it could not.
+pub type Embedded<T> = BTreeMap<String, Result<T, ComponentError>>;
 
 #[derive(Debug, Clone)]
 pub struct Decode {
   pub content_type: String,
   pub value: SlotValue,
   pub options: Option<Value>,
+  /// On the request repeated after this component asked for embedded content (spec §6.6): the
+  /// registry's decode of each slot it asked for. `None` on the first request.
+  pub embedded: Option<Embedded<DecodeResult>>,
+}
+
+impl Decode {
+  /// The first request for a slot: `value` under `content_type`, with no options and nothing embedded.
+  pub fn of(content_type: impl Into<String>, value: SlotValue) -> Self {
+    Decode {
+      content_type: content_type.into(),
+      value,
+      options: None,
+      embedded: None,
+    }
+  }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +46,41 @@ pub struct DecodeResult {
   /// Value-dependent losses this decode could not preserve (spec §6.4); empty when there are
   /// none, which is every case this task's components produce.
   pub degradations: Vec<Value>,
+  /// Content inside these octets of another type, which this component asks the engine to decode
+  /// through the session's registry before it answers (spec §6.6, ADR 0103). When it is not empty, the
+  /// result is a question, not an answer: `document` is not read, and the engine repeats the request
+  /// with [`Decode::embedded`].
+  pub embedded: Vec<EmbeddedDecode>,
+}
+
+impl DecodeResult {
+  /// An answer: `document`, with no degradations.
+  pub fn of(document: RuntimeValue) -> Self {
+    DecodeResult {
+      document,
+      degradations: Vec::new(),
+      embedded: Vec::new(),
+    }
+  }
+
+  /// A question: decode each of `embedded` first, and ask again.
+  pub fn asking(embedded: Vec<EmbeddedDecode>) -> Self {
+    DecodeResult {
+      document: RuntimeValue::Absent,
+      degradations: Vec::new(),
+      embedded,
+    }
+  }
+}
+
+/// Octets of another type inside a slot's, which a component asks the engine to decode for it (spec
+/// §6.6): a multipart part's body by the part's own `Content-Type`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EmbeddedDecode {
+  /// The component's own name for it, unique within one result, by which the answer comes back.
+  pub id: String,
+  pub content_type: String,
+  pub value: SlotValue,
 }
 
 #[derive(Debug, Clone)]
@@ -38,11 +93,67 @@ pub struct Encode {
   /// what a component writes from when the document cannot say: a CSV header for a document with no
   /// rows. It never changes what the document is.
   pub shape: Option<Value>,
+  /// On the request repeated after this component asked for embedded content (spec §6.6): the
+  /// registry's encode of each document it asked for. `None` on the first request.
+  pub embedded: Option<Embedded<EncodeResult>>,
+}
+
+impl Encode {
+  /// The first request for a document: `document` as `content_type`, with no options, no shape and
+  /// nothing embedded.
+  pub fn of(content_type: impl Into<String>, document: RuntimeValue) -> Self {
+    Encode {
+      content_type: content_type.into(),
+      document,
+      options: None,
+      shape: None,
+      embedded: None,
+    }
+  }
 }
 
 #[derive(Debug, Clone)]
 pub struct EncodeResult {
   pub value: SlotValue,
+  /// Documents of another type inside this one, which this component asks the engine to encode
+  /// through the session's registry before it answers (spec §6.6, ADR 0103). When it is not empty,
+  /// `value` is not read, and the engine repeats the request with [`Encode::embedded`].
+  pub embedded: Vec<EmbeddedEncode>,
+}
+
+impl EncodeResult {
+  /// An answer: `value`.
+  pub fn of(value: SlotValue) -> Self {
+    EncodeResult {
+      value,
+      embedded: Vec::new(),
+    }
+  }
+
+  /// A question: encode each of `embedded` first, and ask again.
+  pub fn asking(embedded: Vec<EmbeddedEncode>) -> Self {
+    EncodeResult {
+      value: SlotValue {
+        content: Value::Null,
+        encoded: None,
+        content_type: None,
+      },
+      embedded,
+    }
+  }
+}
+
+/// A document of another type inside the one a component is encoding, which it asks the engine to
+/// encode for it (spec §6.6): a multipart part's body, by the part's own `Content-Type`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EmbeddedEncode {
+  /// The component's own name for it, unique within one result, by which the answer comes back.
+  pub id: String,
+  pub content_type: String,
+  pub document: RuntimeValue,
+  /// Where the document sits in the one being encoded, as a JSON pointer, when it sits somewhere a
+  /// shape can describe. The engine encodes it with the part of the request's `shape` found there.
+  pub at: Option<String>,
 }
 
 #[derive(Debug, Clone)]

@@ -1,0 +1,21 @@
+[package]
+name = "wrapping"
+version = "1.0.0"
+edition = "2024"
+publish = false
+description = "A content component whose octets hold another type's (component-interfaces spec §6.6, ADR 0103): it asks the engine to decode and encode what it wraps, so the WASM binding is tested carrying embedded content both ways."
+
+# A fixture, built by engine/component-host's tests; its own workspace keeps the root one from
+# adopting it.
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.63"
+serde_json = "1"
+base64 = "0.23"
+
+[profile.release]
+opt-level = "s"

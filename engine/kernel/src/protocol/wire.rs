@@ -180,6 +180,7 @@ fn decode_outcome(
       content_type: content_type.to_string(),
       value: slot.clone(),
       options: None,
+      embedded: None,
     }) {
       Ok(result) => SlotDecode {
         document: result.document,
@@ -248,6 +249,7 @@ pub(crate) fn recorded_slot(
     content_type: content_type.to_string(),
     value: slot.clone(),
     options: None,
+    embedded: None,
   }) {
     Ok(result) => (result.document, None),
     Err(error) => (
@@ -339,6 +341,7 @@ pub(crate) fn encode_slot(
       document: RuntimeValue::from_json(value),
       options: None,
       shape: shape.cloned(),
+      embedded: None,
     }) {
       Ok(result) => result.value,
       Err(error) => {
@@ -357,6 +360,7 @@ pub(crate) fn encode_slot(
       document: RuntimeValue::from_json(value),
       options: None,
       shape: shape.cloned(),
+      embedded: None,
     }) {
       Ok(result) => result.value,
       Err(_) => plain_slot(value),
