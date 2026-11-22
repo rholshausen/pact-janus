@@ -1,3 +1,276 @@
+## 0.8.0 (2026-11-22)
+
+### Breaking Changes
+
+#### A check loads the components a project declares, and compares their operators as their handshakes declare
+
+Staged plan S5.7, ADR 0102. A third party's comparable operator is decided by a subsumption check,
+where it was always a review.
+
+- **`subsumption/check` and `broker/check-contracts` take `components`**, loaded as
+  `verification/verify`'s `target.components` are. The walk runs a declared operator's own action
+  against a finite provider and asks its `matcher/compare` for anything wider. A component that cannot
+  be loaded is `component-unavailable`.
+- **`janus check --config <file>`** reads a verifier configuration's `components`, as `janus verify` and
+  `janus explain` do.
+- **A declared component's comparability is read from its handshake** by the engine, whatever binding
+  loaded it, and the WASM binding forwards `matcher/compare` and `matcher/prefix`.
+- **Breaking for a component that declares an operator `exact` or `conservative` without contributing an
+  action of the operator's name, or without implementing `matcher`**: it no longer loads, as
+  `component-invalid`, since nothing could decide the operator.
+
+#### A content component says what a value operator means for its type; plan fragments are withdrawn
+
+Staged plan S5.4, ADR 0100 (gate F). A content component's handshake may give a `content-types` entry
+`substitutions`: a value operator's name to one of the component's contributed actions, such as
+`"integer": "csv:integer"`. In a slot whose declared type the component decodes, the engine compiles the
+shape itself, every structure and every variant's pinning included, and emits the component's action
+where the operator's core action would be, with the same children, run through `matcher/apply`. A slot
+with substitutions begins with an annotation naming them, which `explain` prints. A variant is now
+checked at its point whatever decodes its slot: a fragment used to check every variant against the
+unpinned shape (Phase 9 finding 21).
+
+- Only value operators can be substituted. The loader refuses a substitution for a structure, a
+  modifier or `content-type`, of an action the component does not contribute, or by a component that
+  does not implement `matcher`, as `component-invalid`. An operator name it does not know is ignored.
+- **Breaking for a component that contributed a plan fragment**: `content/compile`'s `fragment` and
+  `grammar-version` are ignored (and logged), so its slots compile with the core actions. Declare
+  `substitutions` instead. `content/compile` now answers success, or fails as `compile-failed`.
+- `component/hello` no longer sends `plan-grammar-versions`, and `matcher/compile` is withdrawn. The
+  schema members stay, deprecated. The `grammar-skew` and `fragment-invalid` refusals are gone.
+- An action is applied with the value under test and its further children's values as
+  `config.arguments`, now normatively: a substituted action gets its core action's arguments, and a
+  component operator's action gets its members as one argument.
+- `pact_janus_kernel::plan::fragment` is gone: the grammar-version rules are `plan::versions`, and
+  `plan::compile_substituted` compiles with a `SlotSubstitutions`. `CompileResult` has no fields, and
+  `Resolved` has `substitutions`.
+
+### Features
+
+#### Provider shapes and subsumption reports go through the engine's broker client
+
+Staged plan S4.3b, ADR 0093. The Pact Broker client publishes and fetches provider shapes and
+publishes subsumption reports, against the resources the brokers' `janus` feature serves (the broker
+PR series, S4.3d). It finds each resource by the link the broker's index advertises.
+
+- `broker/publish-provider-shape` publishes one provider shape for a version of its provider, with
+  the version's branch, tags and build URL, in a broker session.
+- `broker/check-contracts` fetches each contract's provider shape at a provider version, or the
+  latest on a provider branch, checks the pair, and with `publish-reports` publishes each report
+  beside its shape, with the contract it is about. One `broker/checked` event per contract: `checked`
+  with the report, `not-published`, or `failed`. It returns reports; the host decides over them with
+  `subsumption/decide`. A broker that stores no shapes fails every contract by name rather than
+  reporting none published.
+- `broker/publish-contracts` publishes a Janus contract as `specification: "janus"` to a broker whose
+  index advertises `pb:publish-janus-contracts`, and as `pact` to every other broker, as before. A
+  v1–v4 pact is always `pact`. No deployed broker advertises the link yet, so what any broker
+  receives today is unchanged.
+- A contract sent to `broker/publish-contracts` as its text (ADR 0063) is published as the document
+  the text holds. It was published as a JSON string.
+- `janus publish` publishes provider shapes as well as contracts, each document identified by its
+  `$format`, a shape for `--provider-app-version`. `--consumer-app-version` is needed only when there
+  are contracts to publish.
+- `janus check --broker-url` takes each provider's shape from a broker, at `--provider-version` or
+  the latest on `--provider-branch`, in place of `--provider-shape`. `--publish` publishes the
+  reports. The credentials are taken as `janus publish` takes them.
+
+#### A component published with `wkg oci push` loads
+
+Staged plan S5.1b, ADR 0098. The loader accepts the CNCF Wasm OCI artifact layout, which the Bytecode
+Alliance's `wkg oci push` publishes, as well as Janus's own. Such an artifact is a Janus component's
+when its config's `component.exports` names `pact:janus-component/pipe@1.0.0`. The config is read
+before the layer is fetched, so an artifact of another component, or a WebAssembly module, is refused
+as `not-a-component`, naming what it exports, without fetching it. Its config carries no name or
+version, so the component's handshake alone says which it is.
+
+- `janus component pull` names a component from its handshake, for either layout, so the declaration
+  it prints for a `wkg` artifact names the component.
+- `janus component push` still publishes Janus's layout, whose config names the component, and whose
+  digest is the same however often the same bytes are pushed. `wkg` writes a timestamp into its
+  config, so each `wkg` push is a new digest to pin.
+- `pact_janus_component_host::oci::Pulled` has a `layout` (`Layout::Janus` or `Layout::Wasm`).
+
+#### `janus component check` runs a component's conformance cases, and the built-in components have theirs
+
+Staged plan S5.10, ADR 0105.
+
+- **`janus component check <component.wasm> <cases>...`** loads a component as a run does, with no
+  grants, and runs conformance cases against it through the WASM binding (`conformance-case.schema.json`).
+  Exit 0 when every case passes, 1 when one fails or the component does not load, 2 when a case cannot be
+  read. `--output json` prints one document.
+- **The built-in components' conformance cases** are `corpora/components/<component>/`, for `json`,
+  `text`, `form`, `xml`, `multipart` and the HTTP component's matcher, `http`. Each runs through the
+  native binding and a serialising in-process one that reaches the component through frame bytes, as the
+  WASM binding reaches an out-of-tree component. `janus-spec.tar.gz` carries them, and now carries the
+  component-interfaces schemas too.
+- **Fixed, as the corpus found them:** `decode-failed` and `unsupported-content-type` from the built-in
+  content components now have category `document`, as component-interfaces spec §11.1 says (they had
+  `component`). The HTTP component answers `matcher/apply` for an action it does not run with
+  `unknown-action`, not `operation-unsupported`. No verdict changes: nothing dispatched on either.
+- `conformance-case.schema.json`: an expected `error` needs only its `code`, and `serialising` is a known
+  binding. Both loosen the schema.
+
+#### The component interface is generally available for content and matcher components, and a component that declares what nothing calls is refused
+
+Staged plan S5.1d, ADR 0104.
+
+- **Generally available**: content and matcher components loaded through the WASM binding may depend on
+  the WIT world, the `component/*`, `content/*` and `matcher/{apply,compare,prefix}` documents, the
+  declaration, both OCI layouts, signing, and the record of what was loaded, all evolving only additively
+  within component protocol v1. `Documentation/component-author-guide.md` is where an author starts.
+- **A declared component whose handshake declares what no binding calls fails to load** as
+  `component-invalid` (inside `component-unavailable`, `reason: load-failed`), naming what it declared:
+  the `hook` interface, `transport` through the WASM binding, `generators`, or an operator's
+  `variant-facet`. These loaded before and were silently never used. No component outside the
+  repository declared one.
+
+#### A contract and a verification summary name the declared components that were loaded
+
+Staged plan S5.1a, ADR 0097. A consumer session that declared components writes them into its
+contract as `metadata.components`, and a verification run that declared components lists them in its
+summary as `components`. Each entry gives the `name` and `version` the component's handshake declared
+and its `source`: the declaration's `kind`, an `oci` source's `reference` without its digest, and the
+`digest` a declaration would pin. That is the resolved manifest digest for a registry, a tag's included,
+and the SHA-256 of the bytes for a `file` source, whose path is never written. A session or run that
+declared no components writes exactly what it did before, and the engine's own version is not recorded.
+
+- A contract merged into one already written (`finalise`'s `write`) lists every component either
+  writer loaded, once each, sorted by name, then version, then source.
+- `pact_janus_kernel::component::Loaded` has a `fetched` member, where a loader says where it found
+  the bytes, and `Resolved` a `source`. A loader that sets `fetched: None` is recorded by its source's
+  kind alone.
+- `pact_janus_kernel::contract::Metadata` has `components`, a list of `RecordedComponent`.
+
+#### A content component can ask the engine to decode content of another type inside its own, and a multipart part reaches a declared component
+
+Staged plan S5.6, ADR 0103, superseding ADR 0040 decision 3.
+
+- **A multipart part's body is decoded and encoded through the session's content registry**, declared
+  components first, where it went only to the built-in JSON, XML, text and form components. A project
+  that declares a CSV component has a `text/csv` part decoded into rows a contract can shape. A mock
+  serves that part as CSV, written from the part of the shape that describes it. With no component
+  declared, every multipart document is what it was, and no verdict changes.
+- **`content/decode` and `content/encode` results may carry `embedded`**, the slots or documents of
+  another type a component needs first. The engine decodes or encodes each through the registry and
+  repeats the request with `embedded` answered by id. A question carries `document: null` or
+  `value: { "content": null }`, which the engine does not read. One round per request. Content more
+  than eight levels deep is answered `embedding-too-deep`, and asking twice is `component-malformed`.
+  An embedded document is encoded with the part of the request's `shape` at the pointer `at` gives.
+- **`component/hello` now sends `capabilities: { "embedded-content": {} }`**: a component should ask
+  only of an engine that sends it. Components that never ask are unchanged, and so is the WIT world.
+- The native binding's `Decode`, `DecodeResult`, `Encode` and `EncodeResult` gain an `embedded` member,
+  with `of` constructors. A Rust embedding that builds them by hand adds it.
+
+#### A subsumption check no longer tries every provider-shape entry for every interaction
+
+Staged plan S4.11, ADR 0096. Selecting the entry an interaction is checked against ran every entry's
+selector plan, so a check cost interactions × entries. Each entry's selector now fixes constraints,
+an `equality`'s value and a prefix a component operator declares, and an entry one of them certainly
+refuses is passed over before its plan runs. The entries selected, and so every report, are the same.
+A 50-interaction check against a 400-entry shape costs each interaction 269 µs where it cost 1,358 µs.
+
+- The matcher interface has an optional `matcher/prefix` (`{ operator, node }` → `{ prefix? }`,
+  component-interfaces spec §7.6), and `MatcherComponent::prefix` its native binding. The built-in HTTP
+  component answers it for `http:path`.
+- `subsumption/check` reads a provider shape from the frame once, rather than writing it out and
+  parsing it twice. An invalid shape's error no longer gives a line and column, which pointed into
+  that text.
+- `pact_janus_kernel::subsumption::provider_shape_of` reads a provider shape already parsed.
+
+#### A component's declaration can name the signer it trusts, and its Sigstore signature is verified
+
+Staged plan S5.1c, ADR 0099. An `oci` source takes a `signature`: an `issuer` and exactly one of
+`identity`, compared exactly, or `identity-pattern`, a regular expression matching the whole identity,
+and optionally a `trusted-root` file. The loader then finds the Sigstore bundles attached to the
+component's manifest as OCI referrers, as `cosign sign` (v3) attaches them, through the referrers API or
+the referrers tag schema. It verifies them offline against the Sigstore public-good instance's trusted
+root, which the engine carries, or the declared one, and loads the component only when one is from that
+signer. This happens after the digest is checked and before a byte is compiled. A declaration with no
+`signature` loads exactly as before.
+
+- A load with no trusted signature fails as `component-unavailable` with `signature-missing` (nothing
+  attached) or `signature-untrusted` (nothing attached is from that signer, each named with who signed
+  it or why it does not verify).
+- A recorded component's `source` (a contract's `metadata.components`, a verification summary's
+  `components`) has `signer: { identity, issuer }` when the loader verified one.
+- `janus component pull` takes `--certificate-identity`, `--certificate-identity-regexp`,
+  `--certificate-oidc-issuer` and `--trusted-root`. It reports who signed the component, and prints a
+  declaration naming the signer when exactly one verifies. It exits 1 when a signer it names did not
+  sign.
+- A pinned component whose signature verified once loads again from the cache with no request, its
+  bundle verified again.
+- The loader resolves a signature's `trusted-root` against the configuration file, as it resolves a
+  `file` source.
+- `pact_janus_kernel::component::Source` has `signature` (`SignatureTrust`), `Fetched` and
+  `RecordedSource` have `signer` (`Signer`), and `WasmLoader::pull` takes a
+  `pact_janus_component_host::signature::Trust` and returns the signers it verified.
+
+#### A slot that cannot be decoded fails at the slot, a decode's losses are warnings, and encode is given the shape
+
+Staged plan S5.3, ADR 0101. What a content component says about a body now reaches the user.
+
+- **A body a component refuses fails once, at the body, in the component's words**: `$.response.body:
+  could not be decoded as 'application/json': expected value at line 1 column 1`, with no `action`.
+  No check that reads the body runs against a guess, so the mismatches that used to follow it
+  (`Expected a value`, `Expected at least 1 item(s)`) are gone. Checks that read anything else, the
+  status or a header, still run. An empty body is still absent, not undecodable. The verdict of every
+  run is the one it was; the messages are new.
+- **A content component that died decoding a reply** (trapped, timed out, exited) fails the variant
+  with `component-failed`, naming `content/<type>` and the slot's `path`, as a transport's failure does.
+- **New `verification/warning` codes**, before the result they qualify: `content-degraded`, a loss a
+  decode reported, at its place in the reply (`target`), with the component's `degradation`; and
+  `content-type-differs`, a slot a contract declares one type for that arrived labelled with another
+  (`declared`, `labelled`) and was decoded as declared. Neither changes a verdict. Reports print them.
+- **`content/encode` takes an optional `shape`**, the slot's shape as the interaction declares it,
+  whenever the engine produced the document from one. A component writes from it only what the
+  document cannot say, such as the header row of an empty CSV. Components that ignore it are unchanged.
+- The golden corpus's `case.json` may name `undecodable` slots.
+
+#### `janus-engine.wasm` records an HTTP provider's shape, and redacts HTTP's credentials
+
+Staged plan S4.9, ADR 0094. `provider-shape-session/observe` reads an observation through what its
+kind declares: which part answers, the outcome slots that keep a 404 from widening a 200, and the
+credential members recorded only as present. The engine found those by asking the transport for the
+kind, and the WASM component has none, so an `http` recording there was `component-unavailable`. For
+the same reason, a v1–v4 pact upgraded there kept its `Authorization` and `Set-Cookie` values, which
+the native engine records as `[redacted]`.
+
+- The kernel holds what a kind declares as `KindDeclarations`, and an embedding with no transport
+  for a kind can register them with `Engine::register_kind`. A transport registered for the kind
+  still declares it. The kernel registers `message` itself.
+- `pact_janus_component_http::kind` is the HTTP kind's declarations, built without the `transport`
+  feature. `HttpTransport` answers from it, and the WASM component registers it for `http`.
+- A registered kind is not a transport. `engine/hello` is unchanged, and `start-transport` for it is
+  still `component-unavailable`.
+- The release checks that the component records the sample provider's answers, frame for frame, as
+  the native engine does, and upgrades a pact with the same redactions.
+
+### Fixes
+
+#### `subsumption/check` compiles each selector once per check
+
+Staged plan S4.5, ADR 0095. A check compiled every provider-shape entry's selector again for every
+interaction it tried to match. It now compiles each once per check, the first time an interaction
+needs it, which makes a large contract's check about 40% faster. No verdict changes. A selector that
+is not a shape document is reported once as `interaction-invalid`, where it was reported once for
+every interaction that read it.
+
+#### `janus-engine.wasm` decides shapes selected by operation, as `janus check` does
+
+Staged plan S4.3a, ADR 0092. The engine's WASM component registered the content components and
+nothing of the HTTP component, because it has no transport. A provider shape recorded or derived by
+operation (ADR 0086, ADR 0088) selects with the HTTP component's `http:path`, so no entry matched,
+and `subsumption/check` answered `not-checked` where `janus check` found findings. The component now
+registers the HTTP component's matchers (`http:path`, `http:media-type`, `http:list`,
+`http:status-class`) without the transport, so it answers every `subsumption/*` frame as the native
+engine does.
+
+- `pact_janus_component_http`'s transport is behind a default `transport` feature. Without it, the
+  crate is the matcher half alone and builds for `wasm32-wasip2`.
+- The release checks the component it ships against the native engine, frame for frame, under the
+  `wasmtime` crate and under Ruby's `wasmtime` gem, as the Rust and Ruby Pact Brokers would host it.
+  `engine/wasm/hosts/ruby/pipe.rb` is that Ruby host.
+
 ## 0.7.0 (2026-11-13)
 
 ### Breaking Changes
