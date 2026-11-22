@@ -60,8 +60,7 @@ names a body that would not parse.
                  { "name": "csv:equality" }, { "name": "csv:columns" }, { "name": "csv:header-style" } ],
     "operators": [
       { "name": "csv:columns", "comparability": "exact" },
-      { "name": "csv:header-style", "comparability": "exact", "variant-facet": "header-style" } ],
-    "generators": [ { "name": "csv:row-id", "produces": "a unique row identifier per run" } ]
+      { "name": "csv:header-style", "comparability": "exact" } ]
   },
   "capabilities": { "batch-apply": { } }
 }
@@ -193,8 +192,10 @@ value is wrong" (a result) and "I could not do my job" (an error), and only the 
 
 ## 6. A contributed variant dimension
 
-`csv:header-style` declares a facet, so the operator widens the variant space rather than just
-asserting against it:
+Not callable yet: no engine asks a declared component for its dimensions, and a handshake declaring a
+`variant-facet` fails to load (spec §3.2, staged plan S5.9). When it is, `csv:header-style` would declare
+the facet `header-style`, and the operator would widen the variant space rather than just assert against
+it:
 
 ```json variant-space-result
 { "dimensions": [

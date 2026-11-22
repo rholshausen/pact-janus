@@ -184,6 +184,14 @@ jobs:
           cargo clippy --all-targets -- -D warnings
           cargo test
           cargo build --release --target wasm32-wasip2
+      # S5.1d (ADR 0104): the NDJSON component, written from the component author guide alone, held to
+      # the same bar. The engine's tests build it again, publish it, sign it and load it.
+      - name: Third-party component (janus-ndjson)
+        working-directory: third-party/janus-ndjson
+        run: |
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+          cargo build --release --target wasm32-wasip2
 
   verifier-diff:
     # Staged plan S1.1: today's verifier (pact_verifier_cli, pinned in

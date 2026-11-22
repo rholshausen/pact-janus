@@ -1,0 +1,19 @@
+// The component pipe, as a WIT world (spec.md §9.2). This file is part of the specified surface: an
+// out-of-tree WASM component exports this world, and an engine's WASM loader links against it.
+//
+// It is frozen. Everything a component says — its handshake, its contributions, every operation of
+// the four interfaces and every error — travels as a JSON frame through `call`, governed by the
+// schemas under ../schemas/v1/. A new operation, content type or error code is a new document, never a
+// new function here (ADR 0002, ADR 0012), so the package version below does not track the component
+// protocol version and is not expected to change.
+package pact:janus-component@1.0.0;
+
+interface pipe {
+  /// One request frame in (UTF-8 JSON, no framing header — the buffer length delimits it), exactly one
+  /// response frame out. Strictly serial per instance. The engine is the only caller.
+  call: func(request: list<u8>) -> list<u8>;
+}
+
+world component {
+  export pipe;
+}

@@ -1,0 +1,29 @@
+[package]
+name = "janus-ndjson"
+version = "1.0.0"
+edition = "2024"
+description = "A Pact Janus content component for newline-delimited JSON (application/x-ndjson)"
+license = "Apache-2.0"
+publish = false
+
+# Its own workspace: this component is built as a third party would build it, from the published
+# component interface only, and depends on nothing in the Janus repository.
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]   # cdylib for the component, rlib so native tests can call `call`
+
+[dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }
+base64 = "0.22"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wit-bindgen = "0.63"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+
+[dev-dependencies]
+pretty_assertions = "1"

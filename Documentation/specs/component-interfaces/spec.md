@@ -85,6 +85,15 @@ change — and **2.7 owns the hook *system***: which points exist, what configur
 each point are treated, and how secrets reach them. A hook component is not the only implementation of
 a hook point (2.7 also has `exec` and HTTP endpoints); it is the one that goes through this interface.
 
+**What is generally available.** A third party may depend on this specification for **content and
+matcher components loaded through the WASM binding** ([ADR 0104](../../decisions/0104-the-component-interface-is-generally-available-for-content-and-matcher-components-over-wasm.md)): the WIT world, the schemas
+for `component/*`, `content/*` and `matcher/{apply,compare,prefix}` and their semantics here, the
+declaration, the artifact layouts, signing, and the record of what was loaded, all evolving only
+additively (§12). Some of what follows is specified and not yet called on a declared component:
+generators (§7.3), variant dimensions (§7.4), hooks (§8), a WASM transport, and the subprocess binding
+(§9.3). A handshake declaring one of those fails to load (§3.2). The
+[component author guide](../../component-author-guide.md) is where an author starts.
+
 ## 2. What a component is
 
 ### 2.1 Identity
@@ -241,6 +250,12 @@ Result (`ComponentHelloResult`), component → engine:
 **The handshake is the only source of truth about what a component provides.** There is no manifest to
 agree with it (ADR 0012) — an artifact's metadata may hint at contributions for cataloguing, but the
 engine indexes what the running component declared and nothing else.
+
+So what a handshake declares, the engine must be able to call. A declared component that implements an
+interface its loader bound nothing for (`hook`, or `transport` through the WASM binding), contributes
+`generators`, or declares an operator's `variant-facet`, fails to load as `component-invalid`, naming
+what it declared ([ADR 0104](../../decisions/0104-the-component-interface-is-generally-available-for-content-and-matcher-components-over-wasm.md)). It is refused rather than loaded with part of it silently
+unused.
 
 ### 3.3 Contributions
 
@@ -910,6 +925,8 @@ and reaches the user through the same executed plan (spike 1.4 §2).
 ### 7.3 Generating
 
 `generator/generate` produces a value where one must be fresh rather than replayed (shape spec §3.4).
+The engine's built-in `pact` generator component answers it (below). No engine asks a declared component
+for one yet, and a handshake contributing `generators` fails to load (§3.2; staged plan S5.9).
 
 **A generator's output MUST be admitted by the shape it generates for.** The engine SHOULD check this
 and MUST report a violation as a component error, never as a test failure: a generator producing a value
@@ -938,7 +955,8 @@ applies its request generators through it, and `janus upgrade` names it on the s
 ### 7.4 Contributing variant dimensions
 
 `matcher/variant-space` lets a component operator contribute dimensions to the variant space (shape spec
-§6.6, variant semantics §2.1). The returned dimensions are that schema's documents, with two obligations
+§6.6, variant semantics §2.1). No engine asks a declared component for them yet, and a handshake
+declaring an operator's `variant-facet` fails to load (§3.2; staged plan S5.9). The returned dimensions are that schema's documents, with two obligations
 this interface adds:
 
 - **Point order is minimal-to-maximal.** Variant semantics §3.1 records a component facet's extremes as
@@ -1013,6 +1031,9 @@ Schema: [`schemas/v1/hook.schema.json`](schemas/v1/hook.schema.json).
 | Operation | Body → Result |
 |---|---|
 | `hook/invoke` | `{ point, context, config? }` → `{ outcome, changes?, data? }` |
+
+The engine's built-in hook components implement it in-tree. A declared component implementing `hook`
+fails to load (§3.2): no loader binds one yet.
 
 ### 8.1 What a hook is handed
 
@@ -1181,6 +1202,10 @@ expected results, expressed in the same documents as the frames. Schema:
 
 The corpus grows with the golden corpora of plan task 3.7 and is the second thing a third-party
 component author runs after reading this document — the first being the handshake.
+
+**Not built yet.** The case format is specified, and no case exists or is run (staged plan S5.10,
+[ADR 0104](../../decisions/0104-the-component-interface-is-generally-available-for-content-and-matcher-components-over-wasm.md)). Until it is, the checks a load makes (§3.2, §2.4, §6.3, §7.5) and the engine's own
+tests are what hold the interface together.
 
 ## 10. Resolution, distribution and trust
 

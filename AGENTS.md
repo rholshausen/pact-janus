@@ -324,6 +324,12 @@ Three sources are the source of truth and take precedence over this file when th
 > the scope's components before asking it again, so the engine stays the only caller and the WIT is
 > unchanged. The multipart component asks for every typed part's body, so a declared CSV component reads
 > a `text/csv` part; an embedded document is encoded with the part of the shape at its `at`.
+> S5.1d (ADR 0104): the component interface is generally available for content and matcher components
+> over WASM, and `Documentation/component-author-guide.md` is where an author starts. A handshake that
+> declares what no binding calls (a hook, a WASM transport, generators, a variant facet) fails to load
+> as `component-invalid`; those are S5.9, and the conformance corpus spec §9.4 describes is S5.10.
+> `third-party/janus-ndjson` was written by an author who read only the guide; `ndjson_component.rs`
+> publishes it with `wkg`, signs it, declares it and finds it recorded.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -384,7 +390,9 @@ demo/            The RFC's whole loop as a runnable walkthrough (task 9.3): web-
 third-party/     Components written as a third party would, from the published interfaces
                  only — each its own Cargo workspace, excluded from ours and depending on
                  nothing in it: third-party/janus-csv, the text/csv content component task 8.1
-                 built from the docs (Documentation/prototype/third-party-component-report.md)
+                 built from the docs (Documentation/prototype/third-party-component-report.md),
+                 and third-party/janus-ndjson, the application/x-ndjson one S5.1d's author wrote
+                 from Documentation/component-author-guide.md alone (ADR 0104)
 spikes/          The prototype's time-boxed experiments: each one's FINDINGS.md, at the path the
                  ADRs cite, and no code (S0.12 deleted it; `b8d5010` is the last commit with it)
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate

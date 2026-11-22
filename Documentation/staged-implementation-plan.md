@@ -2974,6 +2974,28 @@ The component model, opened to the ecosystem.
     stable, and a guide for a component author. Spec §10.3 specifies signature verification since
     S5.1c. *Exit:* a component written from the guide alone is published with `wkg`,
     signed, declared, and recorded in a contract and a verification summary.
+    *Done 2026-11-22* ([ADR 0104](decisions/0104-the-component-interface-is-generally-available-for-content-and-matcher-components-over-wasm.md)):
+    - Generally available means content and matcher components over the WASM binding: the WIT world,
+      the schemas and semantics of `component/*`, `content/*` and `matcher/{apply,compare,prefix}`, the
+      declaration, the artifact layouts, signing and the record of what was loaded, evolving only
+      additively. Not the native binding's Rust API, nor the subprocess binding until S5.5.
+    - Not foreseen: the specification promised more than any engine calls. A declared component's
+      generators and variant dimensions are asked for by nothing, the WASM loader binds no hook or
+      transport, and the component conformance corpus of spec §9.4 did not exist. A handshake declaring
+      any of the first four now fails to load as `component-invalid`, where it loaded and was silently
+      unused. They are S5.9, and the corpus S5.10; the specification says so where each is described.
+    - `Documentation/component-author-guide.md` takes an author from an empty directory to a published,
+      signed, declared and recorded component, linking the specification for each rule.
+    - The exit's author was a fresh agent, told to read the guide and what it links and nothing else.
+      It wrote `third-party/janus-ndjson`, an `application/x-ndjson` content component with 30
+      frame-level tests, that loaded, served and verified on the first try, and reported 17 findings,
+      every one answered in the guide (ADR 0104's consequences list them). The largest was that the
+      guide showed an interaction where verifying needs a contract. None needed an engine change.
+    - `engine/component-host/tests/ndjson_component.rs` is the exit: the component pushed with
+      `wkg oci push` (when `JANUS_WKG` names one, as CI's does), signed, declared by digest and signer,
+      served by a mock, verified against providers that keep and break its shape, refused under another
+      signer, and recorded with its digest and signer in the contract and the summary. CI holds the
+      component to clippy and its own tests, as it does `janus-csv`.
 - **S5.2 A bridge for today's pact-plugins** — **L**, at least the protobuf/gRPC one, so no existing
   user loses a plugin. A shim process speaking both wires is the smaller route (component-interfaces
   spec §9). This closes S1.8's refusal. With it, S4.2's protobuf half: `janus derive` reads a `.proto`
@@ -3096,6 +3118,28 @@ The component model, opened to the ecosystem.
   part's `body`, read as `content-types` is read for a slot) and whether `content/compile` is asked for
   it. Wait for a contract that needs it: `regex` of a column does today what `integer` would.
   *Exit:* `integer` of a column in a CSV part compiles to `csv:integer` and verifies against a provider.
+
+- **S5.9 Generators and variant dimensions from a declared component** — **M**. Added 2026-11-22 by
+  ADR 0104. The specification has a matcher component contribute generators (`generator/generate`, spec
+  §7.3) and an operator widen the variant space (`matcher/variant-space`, §7.4), and no engine asks a
+  declared component for either: the WASM binding forwards neither, and `add-interaction` finds a
+  generator only among the in-tree ones (ADR 0085). Until this is built, a handshake declaring
+  `generators` or an operator's `variant-facet` fails to load. The binding forwards both; a shape's
+  `generator` names a declared one as it names `pact:Uuid`; the engine checks a generated value against
+  its shape and reports one it rejects as the component's error (§7.3); a contributed dimension set whose
+  gates are not a forest is `interaction-invalid` (§7.4).
+  *Exit:* a component written outside the core team generates a value a mock serves fresh and a contract
+  records as its example, and contributes a dimension whose points are served as variants.
+- **S5.10 A component conformance corpus** — **M**. Added 2026-11-22 by ADR 0104. Spec §9.4 specifies a
+  corpus of `(op, body)` cases with expected results, run through the native and WASM bindings, and
+  `conformance-case.schema.json` is its format; no case exists, and nothing runs one. It is what a
+  component author would run second, after the handshake, and what would hold the in-tree components to
+  their documents rather than their Rust types. Cases for the built-in content components first (JSON,
+  text, form, XML, multipart, embedded content included), run natively and through a serialising
+  in-process binding; then a `janus component check <component.wasm> <cases>` that runs a corpus against
+  a third party's component.
+  *Exit:* every built-in content component passes its cases through both bindings in CI, and
+  `janus component check` runs the CSV component's.
 
 **Done when** a protobuf plugin runs through either the bridge or a native component, and a second
 content component exists written by someone outside the core team.
@@ -3320,10 +3364,12 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.10 | No provider-shape plugin for Drift; waits on Drift publishing its plugin interfaces and SDK | provider-shape plugin proposal; 2026-11-18 |
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user (done: ADR 0101) | findings 12–14 |
-| S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099) | findings 15–17 |
+| S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099); generally available, with a guide (done: S5.1d, ADR 0104) | findings 15–17 |
 | S5.5 | Out-of-process containment and command form | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components (done: ADR 0103) | ADR 0040 decision 3 |
 | S5.8 | A component's substitutions do not reach content embedded in a slot | ADR 0103 |
+| S5.9 | A declared component's generators and variant dimensions are refused at load: nothing calls them | ADR 0104 |
+| S5.10 | No component conformance corpus exists, though spec §9.4 specifies one | ADR 0104 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration (done: ADR 0100) | findings 21, 22, 24; gate F |
 | S5.7 | A declared component's operators are opaque to `janus check`, which loads none (done: ADR 0102) | ADR 0087 |
 | S6.6 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12; moved from S3.7 |

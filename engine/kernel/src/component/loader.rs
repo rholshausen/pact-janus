@@ -400,6 +400,46 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
     }
   }
 
+  // What the handshake declares, the engine must be able to call (ADR 0104): an interface the
+  // loader bound nothing for, or a contribution no binding reaches yet, is refused here, by name,
+  // rather than loaded and silently never used.
+  for interface in &interfaces {
+    let bound = match interface.as_str() {
+      "content" => loaded.content.is_some(),
+      "matcher" => loaded.matcher.is_some(),
+      "transport" => loaded.transport.is_some(),
+      _ => false,
+    };
+    if !bound {
+      return Err(invalid(format!(
+        "component '{declared}' implements '{interface}', which this engine cannot call through its loader (component-interfaces spec §9; ADR 0104)"
+      )));
+    }
+  }
+  if let Some(contributes) = hello.get("contributes") {
+    let generators = contributes
+      .get("generators")
+      .and_then(Value::as_array)
+      .is_some_and(|generators| !generators.is_empty());
+    if generators {
+      return Err(invalid(format!(
+        "component '{declared}' contributes generators, which no engine calls on a declared component yet (staged plan S5.9; ADR 0104)"
+      )));
+    }
+    let facet = contributes
+      .get("operators")
+      .and_then(Value::as_array)
+      .into_iter()
+      .flatten()
+      .find(|operator| operator.get("variant-facet").is_some());
+    if let Some(operator) = facet {
+      let operator = operator.get("name").and_then(Value::as_str).unwrap_or_default();
+      return Err(invalid(format!(
+        "component '{declared}' declares a variant facet for '{operator}', which no engine asks a declared component for yet (staged plan S5.9; ADR 0104)"
+      )));
+    }
+  }
+
   let content = if interfaces.iter().any(|i| i == "content") {
     loaded.content
   } else {
@@ -663,21 +703,77 @@ mod tests {
     }
   }
 
+  /// Content that decodes nothing: what a handshake test needs bound.
+  struct Unreadable;
+
+  impl ContentComponent for Unreadable {
+    fn handles(&self, _: &str) -> bool {
+      false
+    }
+    fn decode(&self, _: super::super::Decode) -> Result<super::super::DecodeResult, ComponentError> {
+      Err(ComponentError::operation_unsupported("content/decode"))
+    }
+    fn encode(&self, _: super::super::Encode) -> Result<super::super::EncodeResult, ComponentError> {
+      Err(ComponentError::operation_unsupported("content/encode"))
+    }
+    fn compile(&self, _: super::super::Compile) -> Result<super::super::CompileResult, ComponentError> {
+      Err(ComponentError::operation_unsupported("content/compile"))
+    }
+    fn detect(&self, _: super::super::Detect) -> Result<super::super::DetectResult, ComponentError> {
+      Err(ComponentError::operation_unsupported("content/detect"))
+    }
+  }
+
   fn handshake(interfaces: Value, actions: Value, operators: Value) -> Result<Resolved, Unavailable> {
+    handshake_with(interfaces, json!({ "actions": actions, "operators": operators }))
+  }
+
+  /// A handshake declaring `interfaces` and `contributes`, loaded with content and matcher bound when
+  /// it declares them, and nothing else, as the WASM loader binds them.
+  fn handshake_with(interfaces: Value, contributes: Value) -> Result<Resolved, Unavailable> {
     let declaration: ComponentDeclaration =
       serde_json::from_value(json!({ "name": "csv", "source": { "kind": "file", "reference": "csv.wasm" } }))
         .unwrap();
+    let declares = |interface: &str| interfaces.as_array().unwrap().iter().any(|i| i == interface);
+    let content: Option<Arc<dyn ContentComponent>> = declares("content").then(|| Arc::new(Unreadable) as _);
+    let matcher: Option<Arc<dyn MatcherComponent>> = declares("matcher").then(|| Arc::new(Silent) as _);
     check_handshake(
       &declaration,
       Loaded {
         hello: json!({ "component": { "name": "csv", "version": "1.0.0" }, "interfaces": interfaces,
-                       "contributes": { "actions": actions, "operators": operators } }),
-        content: None,
+                       "contributes": contributes }),
+        content,
         transport: None,
-        matcher: Some(Arc::new(Silent)),
+        matcher,
         fetched: None,
       },
     )
+  }
+
+  /// ADR 0104: what a handshake declares, the engine can call. An interface the loader bound nothing
+  /// for, and a contribution no binding reaches yet, are refused when the component loads.
+  #[rstest::rstest]
+  #[case::hook(json!(["content", "hook"]), json!({}), "implements 'hook'")]
+  #[case::transport(json!(["transport"]), json!({ "transports": [ { "kind": "line" } ] }), "implements 'transport'")]
+  #[case::generators(json!(["matcher"]), json!({ "generators": [ { "name": "csv:row" } ] }), "contributes generators")]
+  #[case::variant_facet(json!(["matcher"]), json!({ "operators": [ { "name": "csv:column", "variant-facet": "width" } ] }), "variant facet for 'csv:column'")]
+  fn what_a_handshake_declares_and_no_binding_can_call_is_refused(
+    #[case] interfaces: Value,
+    #[case] contributes: Value,
+    #[case] says: &str,
+  ) {
+    let refused = handshake_with(interfaces, contributes).err().expect("refused");
+    assert_eq!(refused.details["reason"], "component-invalid");
+    assert!(refused.message.contains(says), "{}", refused.message);
+  }
+
+  #[test]
+  fn content_and_a_matcher_with_no_generators_or_facets_load() {
+    handshake_with(
+      json!(["content", "matcher"]),
+      json!({ "generators": [], "operators": [ { "name": "csv:column" } ] }),
+    )
+    .expect("loads");
   }
 
   /// ADR 0102: an operator's comparability is read from the handshake, and one declared comparable is
