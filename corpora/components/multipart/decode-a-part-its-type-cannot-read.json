@@ -1,0 +1,54 @@
+{
+  "name": "multipart/decode-a-part-its-type-cannot-read",
+  "component": "multipart",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "multipart/form-data; boundary=b",
+        "value": {
+          "content": "LS1iDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9Im1ldGEiDQpDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24NCg0KeyJhIjoxfQ0KLS1iDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9Im5vdGUiDQoNCmhlbGxvDQotLWINCkNvbnRlbnQtRGlzcG9zaXRpb246IGZvcm0tZGF0YTsgbmFtZT0iZmlsZSI7IGZpbGVuYW1lPSJ4LmJpbiINCkNvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vb2N0ZXQtc3RyZWFtDQoNCgABDQotLWItLQ0K",
+          "encoded": "base64"
+        },
+        "embedded": {
+          "0": {
+            "error": {
+              "code": "decode-failed",
+              "category": "document",
+              "message": "not JSON"
+            }
+          },
+          "2": {
+            "document": "AAE=",
+            "encoded": "base64"
+          }
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": {
+            "meta": [
+              {
+                "headers": {
+                  "content-disposition": "form-data; name=\"meta\"",
+                  "content-type": "application/json"
+                }
+              }
+            ],
+            "note": [
+              {
+                "body": "hello"
+              }
+            ],
+            "file": [
+              {
+                "filename": "x.bin"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

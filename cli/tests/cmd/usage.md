@@ -23,7 +23,8 @@ Commands:
                derivation could not carry
   publish      Publish Janus contracts, v1-v4 pacts or provider shapes to a Pact Broker, for a
                version of the consumer or provider they belong to
-  component    Publish a WASM component to an OCI registry, or fetch one and say what it is
+  component    Publish a WASM component to an OCI registry, fetch one and say what it is, or check
+               one against its conformance cases
   completions  Print a shell completion script
   version      Print the CLI, engine and protocol versions
   help         Print this message or the help of the given subcommand(s)

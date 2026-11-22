@@ -1,0 +1,6 @@
+# Every case is read before the component is loaded: a case that is not one is the command failing to
+# run, exit 2, whatever the component is (S5.10, ADR 0105).
+bin.name = "janus"
+args = ["component", "check", "missing.wasm", "cli/tests/cmd/fixtures/openapi/untitled.openapi.json"]
+fs.cwd = "../../.."
+status.code = 2

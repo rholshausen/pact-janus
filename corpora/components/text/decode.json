@@ -1,0 +1,52 @@
+{
+  "name": "text/decode",
+  "component": "text",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/plain",
+        "value": {
+          "content": "aMOpbGxvIHfDtnJsZA==",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": "héllo wörld"
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/plain; charset=utf-8",
+        "value": {
+          "content": "as written",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": "as written"
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv",
+        "value": {
+          "content": "a,b\r\n1,2",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": "a,b\r\n1,2"
+        }
+      }
+    }
+  ]
+}

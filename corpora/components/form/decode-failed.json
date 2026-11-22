@@ -1,0 +1,46 @@
+{
+  "name": "form/decode-failed",
+  "component": "form",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/x-www-form-urlencoded",
+        "value": {
+          "content": "!!!",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "application/x-www-form-urlencoded"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/x-www-form-urlencoded",
+        "value": {
+          "content": [
+            1
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "application/x-www-form-urlencoded"
+          }
+        }
+      }
+    }
+  ]
+}

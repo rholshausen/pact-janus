@@ -21,7 +21,8 @@ Commands:
                derivation could not carry
   publish      Publish Janus contracts, v1-v4 pacts or provider shapes to a Pact Broker, for a
                version of the consumer or provider they belong to
-  component    Publish a WASM component to an OCI registry, or fetch one and say what it is
+  component    Publish a WASM component to an OCI registry, fetch one and say what it is, or check
+               one against its conformance cases
   completions  Print a shell completion script
   version      Print the CLI, engine and protocol versions
   help         Print this message or the help of the given subcommand(s)
@@ -408,14 +409,16 @@ reached), or the command could not run.
 
 ```console
 $ janus component --help
-Publish a WASM component to an OCI registry, or fetch one and say what it is
+Publish a WASM component to an OCI registry, fetch one and say what it is, or check one against its
+conformance cases
 
 Usage: janus component [OPTIONS] <COMMAND>
 
 Commands:
-  push  Publish a WASM component as an OCI artifact, described by the component's own handshake
-  pull  Fetch a component into the cache, check every byte, and print how to declare it, pinned
-  help  Print this message or the help of the given subcommand(s)
+  push   Publish a WASM component as an OCI artifact, described by the component's own handshake
+  pull   Fetch a component into the cache, check every byte, and print how to declare it, pinned
+  check  Run conformance cases against a WASM component, through the binding a run loads it with
+  help   Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help
@@ -431,7 +434,8 @@ when a registry wants them: JANUS_OCI_USERNAME and JANUS_OCI_PASSWORD. The cache
 JANUS_COMPONENT_CACHE, or pact-janus/components in the user cache directory.
 
 Exit status: 0 done; 1 the artifact is not what it claims (a digest that does not match, not a Janus
-component, a config that disagrees with the component); 2 the command could not run.
+component, a config that disagrees with the component), or a conformance case failed; 2 the command
+could not run.
 
 ```
 
@@ -491,6 +495,33 @@ Global options:
                            default is warn [possible values: off, error, warn, info, debug, trace]
       --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
       --error-chain        Print every cause of an error, not only what failed and its root cause
+
+```
+
+```console
+$ janus component check --help
+Run conformance cases against a WASM component, through the binding a run loads it with
+
+Usage: janus component check [OPTIONS] <COMPONENT_WASM> <CASES>...
+
+Arguments:
+  <COMPONENT_WASM>  The component to check
+  <CASES>...        Case files, or directories holding them (every .json file beneath)
+
+Options:
+      --output <FORMAT>  text prints each case and what it found; json prints one document [default:
+                         text] [possible values: text, json]
+  -h, --help             Print help
+
+Global options:
+  -l, --log-level <LEVEL>  How much to log on standard error. Without it, RUST_LOG is read; the
+                           default is warn [possible values: off, error, warn, info, debug, trace]
+      --no-colour          Print no colour, on a terminal too (as NO_COLOR does)
+      --error-chain        Print every cause of an error, not only what failed and its root cause
+
+Each case is a conformance case (the component interfaces' conformance-case.schema.json): calls on
+the component, with what each must answer. The component is loaded with no grants, as a declaration
+that names none loads it.
 
 ```
 

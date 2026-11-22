@@ -1,0 +1,50 @@
+{
+  "name": "json/decode-a-document-already-decoded",
+  "component": "json",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": {
+            "a": [
+              1,
+              {
+                "b": null
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": {
+            "a": [
+              1,
+              {
+                "b": null
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "just a string",
+          "encoded": "json"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": "just a string"
+        }
+      }
+    }
+  ]
+}

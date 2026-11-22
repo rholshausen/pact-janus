@@ -1,0 +1,97 @@
+{
+  "name": "multipart/decode-asks-for-each-typed-part",
+  "component": "multipart",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "multipart/form-data; boundary=b",
+        "value": {
+          "content": "LS1iDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9Im1ldGEiDQpDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24NCg0KeyJhIjoxfQ0KLS1iDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9Im5vdGUiDQoNCmhlbGxvDQotLWINCkNvbnRlbnQtRGlzcG9zaXRpb246IGZvcm0tZGF0YTsgbmFtZT0iZmlsZSI7IGZpbGVuYW1lPSJ4LmJpbiINCkNvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vb2N0ZXQtc3RyZWFtDQoNCgABDQotLWItLQ0K",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "ok": {
+          "embedded": [
+            {
+              "id": "0",
+              "content-type": "application/json",
+              "value": {
+                "content": "eyJhIjoxfQ==",
+                "encoded": "base64",
+                "content-type": "application/json"
+              }
+            },
+            {
+              "id": "2",
+              "content-type": "application/octet-stream",
+              "value": {
+                "content": "AAE=",
+                "encoded": "base64",
+                "content-type": "application/octet-stream"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "multipart/form-data; boundary=b",
+        "value": {
+          "content": "LS1iDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9Im1ldGEiDQpDb250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL2pzb24NCg0KeyJhIjoxfQ0KLS1iDQpDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9Im5vdGUiDQoNCmhlbGxvDQotLWINCkNvbnRlbnQtRGlzcG9zaXRpb246IGZvcm0tZGF0YTsgbmFtZT0iZmlsZSI7IGZpbGVuYW1lPSJ4LmJpbiINCkNvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vb2N0ZXQtc3RyZWFtDQoNCgABDQotLWItLQ0K",
+          "encoded": "base64"
+        },
+        "embedded": {
+          "0": {
+            "document": {
+              "a": 1
+            }
+          },
+          "2": {
+            "document": "AAE=",
+            "encoded": "base64"
+          }
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": {
+            "meta": [
+              {
+                "headers": {
+                  "content-disposition": "form-data; name=\"meta\"",
+                  "content-type": "application/json"
+                },
+                "body": {
+                  "a": 1
+                }
+              }
+            ],
+            "note": [
+              {
+                "headers": {
+                  "content-disposition": "form-data; name=\"note\""
+                },
+                "body": "hello"
+              }
+            ],
+            "file": [
+              {
+                "headers": {
+                  "content-disposition": "form-data; name=\"file\"; filename=\"x.bin\"",
+                  "content-type": "application/octet-stream"
+                },
+                "filename": "x.bin",
+                "body": "AAE="
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

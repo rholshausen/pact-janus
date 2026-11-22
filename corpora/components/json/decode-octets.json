@@ -1,0 +1,68 @@
+{
+  "name": "json/decode-octets",
+  "component": "json",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "eyJpZCI6MSwibmFtZSI6IkFubiIsInRhZ3MiOlsiYSJdLCJ0b3RhbCI6MTIuNX0=",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": {
+            "id": 1,
+            "name": "Ann",
+            "tags": [
+              "a"
+            ],
+            "total": 12.5
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/hal+json",
+        "value": {
+          "content": "[1, 2.5, null, true, \"x\"]",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": [
+            1,
+            2.5,
+            null,
+            true,
+            "x"
+          ]
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "{\"b\":1,\"a\":2}",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": {
+            "b": 1,
+            "a": 2
+          }
+        }
+      }
+    }
+  ]
+}

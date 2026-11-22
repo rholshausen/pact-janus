@@ -1,0 +1,39 @@
+{
+  "name": "form/another-content-type",
+  "component": "form",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "multipart/form-data",
+        "value": {
+          "content": "a=1",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document"
+        }
+      }
+    },
+    {
+      "op": "content/compile",
+      "body": {
+        "content-type": "application/json",
+        "shape": {
+          "shape": "any"
+        },
+        "path": "$.response.body"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document"
+        }
+      }
+    }
+  ]
+}

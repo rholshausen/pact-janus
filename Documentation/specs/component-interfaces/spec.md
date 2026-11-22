@@ -1080,7 +1080,8 @@ projection of the frame surface, and the projection is specified rather than inc
   returning `Result<ResultDocument, ComponentError>`.
 - **The handshake happens too.** An in-tree component declares its contributions the same way, is
   indexed the same way, and is subject to the same namespace check (§2.4). The engine has no privileged
-  path to a built-in's capabilities.
+  path to a built-in's capabilities. *Not built yet:* a native embedding registers a built-in by name and
+  interface alone, with no `component/hello` document (staged plan S5.11).
 - **Errors are values here too.** A built-in that panics is an engine bug, and the dispatch boundary
   converts the panic to a `ComponentError` exactly as the WASM binding converts a trap. The kernel does
   not distinguish where a component error came from.
@@ -1203,9 +1204,23 @@ expected results, expressed in the same documents as the frames. Schema:
 The corpus grows with the golden corpora of plan task 3.7 and is the second thing a third-party
 component author runs after reading this document — the first being the handshake.
 
-**Not built yet.** The case format is specified, and no case exists or is run (staged plan S5.10,
-[ADR 0104](../../decisions/0104-the-component-interface-is-generally-available-for-content-and-matcher-components-over-wasm.md)). Until it is, the checks a load makes (§3.2, §2.4, §6.3, §7.5) and the engine's own
-tests are what hold the interface together.
+How a case is read ([ADR 0105](../../decisions/0105-run-each-components-conformance-cases-through-every-binding-it-is-reached-by.md)):
+
+- An `ok` is matched member-wise. A member the case does not mention is not constrained, an array is
+  matched in order and must be as long, and a number's kind is how it is written. An `error` is matched
+  on its `code` and on every other member it names except `message`. A call with no `expect` asserts only
+  that the bindings agree.
+- Every binding must answer every call with the same whole document, members the case does not mention
+  included.
+- Calls in a case share no state. A component that asks for embedded content (§6.6) takes two calls: the
+  question, and the request repeated with the answers the case gives.
+
+The built-in components' cases are `corpora/components/<component>/`, run through the native binding and
+a **serialising in-process** one: the component behind real frame bytes, reached by the WASM binding's own
+client (`serialising`). `janus component check <component.wasm> <cases>...` runs a component's cases
+through the WASM binding, the one a run loads it with. `generator/generate` and `matcher/variant-space`
+have no cases yet, because no binding forwards them (staged plan S5.9). An in-tree component has no
+`component/hello` document yet (§9.1, staged plan S5.11), so no case asserts a built-in's handshake.
 
 ## 10. Resolution, distribution and trust
 

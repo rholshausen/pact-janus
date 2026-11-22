@@ -1,0 +1,63 @@
+{
+  "name": "json/detect",
+  "component": "json",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/detect",
+      "body": {
+        "value": {
+          "content": "{\"a\":1}",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "ok": {
+          "media-type": "application/json",
+          "confidence": 1.0
+        }
+      }
+    },
+    {
+      "op": "content/detect",
+      "body": {
+        "value": {
+          "content": "WzEsMl0=",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "ok": {
+          "media-type": "application/json"
+        }
+      }
+    },
+    {
+      "op": "content/detect",
+      "body": {
+        "value": {
+          "content": {
+            "a": 1
+          }
+        }
+      },
+      "expect": {
+        "ok": {
+          "media-type": "application/json"
+        }
+      }
+    },
+    {
+      "op": "content/detect",
+      "body": {
+        "value": {
+          "content": "plain words",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "ok": {}
+      }
+    }
+  ]
+}

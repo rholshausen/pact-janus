@@ -1,0 +1,38 @@
+{
+  "name": "json/another-content-type",
+  "component": "json",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/plain",
+        "value": {
+          "content": "{}",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document"
+        }
+      }
+    },
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "application/xml",
+        "document": {
+          "a": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document"
+        }
+      }
+    }
+  ]
+}

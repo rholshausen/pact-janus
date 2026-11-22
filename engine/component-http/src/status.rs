@@ -126,7 +126,7 @@ impl MatcherComponent for HttpMatcher {
       crate::list::LIST => crate::list::apply(req.config.as_ref(), &req.values),
       crate::path::PATH => crate::path::apply(req.config.as_ref(), &req.values),
       STATUS_CLASS => apply(req.config.as_ref(), &req.values),
-      other => Err(ComponentError::operation_unsupported(other)),
+      other => Err(ComponentError::unknown_action(other)),
     }
   }
 
@@ -289,7 +289,7 @@ mod tests {
   }
 
   #[test]
-  fn any_other_action_is_unsupported() {
+  fn any_other_action_is_unknown() {
     let error = HttpMatcher::new()
       .apply(Apply {
         action: "http:other".to_string(),
@@ -297,6 +297,6 @@ mod tests {
         values: vec![],
       })
       .expect_err("refused");
-    assert_eq!(error.code, "operation-unsupported");
+    assert_eq!(error.code, "unknown-action");
   }
 }

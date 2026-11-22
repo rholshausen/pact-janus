@@ -1,0 +1,46 @@
+{
+  "name": "http/unknown-action",
+  "component": "http",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "http:nothing",
+        "values": [
+          {
+            "content": 1
+          }
+        ]
+      },
+      "expect": {
+        "error": {
+          "code": "unknown-action",
+          "category": "document",
+          "details": {
+            "action": "http:nothing"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "{}",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "operation-unsupported",
+          "category": "protocol",
+          "details": {
+            "op": "content/decode"
+          }
+        }
+      }
+    }
+  ]
+}

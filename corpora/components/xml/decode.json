@@ -1,0 +1,87 @@
+{
+  "name": "xml/decode",
+  "component": "xml",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/xml",
+        "value": {
+          "content": "PD94bWwgdmVyc2lvbj0iMS4wIj8+CjxvcmRlciBpZD0iNyI+PGl0ZW0gc2t1PSJhIj5QZW48L2l0ZW0+PGl0ZW0gc2t1PSJiIj4gSW5rIDwvaXRlbT48bm90ZT48IVtDREFUQVt4PHldXT48L25vdGU+PC9vcmRlcj4=",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": {
+            "order": {
+              "@id": "7",
+              "item": [
+                {
+                  "@sku": "a",
+                  "#text": "Pen",
+                  "#trimmed": "Pen"
+                },
+                {
+                  "@sku": "b",
+                  "#text": " Ink ",
+                  "#trimmed": "Ink"
+                }
+              ],
+              "note": [
+                {
+                  "#text": "x<y",
+                  "#trimmed": "x<y"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/xml",
+        "value": {
+          "content": "<a:root xmlns:a=\"urn:x\" xmlns:b=\"urn:y\" b:at=\"1\"><a:child/></a:root>",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": {
+            "root": {
+              "#namespace": "urn:x",
+              "@{urn:y}at": "1",
+              "child": [
+                {
+                  "#namespace": "urn:x"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/atom+xml",
+        "value": {
+          "content": {
+            "feed": {}
+          }
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": {
+            "feed": {}
+          }
+        }
+      }
+    }
+  ]
+}

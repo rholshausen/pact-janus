@@ -160,7 +160,7 @@ You answer with who you are and what you contribute:
   the engine must be able to call: declaring something §11 lists as not callable fails the load.
 
 The engine checks all of this when it loads you, and refuses the load as `component-invalid` with a
-message saying which rule you broke. That is the fastest way to find out (§9.2).
+message saying which rule you broke. That is the fastest way to find out (§9.3).
 
 ## 5. A content component
 
@@ -508,7 +508,39 @@ Because `call` is a plain function, `cargo test` can drive it with frames and ch
 the handshake, a decode of a real body, a decode of a broken one, `decode(encode(d)) == d`, an `op` you do
 not implement. Most of your tests belong here.
 
-### 9.2 In the engine
+### 9.2 Against conformance cases
+
+A conformance case ([spec §9.4](specs/component-interfaces/spec.md#94-dual-binding-conformance),
+[`conformance-case.schema.json`](specs/component-interfaces/schemas/v1/conformance-case.schema.json)) is a
+JSON file of calls on your component, each with the result or error it must answer:
+
+```json
+{ "name": "ndjson/decode", "component": "ndjson", "interface": "content",
+  "calls": [
+    { "op": "content/decode",
+      "body": { "content-type": "application/x-ndjson",
+                "value": { "content": "{\"id\":1}\n", "encoded": "text" } },
+      "expect": { "ok": { "document": [ { "id": 1 } ] } } },
+    { "op": "content/decode",
+      "body": { "content-type": "application/x-ndjson", "value": { "content": "{", "encoded": "text" } },
+      "expect": { "error": { "code": "decode-failed" } } } ] }
+```
+
+An `ok` constrains only the members it names, so a member you add later does not break a case. An
+`error` is matched on its `code` and on whatever else it names, never its `message`. Keep the cases beside
+your component and run them against the built `.wasm`, which loads it as a run does, with no grants, and
+calls it through the same binding:
+
+```sh
+janus component check target/wasm32-wasip2/release/janus_ndjson.wasm conformance/
+```
+
+It exits 0 when every case passes and 1 when one fails, naming the call and where your answer differs.
+`component/hello` is answered with the handshake the load made, so a case can assert what you contribute.
+The CSV component's are in `third-party/janus-csv/conformance/`, and the built-in components' in
+`corpora/components/`, which show what each operation answers.
+
+### 9.3 In the engine
 
 Declare the built `.wasm` in a project configuration, `verifier.janus.yaml`:
 
@@ -694,4 +726,5 @@ once published, what an operator or action means is frozen. New behaviour is a n
 - [ ] Losses your format cannot avoid are declared as degradations.
 - [ ] No panics, no state between calls, no imports beyond what you were granted.
 - [ ] Built for `wasm32-wasip2`, loaded by `janus explain --config` without `component-invalid`.
+- [ ] Its conformance cases pass `janus component check`.
 - [ ] Published, pinned by digest, signed, and declared with that digest and signer.

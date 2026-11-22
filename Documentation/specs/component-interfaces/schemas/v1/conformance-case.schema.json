@@ -23,10 +23,10 @@
     },
     "bindings": {
       "type": "array",
-      "description": "Bindings this case must run through. Absent means every binding the component supports — which is the normal case and the point of the corpus.",
+      "description": "Bindings this case must run through. Absent means every binding the component supports — which is the normal case and the point of the corpus. 'serialising' is an in-tree component behind real frames, reached by the WASM binding's own client (spec.md §9.4).",
       "items": {
         "type": "string",
-        "x-known-values": ["native", "wasm", "subprocess"]
+        "x-known-values": ["native", "serialising", "wasm", "subprocess"]
       }
     },
     "calls": {
@@ -83,8 +83,15 @@
           "description": "Expected result document, matched member-wise."
         },
         "error": {
-          "$ref": "component-error.schema.json",
-          "description": "Expected error. A case asserting an error asserts its 'code'; 'message' is never asserted."
+          "type": "object",
+          "description": "Expected error, matched member-wise against the ComponentError (component-error.schema.json) the call answered with. A case asserting an error asserts its 'code', and any other member it names but 'message', which is never asserted: it is written for people, so a case need not carry one.",
+          "required": ["code"],
+          "properties": {
+            "code": { "type": "string" },
+            "category": { "type": "string" },
+            "source": { "type": "string" },
+            "details": { "type": "object" }
+          }
         }
       }
     }

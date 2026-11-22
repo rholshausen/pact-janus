@@ -1,0 +1,74 @@
+{
+  "name": "http/path",
+  "component": "http",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "http:path",
+        "values": [
+          {
+            "content": "/orders/7"
+          },
+          {
+            "content": "/orders/"
+          },
+          {
+            "content": "/orders/7/items"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "template": "/orders/{id}"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            },
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/prefix",
+      "body": {
+        "operator": "http:path",
+        "node": {
+          "shape": "http:path",
+          "template": "/orders/{id}"
+        }
+      },
+      "expect": {
+        "ok": {
+          "prefix": "/orders/"
+        }
+      }
+    },
+    {
+      "op": "matcher/prefix",
+      "body": {
+        "operator": "http:status-class",
+        "node": {
+          "shape": "http:status-class",
+          "class": "success"
+        }
+      },
+      "expect": {
+        "ok": {}
+      }
+    }
+  ]
+}

@@ -1,11 +1,15 @@
 //! `janus component push|pull` (plan task 8.2, component-interfaces spec §10.3): publish a WASM
 //! component as an OCI artifact, and fetch one into the cache to find out what it is and what to pin.
+//! `janus component check` (staged plan S5.10, ADR 0105) runs a component's conformance cases (spec
+//! §9.4) against it.
 //!
 //! **The one command that does not go through the protocol**, and deliberately: publishing is not
 //! an engine operation, and a pull here is the WASM loader's own fetch-and-check, run by hand — the
 //! very code a run uses when a declaration names an `oci` source, called from the same crate the
-//! engine registers. Nothing here reaches into the kernel. What a run *does* with a component still
-//! goes only through the protocol, which is why `verify --config` is how a component is used.
+//! engine registers. A check loads a component as a run would and calls it through the binding a run
+//! calls it through, with the kernel's conformance runner, which the built-in components' corpus is
+//! run by too: it asks the component, not the engine. What a run *does* with a component still goes
+//! only through the protocol, which is why `verify --config` is how a component is used.
 //!
 //! Both commands end by printing the declaration to paste, pinned — because a tag is a name and a
 //! digest is the artifact (spec §10.3), and the easiest moment to pin is the one where the digest
@@ -17,14 +21,16 @@
 //! they print carries it, as the same two variables for the loader to interpolate.
 
 use crate::Outcome;
-use crate::args::{ComponentCommand, Output, PullArgs, PushArgs};
+use crate::args::{CheckComponentArgs, ComponentCommand, Output, PullArgs, PushArgs};
 use crate::error::Error;
 use crate::style::{self, paint};
 use pact_janus_component_host::WasmLoader;
 use pact_janus_component_host::oci::Credentials;
 use pact_janus_component_host::signature::Trust;
-use pact_janus_kernel::component::{ComponentError, Signer};
+use pact_janus_kernel::component::conformance::{self, Binding, Case, Report};
+use pact_janus_kernel::component::{ComponentDeclaration, ComponentError, ComponentLoader, Signer};
 use serde_json::{Value, json};
+use std::path::{Path, PathBuf};
 
 pub fn run(command: &ComponentCommand) -> Result<Outcome, Error> {
   let loader = WasmLoader::new().map_err(|err| err.to_string())?;
@@ -32,6 +38,7 @@ pub fn run(command: &ComponentCommand) -> Result<Outcome, Error> {
   match command {
     ComponentCommand::Push(args) => push(&loader, args, credentials.as_ref()),
     ComponentCommand::Pull(args) => pull(&loader, args, credentials.as_ref()),
+    ComponentCommand::Check(args) => check(&loader, args),
   }
 }
 
@@ -239,4 +246,144 @@ fn refused(err: ComponentError, credentials: bool) -> Result<Outcome, Error> {
     | "signature-untrusted" => Err(Error::Refused(message)),
     _ => Err(Error::Failed(message)),
   }
+}
+
+/// Every case is read before the component is loaded: a case that cannot be read is the command
+/// failing to run (exit 2), and a case the component fails is its answer (exit 1).
+fn check(loader: &WasmLoader, args: &CheckComponentArgs) -> Result<Outcome, Error> {
+  let mut files = Vec::new();
+  for path in &args.cases {
+    case_files(path, &mut files)
+      .map_err(|err| format!("{}: {}", path.display(), crate::io::io_error(&err)))?;
+  }
+  if files.is_empty() {
+    return Err(Error::Failed(
+      "no case files (.json) were found in what was named".to_string(),
+    ));
+  }
+  let cases = files
+    .iter()
+    .map(|file| {
+      let text = std::fs::read_to_string(file)
+        .map_err(|err| format!("{}: {}", file.display(), crate::io::io_error(&err)))?;
+      Case::read(&text)
+        .map(|case| (file, case))
+        .map_err(|why| format!("{} is not a conformance case: {why}", file.display()))
+    })
+    .collect::<Result<Vec<_>, String>>()?;
+
+  let component = std::fs::canonicalize(&args.component)
+    .map_err(|err| format!("{}: {}", args.component.display(), crate::io::io_error(&err)))?;
+  let declaration: ComponentDeclaration = serde_json::from_value(json!({
+    "name": "checked",
+    "source": { "kind": "file", "reference": component.display().to_string() },
+  }))
+  .map_err(|err| err.to_string())?;
+  // A component that does not load is the subject failing: not a component, imports beyond the grants
+  // a declaration with none gives, a handshake that traps.
+  let loaded = loader
+    .load(&declaration)
+    .map_err(|err| Error::Refused(format!("{}: {}", err.code, err.message)))?;
+  let name = loaded.hello["component"]["name"]
+    .as_str()
+    .unwrap_or("?")
+    .to_string();
+  let binding = Binding {
+    name: "wasm".to_string(),
+    content: loaded.content,
+    matcher: loaded.matcher,
+    hello: Some(loaded.hello.clone()),
+  };
+
+  let reports: Vec<(&PathBuf, Report)> = cases
+    .iter()
+    .map(|(file, case)| {
+      let report = if case.component == name {
+        conformance::run(case, std::slice::from_ref(&binding))
+      } else {
+        Report {
+          case: case.name.clone(),
+          bindings: Vec::new(),
+          problems: vec![format!(
+            "it is a case of component '{}', and this component is '{name}'",
+            case.component
+          )],
+        }
+      };
+      (*file, report)
+    })
+    .collect();
+  let failed = reports.iter().filter(|(_, report)| !report.passed()).count();
+
+  match args.output {
+    Output::Json => outln!(
+      "{}",
+      crate::output::pretty(&json!({
+        "component": { "name": name, "version": loaded.hello["component"]["version"] },
+        "binding": binding.name,
+        "cases": reports.iter().map(|(file, report)| json!({
+          "name": report.case,
+          "file": file.display().to_string(),
+          "passed": report.passed(),
+          "problems": report.problems,
+        })).collect::<Vec<_>>(),
+        "passed": reports.len() - failed,
+        "failed": failed,
+      }))
+    ),
+    Output::Text => {
+      outln!(
+        "{}: {} case(s) through the {} binding",
+        describe(&loaded.hello),
+        reports.len(),
+        binding.name
+      );
+      for (file, report) in &reports {
+        if report.passed() {
+          outln!("{} {}", paint(style::PASS, "✓"), report.case);
+        } else {
+          outln!(
+            "{} {} {}",
+            paint(style::FAIL, "✗"),
+            report.case,
+            paint(style::DIM, format!("({})", file.display()))
+          );
+          for problem in &report.problems {
+            outln!("    {problem}");
+          }
+        }
+      }
+      let summary = format!("{} passed, {failed} failed", reports.len() - failed);
+      outln!(
+        "{}",
+        paint(if failed == 0 { style::PASS } else { style::FAIL }, summary)
+      );
+    }
+  }
+  Ok(if failed == 0 {
+    Outcome::Done
+  } else {
+    Outcome::SubjectFailed
+  })
+}
+
+/// A case file named, or every `.json` file beneath a directory named, in path order.
+fn case_files(path: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<()> {
+  if !path.is_dir() {
+    std::fs::metadata(path)?;
+    files.push(path.to_path_buf());
+    return Ok(());
+  }
+  let mut entries: Vec<PathBuf> = std::fs::read_dir(path)?
+    .map(|entry| entry.map(|entry| entry.path()))
+    .collect::<std::io::Result<_>>()?;
+  entries.sort();
+  for entry in entries {
+    if entry.is_dir() {
+      case_files(&entry, files)?;
+    } else if entry.extension().is_some_and(|extension| extension == "json") {
+      files.push(entry);
+    }
+  }
+  Ok(())
 }

@@ -1,0 +1,64 @@
+{
+  "name": "csv/compile",
+  "component": "csv",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/compile",
+      "body": {
+        "content-type": "text/csv",
+        "shape": {
+          "shape": "each-like",
+          "min": 0,
+          "items": {
+            "shape": "object",
+            "members": {
+              "id": {
+                "shape": "integer",
+                "example": 1
+              },
+              "name": {
+                "shape": "type",
+                "example": "Ann"
+              }
+            }
+          }
+        },
+        "path": "$.response.body"
+      },
+      "expect": {
+        "ok": {}
+      }
+    },
+    {
+      "op": "content/compile",
+      "body": {
+        "content-type": "text/plain",
+        "shape": {
+          "shape": "each-like",
+          "min": 0,
+          "items": {
+            "shape": "object",
+            "members": {
+              "id": {
+                "shape": "integer",
+                "example": 1
+              },
+              "name": {
+                "shape": "type",
+                "example": "Ann"
+              }
+            }
+          }
+        },
+        "path": "$.response.body"
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document"
+        }
+      }
+    }
+  ]
+}

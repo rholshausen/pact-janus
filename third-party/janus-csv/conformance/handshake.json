@@ -1,0 +1,45 @@
+{
+  "name": "csv/handshake",
+  "component": "csv",
+  "calls": [
+    {
+      "op": "component/hello",
+      "body": {
+        "component-protocol-versions": [
+          1
+        ]
+      },
+      "expect": {
+        "ok": {
+          "component": {
+            "name": "csv"
+          },
+          "interfaces": [
+            "content",
+            "matcher"
+          ],
+          "contributes": {
+            "operators": [
+              {
+                "name": "csv:column",
+                "comparability": "exact"
+              }
+            ],
+            "content-types": [
+              {
+                "media-type": "text/csv",
+                "substitutions": {
+                  "integer": "csv:integer",
+                  "number": "csv:number",
+                  "decimal": "csv:number",
+                  "boolean": "csv:boolean",
+                  "equality": "csv:equality"
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

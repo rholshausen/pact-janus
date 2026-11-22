@@ -48,7 +48,7 @@ fn decode_reports_malformed_json_as_decode_failed() {
     })
     .expect_err("malformed JSON must not decode");
   assert_eq!(err.code, "decode-failed");
-  assert_eq!(err.category, "component");
+  assert_eq!(err.category, "document");
 }
 
 #[test]

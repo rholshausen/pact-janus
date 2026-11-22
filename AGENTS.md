@@ -329,7 +329,11 @@ Three sources are the source of truth and take precedence over this file when th
 > declares what no binding calls (a hook, a WASM transport, generators, a variant facet) fails to load
 > as `component-invalid`; those are S5.9, and the conformance corpus spec §9.4 describes is S5.10.
 > `third-party/janus-ndjson` was written by an author who read only the guide; `ndjson_component.rs`
-> publishes it with `wkg`, signs it, declares it and finds it recorded.
+> publishes it with `wkg`, signs it, declares it and finds it recorded. S5.10 (ADR 0105): the engine's
+> half of the WASM binding is the kernel's `component::wire`, and the built-in components' conformance
+> cases, `corpora/components/<component>/`, run through the native binding and a serialising in-process
+> one that reaches them through that code. `janus component check <component.wasm> <cases>...` runs a
+> component's own cases through the WASM binding (`third-party/janus-csv/conformance/`).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -367,8 +371,10 @@ sdks/jvm/        JVM SDK prototype (DSL + JUnit 5 integration); the Gradle `bind
 sdks/bindings.json  Which spec schema sets the SDKs' bindings are generated from
 sdks/engine-release.json  The released janus-engine an SDK runs when it is told no other: a
                  version and a SHA-256 per target triple (ADR 0029, ADR 0060)
-corpora/         Golden corpora: (spec or pact, expected plan, expected result); and verifier/,
-                 S1.1's fixture corpus — pacts with the providers that answer them — and its
+corpora/         Golden corpora: (spec or pact, expected plan, expected result); components/, each
+                 built-in component's conformance cases (spec §9.4 of the component interfaces,
+                 ADR 0105), run by tools/corpus through the native and serialising bindings; and
+                 verifier/, S1.1's fixture corpus — pacts with the providers that answer them — and its
                  disagreement ledger, disagreements.json
 conformance/     The SDK conformance suite (task 6.4): one corpus of cases every SDK runs, in its
                  own language, against a pinned engine — ADR 0017's definition of "conformant".
@@ -391,7 +397,7 @@ third-party/     Components written as a third party would, from the published i
                  only — each its own Cargo workspace, excluded from ours and depending on
                  nothing in it: third-party/janus-csv, the text/csv content component task 8.1
                  built from the docs (Documentation/prototype/third-party-component-report.md),
-                 and third-party/janus-ndjson, the application/x-ndjson one S5.1d's author wrote
+                 with its conformance cases in conformance/ (ADR 0105), and third-party/janus-ndjson, the application/x-ndjson one S5.1d's author wrote
                  from Documentation/component-author-guide.md alone (ADR 0104)
 spikes/          The prototype's time-boxed experiments: each one's FINDINGS.md, at the path the
                  ADRs cite, and no code (S0.12 deleted it; `b8d5010` is the last commit with it)
@@ -625,6 +631,7 @@ janus component push <component.wasm> <reference> [--output text|json]
 janus component pull <reference> [--digest <sha256:...>] [--output text|json]
                      [--certificate-identity <id> | --certificate-identity-regexp <re>]
                      [--certificate-oidc-issuer <url>] [--trusted-root <file>]   # who signed it (S5.1c, ADR 0099)
+janus component check <component.wasm> <case-or-dir>... [--output text|json]   # its conformance cases (S5.10, ADR 0105)
 janus completions <shell>
 janus version                      # every command also takes --log-level <level>, --no-colour, --error-chain
 ```
@@ -700,9 +707,11 @@ pinned broker, each provider state set up through the broker's API. `.cargo/conf
 tests run against the pinned broker when `JANUS_PACT_BROKER` names it (CI's `verifier-diff` job), and
 skip otherwise.
 
-`janus component push|pull` (plan task 8.2) and `janus derive` (S4.2, ADR 0088) are the commands
-that do not speak the protocol — publishing a component is not an engine operation, and nor is
-deriving a shape from a type document. `push` writes the artifact's config from the component's own
+`janus component push|pull|check` (plan task 8.2, S5.10) and `janus derive` (S4.2, ADR 0088) are the
+commands that do not speak the protocol — publishing or checking a component is not an engine operation,
+and nor is deriving a shape from a type document. `check` loads a component as a run does and runs its
+conformance cases through the WASM binding with the kernel's runner (`component::conformance`), the one
+`tools/corpus` runs the built-in components' cases with (ADR 0105). `push` writes the artifact's config from the component's own
 handshake; `pull` fetches into the cache, checks every byte, and prints the pinned declaration. A pin
 is fetched by digest alone and a second run fetches nothing. Loopback registries are plain HTTP.
 A run's registry credential is its declaration's `source.auth`, `${VAR}`-interpolated by the loader
@@ -753,7 +762,7 @@ anything they print.
 - **SDKs are thin.** No matching logic, no orchestration beyond the protocol operations, in any SDK.
   Generated protocol bindings are never hand-edited — regenerate them via the binding pipeline.
 - **Corpora are load-bearing.** Any change to matching behaviour must change `corpora/` in the same
-  commit. CI runs plans against the corpora; a behaviour change without a corpus change is a bug.
+  commit, and so must any change to what a built-in component answers (`corpora/components/`, ADR 0105). CI runs plans against the corpora; a behaviour change without a corpus change is a bug.
   The same holds one layer up: a change to what an SDK's DSL does belongs in the behavioural
   specification and `conformance/` — every SDK runs that corpus, and "conformant" means passing it
   (ADR 0017).

@@ -1,0 +1,64 @@
+{
+  "name": "json/decode-failed",
+  "component": "json",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "eyJpZCI6",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "application/json"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "//4=",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "application/json"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "{}",
+          "encoded": "rot13"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "application/json"
+          }
+        }
+      }
+    }
+  ]
+}

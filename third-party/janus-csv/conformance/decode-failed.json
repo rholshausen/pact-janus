@@ -1,0 +1,65 @@
+{
+  "name": "csv/decode-failed",
+  "component": "csv",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv",
+        "value": {
+          "content": "a,a\r\n1,2\r\n",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "text/csv",
+            "line": 1
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv",
+        "value": {
+          "content": "a,b\r\n1\r\n",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "text/csv"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv",
+        "value": {
+          "content": "/yz+",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "text/csv"
+          }
+        }
+      }
+    }
+  ]
+}

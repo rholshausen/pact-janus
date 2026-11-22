@@ -4,16 +4,18 @@
 //! that this crate deliberately does not depend on, so the kernel itself stays free of HTTP/JSON
 //! knowledge (AGENTS.md's B3, kernel-boundary-review.md).
 //!
-//! Out of scope here, deliberately: the WASM and subprocess bindings themselves, which need a
-//! runtime this crate cannot depend on and which an embedding registers as a [`ComponentLoader`]
-//! (plan task 8.1; `engine/component-host` is the WASM one). Of the matcher interface, what the engine
-//! calls is here ([`matcher`]): `apply` runs a component's actions where a plan names one. What
-//! *is* here is everything around a load that must not differ by binding:
-//! resolution, the handshake checks, requirements ([`loader`]) and routing by media type
-//! ([`registry`]). The hook interface ([`hook`]) does, as of plan task 5.3: the hook *system*
-//! around it is design 2.7's and lives in [`crate::hooks`]. See
+//! Out of scope here, deliberately: the WASM and subprocess runtimes themselves, which this crate
+//! cannot depend on and which an embedding registers as a [`ComponentLoader`] (plan task 8.1;
+//! `engine/component-host` is the WASM one). Of the matcher interface, what the engine calls is here
+//! ([`matcher`]): `apply` runs a component's actions where a plan names one. What *is* here is
+//! everything around a load that must not differ by binding: resolution, the handshake checks,
+//! requirements ([`loader`]), routing by media type ([`registry`]), the documents the pipe carries at
+//! both its ends ([`wire`]), and the conformance corpus that runs a component through each of its
+//! bindings ([`conformance`], ADR 0105). The hook interface ([`hook`]) is here too, as of plan task
+//! 5.3: the hook *system* around it is design 2.7's and lives in [`crate::hooks`]. See
 //! `Documentation/specs/component-interfaces/spec.md`.
 
+pub mod conformance;
 mod content;
 mod error;
 mod generator;
@@ -23,6 +25,7 @@ mod matcher;
 mod parts;
 mod registry;
 mod transport;
+pub mod wire;
 
 pub use content::{
   Compile, CompileResult, ContentComponent, ContentDetection, Decode, DecodeResult, Detect, DetectResult,

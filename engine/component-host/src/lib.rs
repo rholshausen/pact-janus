@@ -24,16 +24,11 @@
 pub mod oci;
 pub mod signature;
 
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_janus_kernel::component::{
-  Apply, ApplyResult, Compare, CompareResult, Compile, CompileResult, ComponentDeclaration, ComponentError,
-  ComponentLoader, ContentComponent, Decode, DecodeResult, Detect, DetectResult, EmbeddedDecode,
-  EmbeddedEncode, Encode, EncodeResult, Fetched, Grants, Label, LabelResult, Loaded, MatcherComponent,
-  Prefix, PrefixResult, Signer, SlotValue, media_type_matches,
+  ComponentDeclaration, ComponentError, ComponentLoader, ContentComponent, Fetched, Grants, Loaded,
+  MatcherComponent, Signer, wire,
 };
 use pact_janus_kernel::persisted::Persisted;
-use pact_janus_kernel::plan::RuntimeValue;
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -340,7 +335,6 @@ impl WasmLoader {
       deadline_ticks: deadline_ms
         .unwrap_or(DEFAULT_DEADLINE_MS)
         .div_ceil(TICK.as_millis() as u64),
-      media_types: Vec::new(),
       next_id: AtomicU64::new(0),
       engine: self.engine.clone(),
     })
@@ -462,7 +456,7 @@ impl ComponentLoader for WasmLoader {
 
   fn load(&self, declaration: &ComponentDeclaration) -> Result<Loaded, ComponentError> {
     let (bytes, what, fetched, pulled) = self.fetch(declaration)?;
-    let mut wasm = self.bind(
+    let wasm = self.bind(
       &what,
       &declaration.name,
       &bytes,
@@ -471,18 +465,6 @@ impl ComponentLoader for WasmLoader {
     )?;
     check_imports(&self.engine, &wasm.component, &declaration.grants)?;
     let hello = wasm.hello()?;
-    wasm.media_types = hello
-      .pointer("/contributes/content-types")
-      .and_then(Value::as_array)
-      .into_iter()
-      .flatten()
-      .filter_map(|entry| {
-        entry
-          .get("media-type")
-          .and_then(Value::as_str)
-          .map(str::to_string)
-      })
-      .collect();
     tracing::debug!(component = %declaration.name, ?hello, "component handshake");
     if let Some(pulled) = &pulled {
       check_artifact_config(pulled, &hello)?;
@@ -495,14 +477,14 @@ impl ComponentLoader for WasmLoader {
         .is_some_and(|interfaces| interfaces.iter().any(|i| i == interface))
     };
     let (declares_content, declares_matcher) = (declares("content"), declares("matcher"));
-    let wasm = Arc::new(wasm);
+    let client = Arc::new(wire::PipeClient::new(wasm, wire::declared_media_types(&hello)));
     // No transport over this binding yet: a WASM transport needs sockets, which is the grant a
     // sandbox exists to withhold (spec §13), and 8.3's escape hatch is the subprocess binding.
     Ok(Loaded {
       hello,
-      content: declares_content.then(|| Arc::clone(&wasm) as Arc<dyn ContentComponent>),
+      content: declares_content.then(|| Arc::clone(&client) as Arc<dyn ContentComponent>),
       transport: None,
-      matcher: declares_matcher.then_some(wasm as Arc<dyn MatcherComponent>),
+      matcher: declares_matcher.then_some(client as Arc<dyn MatcherComponent>),
       fetched: Some(fetched),
     })
   }
@@ -557,9 +539,6 @@ struct WasmComponent {
   call: ComponentExportIndex,
   grants: Grants,
   deadline_ticks: u64,
-  /// The `media-type` of every `content-types` entry the handshake declared: what
-  /// [`ContentComponent::handles`] answers from.
-  media_types: Vec<String>,
   next_id: AtomicU64,
   engine: Engine,
 }
@@ -636,7 +615,7 @@ impl WasmComponent {
       let (response,) = call
         .call(&mut store, (request,))
         .map_err(|err| self.synthesise(&err, op))?;
-      read_response(&response, &id, op)
+      wire::read_response(&response, &id, op)
     };
     if op == "component/hello" {
       return exchange(op, body);
@@ -679,38 +658,6 @@ fn hello_body(grants: &Grants) -> Value {
   })
 }
 
-/// A response frame's `ok` document, or its `error` as the component's own error, passed through
-/// untranslated (spec §11.2). A frame that is not one is the component's failure, marked as such.
-fn read_response(bytes: &[u8], id: &str, op: &str) -> Result<Value, ComponentError> {
-  let malformed = |why: &str| {
-    ComponentError::synthesised(
-      "component-malformed",
-      format!("the component answered '{op}' with {why}"),
-    )
-  };
-  let frame: Value =
-    serde_json::from_slice(bytes).map_err(|err| malformed(&format!("a frame that is not JSON ({err})")))?;
-  if frame.get("type").and_then(Value::as_str) != Some("response") {
-    return Err(malformed("a frame that is not a response"));
-  }
-  if let Some(error) = frame.get("error") {
-    return Err(
-      serde_json::from_value(error.clone())
-        .unwrap_or_else(|_| malformed("an error that is not a ComponentError")),
-    );
-  }
-  let answered = frame.get("id").and_then(Value::as_str).unwrap_or_default();
-  if answered != id {
-    return Err(malformed(&format!(
-      "a response to '{answered}' where '{id}' was asked"
-    )));
-  }
-  frame
-    .get("ok")
-    .cloned()
-    .ok_or_else(|| malformed("a response carrying neither 'ok' nor 'error'"))
-}
-
 fn load_error(message: &str) -> ComponentError {
   ComponentError {
     code: "unavailable".to_string(),
@@ -722,281 +669,17 @@ fn load_error(message: &str) -> ComponentError {
   }
 }
 
-/// The content interface over the pipe (spec §6): the kernel's in-memory documents turned into the
-/// frames' JSON and back. The document model's bytes travel as `encoded: base64` (ADR 0006).
-impl ContentComponent for WasmComponent {
-  fn handles(&self, content_type: &str) -> bool {
-    self
-      .media_types
-      .iter()
-      .any(|pattern| media_type_matches(pattern, content_type))
+/// The pipe a [`wire::PipeClient`] reaches the component through: the content and matcher interfaces'
+/// documents are written and read by the kernel's codec, the one the serialising in-process binding
+/// runs the conformance corpus through (spec §9.4, ADR 0105).
+impl wire::Pipe for WasmComponent {
+  fn name(&self) -> &str {
+    &self.name
   }
 
-  fn decode(&self, req: Decode) -> Result<DecodeResult, ComponentError> {
-    let mut body = json!({ "content-type": req.content_type, "value": slot_json(&req.value)? });
-    if let Some(options) = req.options {
-      body["options"] = options;
-    }
-    // What the registry made of the content it asked for (spec §6.6, ADR 0103), on the repeated request.
-    if let Some(embedded) = req.embedded {
-      body["embedded"] = answers_json(embedded, |result| {
-        let mut answer = tagged_document(&result.document, "document");
-        if !result.degradations.is_empty() {
-          answer["degradations"] = Value::Array(result.degradations);
-        }
-        Ok(answer)
-      })?;
-    }
-    let result = self.instance_call("content/decode", body)?;
-    let embedded = match result.get("embedded") {
-      None => Vec::new(),
-      Some(embedded) => embedded_decodes(embedded)?,
-    };
-    if !embedded.is_empty() {
-      return Ok(DecodeResult::asking(embedded));
-    }
-    let document = document_of(&result, "document", "decode")?;
-    let degradations = result
-      .get("degradations")
-      .and_then(Value::as_array)
-      .cloned()
-      .unwrap_or_default();
-    if !degradations.is_empty() {
-      tracing::debug!(component = %self.name, ?degradations, "decode degradations");
-    }
-    Ok(DecodeResult {
-      document,
-      degradations,
-      embedded: Vec::new(),
-    })
+  fn call(&self, op: &str, body: Value) -> Result<Value, ComponentError> {
+    self.instance_call(op, body)
   }
-
-  fn encode(&self, req: Encode) -> Result<EncodeResult, ComponentError> {
-    let mut body = tagged_document(&req.document, "document");
-    body["content-type"] = json!(req.content_type);
-    if let Some(options) = req.options {
-      body["options"] = options;
-    }
-    // The shape it was produced from (spec §6.2, ADR 0101), when there is one.
-    if let Some(shape) = req.shape {
-      body["shape"] = shape;
-    }
-    if let Some(embedded) = req.embedded {
-      body["embedded"] = answers_json(embedded, |result| {
-        Ok(json!({ "value": slot_json(&result.value)? }))
-      })?;
-    }
-    let result = self.instance_call("content/encode", body)?;
-    let embedded = match result.get("embedded") {
-      None => Vec::new(),
-      Some(embedded) => embedded_encodes(embedded)?,
-    };
-    if !embedded.is_empty() {
-      return Ok(EncodeResult::asking(embedded));
-    }
-    let value = result
-      .get("value")
-      .cloned()
-      .and_then(|value| serde_json::from_value::<SlotValue>(value).ok())
-      .ok_or_else(|| ComponentError::synthesised("component-malformed", "encode returned no slot value"))?;
-    Ok(EncodeResult::of(value))
-  }
-
-  fn compile(&self, req: Compile) -> Result<CompileResult, ComponentError> {
-    let result = self.instance_call(
-      "content/compile",
-      json!({ "content-type": req.content_type, "shape": req.shape, "path": req.path }),
-    )?;
-    // Success is the whole answer (spec §6.3). A fragment, which a component built before ADR 0100
-    // may still return, is not read: say so where someone debugging that component will look.
-    if result.get("fragment").is_some() {
-      tracing::warn!(component = %self.name, path = %req.path, "the component returned a plan fragment, which this engine does not read (ADR 0100); declare substitutions instead");
-    }
-    Ok(CompileResult::default())
-  }
-
-  fn detect(&self, req: Detect) -> Result<DetectResult, ComponentError> {
-    let mut body = json!({ "value": slot_json(&req.value)? });
-    if let Some(hint) = req.hint {
-      body["hint"] = json!(hint);
-    }
-    let result = self.instance_call("content/detect", body)?;
-    Ok(DetectResult {
-      media_type: result
-        .get("media-type")
-        .and_then(Value::as_str)
-        .map(str::to_string),
-      confidence: result.get("confidence").and_then(Value::as_f64),
-    })
-  }
-
-  fn label(&self, req: Label) -> Result<LabelResult, ComponentError> {
-    let result = self.instance_call(
-      "content/label",
-      json!({ "content-type": req.content_type, "value": slot_json(&req.value)?, "at": req.at }),
-    )?;
-    Ok(LabelResult {
-      media_type: result
-        .get("media-type")
-        .and_then(Value::as_str)
-        .map(str::to_string),
-    })
-  }
-}
-
-/// The matcher interface over the pipe: `apply` (spec §7.1), and the two operations the subsumption
-/// walk asks (ADR 0102), `compare` (§7.5) and `prefix` (§7.6). An operator's comparability is not asked
-/// here: the engine reads it from the handshake, whichever binding loaded the component.
-impl MatcherComponent for WasmComponent {
-  fn apply(&self, req: Apply) -> Result<ApplyResult, ComponentError> {
-    let mut body = json!({ "action": req.action, "values": req.values });
-    if let Some(config) = req.config {
-      body["config"] = config;
-    }
-    let result = self.instance_call("matcher/apply", body)?;
-    let results = result
-      .get("results")
-      .and_then(Value::as_array)
-      .cloned()
-      .ok_or_else(|| ComponentError::synthesised("component-malformed", "apply returned no results"))?;
-    Ok(ApplyResult { results })
-  }
-
-  fn compare(&self, req: Compare) -> Result<CompareResult, ComponentError> {
-    let result = self.instance_call(
-      "matcher/compare",
-      json!({ "operator": req.operator, "provider": req.provider, "consumer": req.consumer }),
-    )?;
-    let verdict = result
-      .get("verdict")
-      .and_then(Value::as_str)
-      .ok_or_else(|| ComponentError::synthesised("component-malformed", "compare returned no verdict"))?;
-    Ok(CompareResult {
-      verdict: verdict.to_string(),
-      reason: result.get("reason").and_then(Value::as_str).map(str::to_string),
-    })
-  }
-
-  fn prefix(&self, req: Prefix) -> Result<PrefixResult, ComponentError> {
-    let result = self.instance_call(
-      "matcher/prefix",
-      json!({ "operator": req.operator, "node": req.node }),
-    )?;
-    Ok(PrefixResult {
-      prefix: result.get("prefix").and_then(Value::as_str).map(str::to_string),
-    })
-  }
-}
-
-fn slot_json(slot: &SlotValue) -> Result<Value, ComponentError> {
-  serde_json::to_value(slot).map_err(|err| ComponentError::internal(err.to_string()))
-}
-
-/// A document under `member`, tagged as the content schema tags one: octets as `encoded: base64`,
-/// anything else as its JSON value.
-fn tagged_document(document: &RuntimeValue, member: &str) -> Value {
-  let mut body = json!({});
-  match document {
-    RuntimeValue::Bytes(bytes) => {
-      body[member] = json!(BASE64.encode(bytes));
-      body["encoded"] = json!("base64");
-    }
-    document => body[member] = document.to_json(),
-  }
-  body
-}
-
-/// The document under `member` of a frame tagged as [`tagged_document`] writes one, `text` included.
-fn document_of(frame: &Value, member: &str, op: &str) -> Result<RuntimeValue, ComponentError> {
-  let text = || frame.get(member).and_then(Value::as_str).unwrap_or_default();
-  Ok(match frame.get("encoded").and_then(Value::as_str) {
-    Some("base64") => RuntimeValue::Bytes(BASE64.decode(text()).map_err(|err| {
-      ComponentError::synthesised("component-malformed", format!("{op} returned bad base64: {err}"))
-    })?),
-    Some("text") => RuntimeValue::String(text().to_string()),
-    _ => RuntimeValue::from_json(frame.get(member).unwrap_or(&Value::Null)),
-  })
-}
-
-/// The registry's answers to what a component asked for, as the repeated request carries them (spec
-/// §6.6): by id, each the operation's result or `{ error }`.
-fn answers_json<T>(
-  answers: pact_janus_kernel::component::Embedded<T>,
-  result: impl Fn(T) -> Result<Value, ComponentError>,
-) -> Result<Value, ComponentError> {
-  let mut json = serde_json::Map::new();
-  for (id, answer) in answers {
-    let answer = match answer {
-      Ok(answer) => result(answer)?,
-      Err(error) => json!({ "error": error }),
-    };
-    json.insert(id, answer);
-  }
-  Ok(Value::Object(json))
-}
-
-fn malformed_embedded(op: &str, why: &str) -> ComponentError {
-  ComponentError::synthesised(
-    "component-malformed",
-    format!("the component asked for embedded content in '{op}' with {why}"),
-  )
-}
-
-/// `content/decode`'s `embedded`: each `{ id, content-type, value }` the component asks the engine to
-/// decode.
-fn embedded_decodes(embedded: &Value) -> Result<Vec<EmbeddedDecode>, ComponentError> {
-  let entries = embedded
-    .as_array()
-    .ok_or_else(|| malformed_embedded("content/decode", "a value that is not an array"))?;
-  entries
-    .iter()
-    .map(|entry| {
-      let id = entry.get("id").and_then(Value::as_str);
-      let content_type = entry.get("content-type").and_then(Value::as_str);
-      let value = entry
-        .get("value")
-        .cloned()
-        .and_then(|value| serde_json::from_value::<SlotValue>(value).ok());
-      match (id, content_type, value) {
-        (Some(id), Some(content_type), Some(value)) => Ok(EmbeddedDecode {
-          id: id.to_string(),
-          content_type: content_type.to_string(),
-          value,
-        }),
-        _ => Err(malformed_embedded(
-          "content/decode",
-          "an entry missing its id, content-type or value",
-        )),
-      }
-    })
-    .collect()
-}
-
-/// `content/encode`'s `embedded`: each `{ id, content-type, document, encoded?, at? }` the component
-/// asks the engine to encode.
-fn embedded_encodes(embedded: &Value) -> Result<Vec<EmbeddedEncode>, ComponentError> {
-  let entries = embedded
-    .as_array()
-    .ok_or_else(|| malformed_embedded("content/encode", "a value that is not an array"))?;
-  entries
-    .iter()
-    .map(|entry| {
-      let id = entry.get("id").and_then(Value::as_str);
-      let content_type = entry.get("content-type").and_then(Value::as_str);
-      match (id, content_type, entry.get("document")) {
-        (Some(id), Some(content_type), Some(_)) => Ok(EmbeddedEncode {
-          id: id.to_string(),
-          content_type: content_type.to_string(),
-          document: document_of(entry, "document", "content/encode")?,
-          at: entry.get("at").and_then(Value::as_str).map(str::to_string),
-        }),
-        _ => Err(malformed_embedded(
-          "content/encode",
-          "an entry missing its id, content-type or document",
-        )),
-      }
-    })
-    .collect()
 }
 
 #[cfg(test)]

@@ -1,0 +1,41 @@
+{
+  "name": "text/encode",
+  "component": "text",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "text/plain",
+        "document": "hi"
+      },
+      "expect": {
+        "ok": {
+          "value": {
+            "content": "aGk=",
+            "encoded": "base64",
+            "content-type": "text/plain"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "text/plain",
+        "document": {
+          "a": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "encode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "text/plain"
+          }
+        }
+      }
+    }
+  ]
+}

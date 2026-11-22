@@ -1,0 +1,22 @@
+{
+  "name": "csv/detect",
+  "component": "csv",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/detect",
+      "body": {
+        "value": {
+          "content": "a,b\r\n",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "operation-unsupported",
+          "category": "protocol"
+        }
+      }
+    }
+  ]
+}

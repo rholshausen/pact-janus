@@ -1,0 +1,55 @@
+{
+  "name": "csv/encode-no-rows-from-the-shape",
+  "component": "csv",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "text/csv",
+        "document": [],
+        "shape": {
+          "shape": "each-like",
+          "min": 0,
+          "items": {
+            "shape": "object",
+            "members": {
+              "id": {
+                "shape": "integer",
+                "example": 1
+              },
+              "name": {
+                "shape": "type",
+                "example": "Ann"
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "ok": {
+          "value": {
+            "content": "aWQsbmFtZQ0K",
+            "encoded": "base64",
+            "content-type": "text/csv"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv",
+        "value": {
+          "content": "aWQsbmFtZQ0K",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": []
+        }
+      }
+    }
+  ]
+}

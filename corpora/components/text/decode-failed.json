@@ -1,0 +1,47 @@
+{
+  "name": "text/decode-failed",
+  "component": "text",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/plain",
+        "value": {
+          "content": "//4=",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "text/plain"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/plain",
+        "value": {
+          "content": [
+            "not",
+            "text"
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "text/plain"
+          }
+        }
+      }
+    }
+  ]
+}

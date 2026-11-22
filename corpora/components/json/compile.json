@@ -1,0 +1,24 @@
+{
+  "name": "json/compile",
+  "component": "json",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/compile",
+      "body": {
+        "content-type": "application/json",
+        "shape": {
+          "shape": "each-like",
+          "items": {
+            "shape": "integer",
+            "example": 1
+          }
+        },
+        "path": "$.response.body"
+      },
+      "expect": {
+        "ok": {}
+      }
+    }
+  ]
+}

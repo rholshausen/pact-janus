@@ -1,0 +1,44 @@
+{
+  "name": "csv/unknown-action",
+  "component": "csv",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "csv:nothing",
+        "values": [
+          {
+            "content": "1"
+          }
+        ]
+      },
+      "expect": {
+        "error": {
+          "code": "unknown-action",
+          "category": "document",
+          "details": {
+            "action": "csv:nothing"
+          }
+        }
+      }
+    },
+    {
+      "op": "matcher/compare",
+      "body": {
+        "operator": "csv:nothing",
+        "provider": {},
+        "consumer": {}
+      },
+      "expect": {
+        "error": {
+          "code": "unknown-operator",
+          "category": "document",
+          "details": {
+            "operator": "csv:nothing"
+          }
+        }
+      }
+    }
+  ]
+}

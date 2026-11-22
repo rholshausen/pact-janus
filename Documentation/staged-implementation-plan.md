@@ -3140,6 +3140,33 @@ The component model, opened to the ecosystem.
   a third party's component.
   *Exit:* every built-in content component passes its cases through both bindings in CI, and
   `janus component check` runs the CSV component's.
+  *Done 2026-11-23* ([ADR 0105](decisions/0105-run-each-components-conformance-cases-through-every-binding-it-is-reached-by.md)):
+  - The engine's half of the WASM binding moved into the kernel as `component::wire`: `PipeClient` writes
+    and reads the content and matcher documents over any pipe, and `serve`/`serve_frame` are a native
+    component's end. The serialising in-process binding is a `PipeClient` over `InProcess`, so a built-in
+    is reached through frame bytes by the code that reaches every out-of-tree component.
+  - `corpora/components/` holds 36 cases for `json`, `text`, `form`, `xml`, `multipart` and the HTTP
+    component's matcher, `http`, each checked against the schema and run through both bindings by
+    `tools/corpus`. A built-in with no cases fails it. They ship in `janus-spec.tar.gz`, with the
+    component-interfaces schemas beside them.
+  - `janus component check <component.wasm> <cases>...` loads a component as a run does and runs its cases
+    through the WASM binding: exit 0, 1 for a failed case or a component that does not load, 2 for a case
+    that cannot be read. `third-party/janus-csv/conformance/` is its 12 cases, which CI runs.
+  - The schema's `Expected.error` requires only `code`, as it said, and `serialising` is a known binding.
+  - Found by the corpus and fixed: `decode-failed` and `unsupported-content-type` were written with
+    category `component`, not spec §11.1's `document`, and the HTTP matcher answered an unknown action
+    with `operation-unsupported`, not `unknown-action`.
+  - Not done, on purpose: a built-in has no handshake document to assert (S5.11), generators and variant
+    spaces have no cases until S5.9 forwards them, and `janus-ndjson`'s cases are its author's to write.
+- **S5.11 In-tree components answer `component/hello`** — **S**. Added 2026-11-23 by ADR 0105. Spec §9.1
+  says a built-in's handshake happens too, and that the engine has no privileged path to its capabilities.
+  But a native embedding registers a built-in by name and interface alone (`InTree`), and what it
+  contributes is the embedding's code (`register_matcher`'s action list, `register_content`'s order), so
+  no conformance case can assert a built-in's handshake. Each built-in crate would answer
+  `component/hello` with the document a WASM component answers, and the embedding would index it through
+  the loader's own handshake checks (spec §2.4, §3.3).
+  *Exit:* each built-in's `component/hello` is a case under `corpora/components/`, and `engine/hello`'s
+  in-tree list is read from those handshakes.
 
 **Done when** a protobuf plugin runs through either the bridge or a native component, and a second
 content component exists written by someone outside the core team.
@@ -3369,7 +3396,8 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S5.6 | A multipart part's body reaches only the built-in content components (done: ADR 0103) | ADR 0040 decision 3 |
 | S5.8 | A component's substitutions do not reach content embedded in a slot | ADR 0103 |
 | S5.9 | A declared component's generators and variant dimensions are refused at load: nothing calls them | ADR 0104 |
-| S5.10 | No component conformance corpus exists, though spec §9.4 specifies one | ADR 0104 |
+| S5.10 | No component conformance corpus exists, though spec §9.4 specifies one (done: ADR 0105) | ADR 0104 |
+| S5.11 | An in-tree component has no `component/hello` document, so nothing indexes a built-in as spec §9.1 says | ADR 0105 |
 | S5.4 | Fragments: the variant, decoding in the plan, action configuration (done: ADR 0100) | findings 21, 22, 24; gate F |
 | S5.7 | A declared component's operators are opaque to `janus check`, which loads none (done: ADR 0102) | ADR 0087 |
 | S6.6 | A provider test under Vitest, Jest or Spock is one test for the whole run, where JUnit 5 has one per interaction | asked by a community member, 2026-11-12; moved from S3.7 |

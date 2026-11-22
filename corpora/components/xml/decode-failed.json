@@ -1,0 +1,45 @@
+{
+  "name": "xml/decode-failed",
+  "component": "xml",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/xml",
+        "value": {
+          "content": "<unclosed>",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "application/xml"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/xml",
+        "value": {
+          "content": "/w==",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "application/xml"
+          }
+        }
+      }
+    }
+  ]
+}

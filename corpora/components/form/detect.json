@@ -1,0 +1,25 @@
+{
+  "name": "form/detect",
+  "component": "form",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/detect",
+      "body": {
+        "value": {
+          "content": "a=1",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "operation-unsupported",
+          "category": "protocol",
+          "details": {
+            "op": "content/detect"
+          }
+        }
+      }
+    }
+  ]
+}

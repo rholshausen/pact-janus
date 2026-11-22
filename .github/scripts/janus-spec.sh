@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # janus-spec.sh <out.tar.gz> — the executable specification as a release carries it (staged plan
 # S0.11, ADR 0030): the corpora, the conformance suite, the behavioural specification its ids come
-# from, the binding manifest and every schema set it names. Each at its path in this repository, so
-# a checker reads an unpacked archive and a checkout the same way (`--spec <dir>`, `JANUS_SPEC`).
+# from, the binding manifest and every schema set it names, and the component interfaces' schemas,
+# which the component conformance cases under corpora/components/ are written to (S5.10, ADR 0105).
+# Each at its path in this repository, so a checker reads an unpacked archive and a checkout the same
+# way (`--spec <dir>`, `JANUS_SPEC`).
 #
 # Made by `git archive` from HEAD: the committed tree, nothing the working copy adds, and the same
 # bytes for the same commit.
@@ -20,6 +22,7 @@ paths=(
   conformance
   Documentation/specs/sdk-specification/behavioural-spec.json
   sdks/bindings.json
+  Documentation/specs/component-interfaces/schemas/v1
 )
 while IFS= read -r schemas; do
   paths+=("$schemas")

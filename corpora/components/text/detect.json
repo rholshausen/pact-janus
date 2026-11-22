@@ -1,0 +1,25 @@
+{
+  "name": "text/detect",
+  "component": "text",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/detect",
+      "body": {
+        "value": {
+          "content": "anything",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "operation-unsupported",
+          "category": "protocol",
+          "details": {
+            "op": "content/detect"
+          }
+        }
+      }
+    }
+  ]
+}

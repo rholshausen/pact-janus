@@ -1,0 +1,46 @@
+{
+  "name": "http/media-type",
+  "component": "http",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "http:media-type",
+        "values": [
+          {
+            "content": "application/json; charset=utf-8"
+          },
+          {
+            "content": "APPLICATION/JSON"
+          },
+          {
+            "content": "text/plain"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "type": "application/json"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

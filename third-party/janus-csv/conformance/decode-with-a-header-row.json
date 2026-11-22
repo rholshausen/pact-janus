@@ -1,0 +1,58 @@
+{
+  "name": "csv/decode-with-a-header-row",
+  "component": "csv",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv",
+        "value": {
+          "content": "aWQsbmFtZSxwYWlkDQoxLEFubix0cnVlDQoyLEJvLGZhbHNlDQo=",
+          "encoded": "base64"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": [
+            {
+              "id": "1",
+              "name": "Ann",
+              "paid": "true"
+            },
+            {
+              "id": "2",
+              "name": "Bo",
+              "paid": "false"
+            }
+          ],
+          "degradations": [
+            {
+              "code": "numeric-lexical",
+              "path": "$[*].id"
+            },
+            {
+              "code": "no-boolean",
+              "path": "$[*].paid"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv",
+        "value": {
+          "content": "note\r\n\r\n",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": []
+        }
+      }
+    }
+  ]
+}

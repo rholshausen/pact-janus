@@ -1,0 +1,152 @@
+{
+  "name": "csv/substituted-actions",
+  "component": "csv",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "csv:integer",
+        "values": [
+          {
+            "content": "12"
+          },
+          {
+            "content": "-3"
+          },
+          {
+            "content": "1.5"
+          },
+          {
+            "content": ""
+          },
+          {
+            "content": 12
+          }
+        ]
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            },
+            {
+              "status": "error"
+            },
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "csv:number",
+        "values": [
+          {
+            "content": "1.5"
+          },
+          {
+            "content": "1e3"
+          },
+          {
+            "content": " 1"
+          },
+          {
+            "content": "x"
+          }
+        ]
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            },
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "csv:boolean",
+        "values": [
+          {
+            "content": "true"
+          },
+          {
+            "content": "false"
+          },
+          {
+            "content": "TRUE"
+          }
+        ]
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "csv:equality",
+        "values": [
+          {
+            "content": "1"
+          },
+          {
+            "content": "01"
+          }
+        ],
+        "config": {
+          "arguments": [
+            1
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

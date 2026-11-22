@@ -31,6 +31,36 @@ fn main() -> ExitCode {
 
   let passed = cases.len() - failed;
   println!("{passed}/{} cases passed", cases.len());
+
+  // The component conformance cases (ADR 0105): nothing in them is a snapshot, so `accept` fixes none.
+  let components = root.join("components");
+  let built_ins = pact_janus_corpus::components::built_ins();
+  let files = pact_janus_corpus::components::discover(&components);
+  let mut components_failed = 0usize;
+  for file in &files {
+    let relative = file.strip_prefix(&root).unwrap_or(file);
+    match pact_janus_corpus::components::run_file(file, &built_ins) {
+      Ok(report) if report.passed() => println!("✓ corpora/{}", relative.display()),
+      Ok(report) => {
+        components_failed += 1;
+        println!("✗ corpora/{}", relative.display());
+        for problem in &report.problems {
+          println!("    {problem}");
+        }
+      }
+      Err(problem) => {
+        components_failed += 1;
+        println!("✗ corpora/{} ({problem})", relative.display());
+      }
+    }
+  }
+  println!(
+    "{}/{} component cases passed",
+    files.len() - components_failed,
+    files.len()
+  );
+  failed += components_failed;
+
   if failed > 0 {
     ExitCode::FAILURE
   } else {

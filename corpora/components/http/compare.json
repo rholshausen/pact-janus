@@ -1,0 +1,50 @@
+{
+  "name": "http/compare",
+  "component": "http",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/compare",
+      "body": {
+        "operator": "http:status-class",
+        "provider": {
+          "shape": "http:status-class",
+          "codes": [
+            200,
+            204
+          ]
+        },
+        "consumer": {
+          "shape": "http:status-class",
+          "class": "success"
+        }
+      },
+      "expect": {
+        "ok": {
+          "verdict": "yes"
+        }
+      }
+    },
+    {
+      "op": "matcher/compare",
+      "body": {
+        "operator": "http:status-class",
+        "provider": {
+          "shape": "http:status-class",
+          "class": "success"
+        },
+        "consumer": {
+          "shape": "http:status-class",
+          "codes": [
+            200
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "verdict": "no"
+        }
+      }
+    }
+  ]
+}

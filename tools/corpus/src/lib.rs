@@ -14,6 +14,11 @@
 //! [`run_case`] is the one entry point both `src/main.rs` (`cargo run -p pact_janus_corpus
 //! [-- accept]`) and `tests/corpus.rs` (`cargo test -p pact_janus_corpus`) call, so the two never
 //! drift into checking different things.
+//!
+//! [`components`] runs the other corpus under `corpora/`, the component conformance cases (spec §9.4 of
+//! the component interfaces, ADR 0105), which call a component's operations rather than compile plans.
+
+pub mod components;
 
 use pact_janus_component_json::JsonContent;
 use pact_janus_kernel::display::{Kind, Marked};

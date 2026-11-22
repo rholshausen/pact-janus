@@ -81,7 +81,7 @@ impl ComponentError {
   pub fn decode_failed(content_type: &str, message: impl Into<String>) -> Self {
     ComponentError {
       code: "decode-failed".to_string(),
-      category: "component".to_string(),
+      category: "document".to_string(),
       message: message.into(),
       source: None,
       details: Some(Box::new(serde_json::json!({ "content-type": content_type }))),
@@ -107,7 +107,7 @@ impl ComponentError {
   pub fn unsupported_content_type(content_type: &str) -> Self {
     ComponentError {
       code: "unsupported-content-type".to_string(),
-      category: "component".to_string(),
+      category: "document".to_string(),
       message: format!("unsupported content type '{content_type}'"),
       source: None,
       details: Some(Box::new(serde_json::json!({ "content-type": content_type }))),
@@ -124,6 +124,18 @@ impl ComponentError {
       message: message.into(),
       source: None,
       details: None,
+      chain: None,
+    }
+  }
+
+  /// `unknown-action` (spec §11.1): `matcher/apply` named an action this component does not run.
+  pub fn unknown_action(action: &str) -> Self {
+    ComponentError {
+      code: "unknown-action".to_string(),
+      category: "document".to_string(),
+      message: format!("no action '{action}'"),
+      source: None,
+      details: Some(Box::new(serde_json::json!({ "action": action }))),
       chain: None,
     }
   }

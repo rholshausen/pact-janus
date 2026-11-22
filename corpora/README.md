@@ -97,6 +97,19 @@ listed under `redacted` (contract-file spec §5.6, ADR 0074). A dependency that 
 a deliberate move changes the case in the same commit, and needs a change file, since every contract
 holding that spelling gets a new hash at a broker.
 
+`components/` is a different kind of corpus: the built-in components' conformance cases
+(component-interfaces spec §9.4, ADR 0105). Each is a file, `components/<component>/<case>.json`, in
+`conformance-case.schema.json`'s form: calls on one component (`content/decode`, `matcher/apply`, …)
+with the result or error each must answer. There is a directory for each component the native embeddings
+register: `json`, `text`, `form`, `xml`, `multipart`, and `http`, the HTTP component's matcher. The corpus
+runner runs every case through the component's native binding and through a serialising one, which
+reaches it through frame bytes as the WASM binding reaches an out-of-tree component, and both must answer
+every call alike. It holds no `case.json`, so no plan is compiled for it, and nothing in it is a snapshot:
+every expectation is written by hand, and an `ok` constrains only the members it names. A component that
+asks for embedded content takes two calls: the question, then the request repeated with the answers
+(`multipart/decode-asks-for-each-typed-part.json`). A change to what a built-in component answers changes
+its cases in the same commit, and a built-in with no cases fails the run.
+
 `verifier/` is a different kind of corpus, with its own [README](verifier/README.md): pacts and the
 providers that answer them, which staged plan S1.1's harness verifies with today's verifier and with
 `janus verify`, comparing the verdicts. It holds no `case.json`, so the corpus runner below does not
@@ -105,8 +118,9 @@ read it.
 ## Running the corpus
 
 `cargo test -p pact_janus_corpus` is what CI runs: every case must match its `result` exactly, and
-its `plan.txt`/`executed.txt` must match the checked-in snapshot byte for byte. `cargo run -p
-pact_janus_corpus` runs the same checks with human-readable `✓`/`✗` output.
+its `plan.txt`/`executed.txt` must match the checked-in snapshot byte for byte, and every case under
+`components/` must pass through both bindings. `cargo run -p pact_janus_corpus` runs the same checks with
+human-readable `✓`/`✗` output.
 
 A case may instead say that its input is refused: `result` is then `status: invalid` with the
 `problems` the engine must report — each the pointer it names and words its message must contain — and

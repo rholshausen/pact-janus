@@ -1,0 +1,39 @@
+{
+  "name": "csv/another-content-type",
+  "component": "csv",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "{}",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document"
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv; charset=latin1",
+        "value": {
+          "content": "a\r\n",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "xml/detect",
+  "component": "xml",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/detect",
+      "body": {
+        "value": {
+          "content": "<a/>",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "operation-unsupported",
+          "category": "protocol",
+          "details": {
+            "op": "content/detect"
+          }
+        }
+      }
+    }
+  ]
+}

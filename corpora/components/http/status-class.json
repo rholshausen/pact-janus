@@ -1,0 +1,88 @@
+{
+  "name": "http/status-class",
+  "component": "http",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "http:status-class",
+        "values": [
+          {
+            "content": 204
+          },
+          {
+            "content": 404
+          },
+          {
+            "content": "200"
+          },
+          {
+            "content": "x"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "class": "success"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            },
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "http:status-class",
+        "values": [
+          {
+            "content": 204
+          },
+          {
+            "content": 201
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "codes": [
+                200,
+                204
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

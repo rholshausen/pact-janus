@@ -1,0 +1,79 @@
+{
+  "name": "text/compile",
+  "component": "text",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/compile",
+      "body": {
+        "content-type": "text/plain",
+        "shape": {
+          "shape": "regex",
+          "pattern": "^a",
+          "example": "abc"
+        },
+        "path": "$.response.body"
+      },
+      "expect": {
+        "ok": {}
+      }
+    },
+    {
+      "op": "content/compile",
+      "body": {
+        "content-type": "text/plain",
+        "shape": {
+          "shape": "equality",
+          "example": "exactly"
+        },
+        "path": "$.response.body"
+      },
+      "expect": {
+        "ok": {}
+      }
+    },
+    {
+      "op": "content/compile",
+      "body": {
+        "content-type": "text/csv",
+        "shape": {
+          "shape": "each-like",
+          "items": {
+            "shape": "object",
+            "members": {}
+          }
+        },
+        "path": "$.response.body"
+      },
+      "expect": {
+        "error": {
+          "code": "encode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "text/csv"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/compile",
+      "body": {
+        "content-type": "text/plain",
+        "shape": {
+          "shape": "equality",
+          "example": 1
+        },
+        "path": "$.response.body"
+      },
+      "expect": {
+        "error": {
+          "code": "encode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "text/plain"
+          }
+        }
+      }
+    }
+  ]
+}

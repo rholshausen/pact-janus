@@ -1,0 +1,76 @@
+{
+  "name": "csv/decode-without-a-header-row",
+  "component": "csv",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv; header=absent",
+        "value": {
+          "content": "a,1\r\nb,2\r\n",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": [
+            [
+              "a",
+              "1"
+            ],
+            [
+              "b",
+              "2"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv",
+        "value": {
+          "content": "a,1\r\n",
+          "encoded": "text"
+        },
+        "options": {
+          "header": "absent"
+        }
+      },
+      "expect": {
+        "ok": {
+          "document": [
+            [
+              "a",
+              "1"
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "text/csv",
+        "value": {
+          "content": "a,1\r\n",
+          "encoded": "text"
+        },
+        "options": {
+          "header": "sometimes"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "invalid-config",
+          "category": "document",
+          "details": {
+            "header": "sometimes"
+          }
+        }
+      }
+    }
+  ]
+}

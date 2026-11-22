@@ -1,0 +1,85 @@
+{
+  "name": "multipart/encode-asks-for-each-typed-part",
+  "component": "multipart",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "multipart/form-data; boundary=b",
+        "document": {
+          "meta": [
+            {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "a": 1
+              }
+            }
+          ],
+          "note": [
+            {
+              "body": "hello"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "embedded": [
+            {
+              "id": "0",
+              "content-type": "application/json",
+              "document": {
+                "a": 1
+              },
+              "at": "/meta/0/body"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "multipart/form-data; boundary=b",
+        "document": {
+          "meta": [
+            {
+              "headers": {
+                "content-type": "application/json"
+              },
+              "body": {
+                "a": 1
+              }
+            }
+          ],
+          "note": [
+            {
+              "body": "hello"
+            }
+          ]
+        },
+        "embedded": {
+          "0": {
+            "value": {
+              "content": "eyJhIjoxfQ==",
+              "encoded": "base64",
+              "content-type": "application/json"
+            }
+          }
+        }
+      },
+      "expect": {
+        "ok": {
+          "value": {
+            "content": "LS1iDQpjb250ZW50LWRpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9Im1ldGEiDQpjb250ZW50LXR5cGU6IGFwcGxpY2F0aW9uL2pzb24NCg0KeyJhIjoxfQ0KLS1iDQpjb250ZW50LWRpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9Im5vdGUiDQoNCmhlbGxvDQotLWItLQ0K",
+            "encoded": "base64",
+            "content-type": "multipart/form-data; boundary=b"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "name": "form/encode",
+  "component": "form",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "application/x-www-form-urlencoded",
+        "document": {
+          "a": [
+            "1",
+            "2"
+          ],
+          "b": "x y",
+          "n": 5
+        }
+      },
+      "expect": {
+        "ok": {
+          "value": {
+            "content": "YT0xJmE9MiZiPXgreSZuPTU=",
+            "encoded": "base64",
+            "content-type": "application/x-www-form-urlencoded"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "application/x-www-form-urlencoded",
+        "document": {
+          "a": {
+            "b": 1
+          }
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "encode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "application/x-www-form-urlencoded"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "application/x-www-form-urlencoded",
+        "document": [
+          "a"
+        ]
+      },
+      "expect": {
+        "error": {
+          "code": "encode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "application/x-www-form-urlencoded"
+          }
+        }
+      }
+    }
+  ]
+}

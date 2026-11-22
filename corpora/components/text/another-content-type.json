@@ -1,0 +1,23 @@
+{
+  "name": "text/another-content-type",
+  "component": "text",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "{}",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document"
+        }
+      }
+    }
+  ]
+}

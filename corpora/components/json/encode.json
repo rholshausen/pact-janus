@@ -1,0 +1,48 @@
+{
+  "name": "json/encode",
+  "component": "json",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "application/json",
+        "document": {
+          "a": 1,
+          "b": [
+            true,
+            null
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "value": {
+            "content": "eyJhIjoxLCJiIjpbdHJ1ZSxudWxsXX0=",
+            "encoded": "base64",
+            "content-type": "application/json"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "application/json",
+        "document": {
+          "z": 1,
+          "a": 2
+        }
+      },
+      "expect": {
+        "ok": {
+          "value": {
+            "content": "eyJ6IjoxLCJhIjoyfQ==",
+            "encoded": "base64",
+            "content-type": "application/json"
+          }
+        }
+      }
+    }
+  ]
+}

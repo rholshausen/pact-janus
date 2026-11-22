@@ -1,0 +1,124 @@
+{
+  "name": "csv/column",
+  "component": "csv",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "csv:column",
+        "values": [
+          {
+            "content": "7"
+          },
+          {
+            "content": "x"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "shape": "csv:column",
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "csv:column",
+        "values": [
+          {
+            "content": "anything"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "shape": "csv:column"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/compare",
+      "body": {
+        "operator": "csv:column",
+        "provider": {
+          "shape": "csv:column",
+          "type": "integer"
+        },
+        "consumer": {
+          "shape": "csv:column",
+          "type": "number"
+        }
+      },
+      "expect": {
+        "ok": {
+          "verdict": "yes"
+        }
+      }
+    },
+    {
+      "op": "matcher/compare",
+      "body": {
+        "operator": "csv:column",
+        "provider": {
+          "shape": "csv:column",
+          "type": "number"
+        },
+        "consumer": {
+          "shape": "csv:column",
+          "type": "integer"
+        }
+      },
+      "expect": {
+        "ok": {
+          "verdict": "no"
+        }
+      }
+    },
+    {
+      "op": "matcher/compare",
+      "body": {
+        "operator": "csv:column",
+        "provider": {
+          "shape": "csv:column",
+          "type": "integer"
+        },
+        "consumer": {
+          "shape": "integer"
+        }
+      },
+      "expect": {
+        "ok": {
+          "verdict": "unknown"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "name": "csv/encode",
+  "component": "csv",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "text/csv",
+        "document": [
+          {
+            "id": "1",
+            "name": "Ann"
+          },
+          {
+            "id": 2,
+            "name": null
+          }
+        ]
+      },
+      "expect": {
+        "ok": {
+          "value": {
+            "content": "aWQsbmFtZQ0KMSxBbm4NCjIsDQo=",
+            "encoded": "base64",
+            "content-type": "text/csv"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "text/csv; header=absent",
+        "document": [
+          [
+            "a",
+            "1"
+          ]
+        ]
+      },
+      "expect": {
+        "ok": {
+          "value": {
+            "content": "YSwxDQo=",
+            "encoded": "base64",
+            "content-type": "text/csv; header=absent"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/encode",
+      "body": {
+        "content-type": "text/csv",
+        "document": [
+          {
+            "id": {
+              "nested": 1
+            }
+          }
+        ]
+      },
+      "expect": {
+        "error": {
+          "code": "encode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "text/csv",
+            "path": "$[0].id"
+          }
+        }
+      }
+    }
+  ]
+}

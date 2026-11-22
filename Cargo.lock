@@ -2564,8 +2564,13 @@ name = "pact_janus_corpus"
 version = "0.7.0"
 dependencies = [
  "base64 0.23.1",
+ "jsonschema",
+ "pact_janus_component_form",
  "pact_janus_component_http",
  "pact_janus_component_json",
+ "pact_janus_component_multipart",
+ "pact_janus_component_text",
+ "pact_janus_component_xml",
  "pact_janus_kernel",
  "serde",
  "serde_json",

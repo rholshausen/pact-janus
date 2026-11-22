@@ -1,0 +1,27 @@
+{
+  "name": "json/label",
+  "component": "json",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/label",
+      "body": {
+        "content-type": "application/json",
+        "value": {
+          "content": "{}",
+          "encoded": "text"
+        },
+        "at": "/a"
+      },
+      "expect": {
+        "error": {
+          "code": "operation-unsupported",
+          "category": "protocol",
+          "details": {
+            "op": "content/label"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "name": "multipart/decode-failed",
+  "component": "multipart",
+  "interface": "content",
+  "calls": [
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "multipart/form-data",
+        "value": {
+          "content": "--b--\r\n",
+          "encoded": "text"
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "multipart/form-data"
+          }
+        }
+      }
+    },
+    {
+      "op": "content/decode",
+      "body": {
+        "content-type": "multipart/form-data; boundary=b",
+        "value": {
+          "content": 1
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "decode-failed",
+          "category": "document",
+          "details": {
+            "content-type": "multipart/form-data; boundary=b"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -121,6 +121,7 @@ superseding ADR instead.
 | [0102](0102-a-check-loads-the-components-a-project-declares-and-compares-their-operators-as-their-handshakes-declare.md) | A check loads the components a project declares, and compares their operators as their handshakes declare | accepted |
 | [0103](0103-a-content-component-asks-for-embedded-content-in-its-answer-and-the-registry-decodes-it.md) | A content component asks for embedded content in its answer, and the registry decodes it | accepted |
 | [0104](0104-the-component-interface-is-generally-available-for-content-and-matcher-components-over-wasm.md) | The component interface is generally available for content and matcher components over WASM | accepted |
+| [0105](0105-run-each-components-conformance-cases-through-every-binding-it-is-reached-by.md) | Run each component's conformance cases through every binding it is reached by | accepted |
 
 ## Decision backlog
 

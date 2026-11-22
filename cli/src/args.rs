@@ -68,7 +68,8 @@ pub enum Command {
   /// Publish Janus contracts, v1-v4 pacts or provider shapes to a Pact Broker, for a version of the
   /// consumer or provider they belong to
   Publish(PublishArgs),
-  /// Publish a WASM component to an OCI registry, or fetch one and say what it is
+  /// Publish a WASM component to an OCI registry, fetch one and say what it is, or check one against
+  /// its conformance cases
   #[command(subcommand)]
   Component(ComponentCommand),
   /// Print a shell completion script
@@ -89,6 +90,7 @@ impl Command {
       Command::Publish(_) => "publish",
       Command::Component(ComponentCommand::Push(_)) => "component push",
       Command::Component(ComponentCommand::Pull(_)) => "component pull",
+      Command::Component(ComponentCommand::Check(_)) => "component check",
       Command::Completions(_) => "completions",
       Command::Version => "version",
     }
@@ -1064,14 +1066,38 @@ pub struct PublishArgs {
                         and JANUS_OCI_PASSWORD. The cache is JANUS_COMPONENT_CACHE, or \
                         pact-janus/components in the user cache directory.\n\nExit status: 0 \
                         done; 1 the artifact is not what it claims (a digest that does not match, \
-                        not a Janus component, a config that disagrees with the component); 2 the \
-                        command could not run."
+                        not a Janus component, a config that disagrees with the component), or a \
+                        conformance case failed; 2 the command could not run."
 )]
 pub enum ComponentCommand {
   /// Publish a WASM component as an OCI artifact, described by the component's own handshake
   Push(PushArgs),
   /// Fetch a component into the cache, check every byte, and print how to declare it, pinned
   Pull(PullArgs),
+  /// Run conformance cases against a WASM component, through the binding a run loads it with
+  Check(CheckComponentArgs),
+}
+
+#[derive(Debug, Args)]
+#[command(
+  arg_required_else_help = true,
+  after_help = "Each case is a conformance case (the component interfaces' \
+                conformance-case.schema.json): calls on the component, with what each must \
+                answer. The component is loaded with no grants, as a declaration that names none \
+                loads it."
+)]
+pub struct CheckComponentArgs {
+  /// The component to check
+  #[arg(value_name = "COMPONENT_WASM")]
+  pub component: PathBuf,
+
+  /// Case files, or directories holding them (every .json file beneath)
+  #[arg(value_name = "CASES", required = true)]
+  pub cases: Vec<PathBuf>,
+
+  /// text prints each case and what it found; json prints one document
+  #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]
+  pub output: Output,
 }
 
 #[derive(Debug, Args)]

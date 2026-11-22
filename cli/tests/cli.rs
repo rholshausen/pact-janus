@@ -2606,6 +2606,63 @@ fn verify_without_the_component_fails_before_the_run_naming_what_is_missing() {
   assert!(text.contains("content/csv"), "{text}");
 }
 
+/// S5.10 (ADR 0105): `component check` runs the CSV component's own conformance corpus through the
+/// WASM binding, the one a run loads it with, and every case passes.
+#[test]
+fn component_check_runs_a_components_conformance_cases_through_the_wasm_binding() {
+  let output = janus(&[
+    "component",
+    "check",
+    &csv_component(),
+    &repo("third-party/janus-csv/conformance"),
+  ]);
+  assert_eq!(code(&output), 0, "{}\n{}", stdout(&output), stderr(&output));
+  assert_data_eq!(
+    stdout(&output),
+    str![[r#"
+csv 1.0.0 (content, matcher): 12 case(s) through the wasm binding
+✓ csv/another-content-type
+✓ csv/column
+✓ csv/compile
+✓ csv/decode-failed
+✓ csv/decode-with-a-header-row
+✓ csv/decode-without-a-header-row
+✓ csv/detect
+✓ csv/encode-no-rows-from-the-shape
+✓ csv/encode
+✓ csv/handshake
+✓ csv/substituted-actions
+✓ csv/unknown-action
+12 passed, 0 failed
+
+"#]]
+  );
+}
+
+/// A case the component does not answer as it expects is the subject failing, exit 1, and the case
+/// says which call, through which binding, and where its answer differs.
+#[test]
+fn component_check_reports_each_case_the_component_fails() {
+  let case = temp("csv-fails.json");
+  std::fs::write(
+    &case,
+    json!({ "name": "csv/fails", "component": "csv", "calls": [
+      { "op": "content/decode",
+        "body": { "content-type": "text/csv", "value": { "content": "id\r\n1\r\n", "encoded": "text" } },
+        "expect": { "ok": { "document": [ { "id": 1 } ] } } } ] })
+    .to_string(),
+  )
+  .expect("the case is written");
+  let output = janus(&["component", "check", &csv_component(), &case, "--output", "json"]);
+  assert_eq!(code(&output), 1, "{}\n{}", stdout(&output), stderr(&output));
+  let report: Value = serde_json::from_str(&stdout(&output)).expect("JSON");
+  assert_eq!(report["failed"], json!(1));
+  assert_eq!(
+    report["cases"][0]["problems"],
+    json!([r#"calls[0] (content/decode) through wasm: at /document/0/id: expected 1, got "1""#])
+  );
+}
+
 // ---------------------------------------------------------------------------------------------
 // OCI distribution (plan task 8.2)
 // ---------------------------------------------------------------------------------------------
