@@ -28,8 +28,8 @@
 use super::compile::{
   LIST, LegacyBody, LegacyPart, MEDIA_TYPE, OPTIONAL_PART_HEADERS, STATUS_CLASS, accepts_empty_text,
   anchored_pattern, best_rule, definition_rules, each_value_category, form_parameters, is_whole_equality,
-  list_elements, namespace_of, only_element, rerooted, rules_for, status_class, type_rule_names,
-  type_rule_reaches,
+  list_elements, names_ruled_below, namespace_of, only_element, rerooted, rules_for, status_class,
+  type_rule_names, type_rule_reaches,
 };
 use super::multipart as legacy_multipart;
 use super::pact::{
@@ -1315,8 +1315,8 @@ impl Conversion {
       // and nothing is decided by member order (ADR 0037).
       let first = members.iter().min_by(|(a, _), (b, _)| a.cmp(b));
       let sample = first.map(|(_, value)| value.clone()).unwrap_or(Value::Null);
-      // `eachValue` matches the values by its own rules alone, at `*` below the map, as the legacy
-      // compiler does (ADR 0042); the other two by the body's.
+      // `eachValue` matches the values by its own rules merged into the body's below the map, as the
+      // legacy compiler does (ADR 0107); the other two by the body's.
       let own = match rule {
         MatchingRule::EachValue(definition) => {
           let (own, unresolved) = definition_rules(definition);
@@ -1330,7 +1330,7 @@ impl Conversion {
                 .to_string(),
             ));
           }
-          Some(each_value_category(&ctx.fragments, own))
+          Some(each_value_category(rules, &ctx.fragments, own))
         }
         _ => None,
       };
@@ -1369,7 +1369,9 @@ impl Conversion {
         };
         return json!({ "shape": "each-entry", "keys": keys, "values": values, "min": 0 });
       }
-      let values = self.body_shape(own.as_ref().or(rules), &sample, &ctx.entry_value());
+      let values_rules = own.as_ref().or(rules);
+      let values_at = self.entry_values_at(values_rules, first.map(|(name, _)| name.as_str()), ctx);
+      let values = self.body_shape(values_rules, &sample, &values_at);
       return json!({ "shape": "each-entry", "values": values, "min": 0 });
     }
     let mut shapes = Map::new();
@@ -1378,6 +1380,52 @@ impl Conversion {
       shapes.insert(name.clone(), self.body_shape(rules, value, &member));
     }
     json!({ "shape": "object", "members": shapes })
+  }
+
+  /// Where a map's `each-entry` values are converted, from the pact's first member by name: any
+  /// value's position (`*`), unless a rule below the map names a key, which v1–v4 apply to that
+  /// key's value alone and `each-entry`, one shape for every value, cannot (ADR 0107). Then the
+  /// values are converted at the first member's key, so a rule for it holds every value, stricter
+  /// than v1–v4 (a false failure rather than a false pass), and a rule for any other key is dropped.
+  fn entry_values_at(
+    &mut self,
+    rules: Option<&MatchingRuleCategory>,
+    sample: Option<&str>,
+    ctx: &BodyCtx,
+  ) -> BodyCtx {
+    let named = names_ruled_below(rules, &ctx.fragments);
+    let Some(sample) = sample.filter(|_| !named.is_empty()) else {
+      return ctx.entry_value();
+    };
+    let others: Vec<&str> = named
+      .iter()
+      .map(String::as_str)
+      .filter(|name| *name != sample)
+      .collect();
+    if named.contains(sample) {
+      self.finding(Finding::at(
+        "rule-narrowed",
+        "judgement",
+        &ctx.at,
+        format!(
+          "a rule for the value of the key '{sample}' became each-entry's values, so it holds every \
+           value; v1–v4 apply it to that key's value alone"
+        ),
+      ));
+    }
+    if !others.is_empty() {
+      self.finding(Finding::at(
+        "rule-unmapped",
+        "lossy",
+        &ctx.at,
+        format!(
+          "each-entry has one shape for every value, so the rules for the values of the keys '{}' \
+           were dropped; v1–v4 apply each to that key's value",
+          others.join("', '")
+        ),
+      ));
+    }
+    ctx.entry_sample(sample)
   }
 
   /// An array: a rule reaching this path (exactly or cascaded) makes it an `each-like` over a
@@ -1405,11 +1453,11 @@ impl Conversion {
     if let Some(MatchingRule::ArrayContains(variants)) = list.rules.first() {
       return self.contains_shape(items, variants, ctx);
     }
-    // `eachValue` on a list matches every element by its own rules alone, and any length, as the
-    // legacy compiler applies it (ADR 0042).
+    // `eachValue` on a list matches every element by its own rules merged into the body's below the
+    // list, and any length, as the legacy compiler applies it (ADR 0042, ADR 0107).
     if !cascaded && let Some(MatchingRule::EachValue(definition)) = list.rules.first() {
       let (own, _) = definition_rules(definition);
-      let own = each_value_category(&ctx.fragments, own);
+      let own = each_value_category(rules, &ctx.fragments, own);
       let template = items.first().cloned().unwrap_or(Value::Null);
       let items_shape = self.body_shape(Some(&own), &template, &ctx.template_item());
       return json!({ "shape": "each-like", "items": items_shape, "min": 0 });
@@ -2584,6 +2632,11 @@ impl BodyCtx {
 
   fn entry_value(&self) -> BodyCtx {
     self.push("*".to_string(), "/*", "/values")
+  }
+
+  /// An `each-entry`'s values, converted from the member `name`: rules are looked up at its key.
+  fn entry_sample(&self, name: &str) -> BodyCtx {
+    self.push(name.to_string(), &format!("/{}", escape_pointer(name)), "/values")
   }
 }
 

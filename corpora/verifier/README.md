@@ -111,7 +111,8 @@ interaction of a pact it did not fetch is `absent` there too.
 - `state-callbacks/`: provider-state callbacks that misbehave in ways the compatibility suite does not
   cover, such as `fails-once`, an endpoint that fails while it warms up.
 - `generators/`: request generators applied before sending (S1.4), recognised by `patterns`. In a
-  form body they are a deliberate difference: today's verifier sends them unapplied (ADR 0038). In an
+  form body both verifiers apply them (ADR 0038; pact_verifier_cli 1.3.5 sent them unapplied, and
+  1.5.0 fixed that, pact-reference#588). In an
   XML body both verifiers write the same bytes, so the provider recognises them exactly.
 - `connection/`: the provider connection options, `--header`, `--base-path`, `--request-timeout` and
   TLS (S1.5).
@@ -135,8 +136,8 @@ interaction of a pact it did not fetch is `absent` there too.
 - `matching-rules/`: the rules about a collection's entries, which no pact-specification case covers
   (S1.24, ADR 0042): `values`, `each-key`, `each-value` and `array-contains`, each with replies that
   match and that do not, and mutations. `each-value-nested` puts rules below an `eachValue` matcher's
-  values (`$.chips.*.amount`), which pact_verifier_cli 1.3.5 ignores and pact-reference#586 makes it
-  apply: a tripwire for moving the pin to a verifier with that fix. `status-code` is v4's `statusCode`
+  values (`$.chips.*.amount`), which pact_verifier_cli 1.3.5 ignored and 1.5.0 applies
+  (pact-reference#586, ADR 0107), with mutations. `status-code` is v4's `statusCode`
   rule on a response's status (S1.35, ADR 0057): every class and a list of codes, one reply outside its
   class, and mutations that step each status past its class's edge. `ignore-order` is pact-jvm's
   `unorderedArray` rule, with and without its bounds, which both verifiers fail as a plugin's rule

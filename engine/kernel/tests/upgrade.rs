@@ -1177,3 +1177,109 @@ fn every_converted_contract_reads_back_as_a_contract() {
       .unwrap_or_else(|err| panic!("{name} reads back: {err:?}"));
   }
 }
+
+/// A v4 pact with one HTTP interaction whose response has `body` and its body `rules`.
+fn v4_response_body(body: Value, rules: Value) -> Value {
+  json!({
+    "consumer": { "name": "c" },
+    "provider": { "name": "p" },
+    "interactions": [{
+      "type": "Synchronous/HTTP",
+      "description": "an interaction",
+      "request": { "method": "GET", "path": "/" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": ["application/json"] },
+        "body": { "content": body, "contentType": "application/json", "encoded": false },
+        "matchingRules": { "body": rules }
+      }
+    }],
+    "metadata": { "pactSpecification": { "version": "4.0" } }
+  })
+}
+
+fn each_value(example: &str) -> Value {
+  json!({ "combine": "AND", "matchers": [{ "match": "eachValue", "rules": [{ "match": "type" }], "value": example }] })
+}
+
+fn integer() -> Value {
+  json!({ "combine": "AND", "matchers": [{ "match": "integer" }] })
+}
+
+/// ADR 0107: an `eachValue` rule's values are converted under the rules below them too, on a map
+/// and on a list, as pact_verifier_cli 1.5.0 applies them.
+#[test]
+fn each_value_converts_the_values_under_the_rules_below_them() {
+  let map = upgrade(&v4_response_body(
+    json!({ "chips": { "main": { "amount": 1000 } } }),
+    json!({ "$.chips": each_value(r#"{"main":{"amount":1000}}"#), "$.chips.*.amount": integer() }),
+  ));
+  let chips = &shape(&map, 0, "response", "body")["members"]["chips"];
+  assert_eq!(chips["shape"], json!("each-entry"));
+  assert_eq!(
+    chips["values"]["members"]["amount"]["shape"],
+    json!("integer"),
+    "{chips}"
+  );
+  assert!(
+    map.findings.iter().all(|f| f.code != "rule-unmapped"),
+    "{:?}",
+    codes(&map.findings)
+  );
+
+  let list = upgrade(&v4_response_body(
+    json!({ "items": [{ "amount": 1000 }] }),
+    json!({ "$.items": each_value(r#"[{"amount":1000}]"#), "$.items[*].amount": integer() }),
+  ));
+  let items = &shape(&list, 0, "response", "body")["members"]["items"];
+  assert_eq!(items["shape"], json!("each-like"));
+  assert_eq!(
+    items["items"]["members"]["amount"]["shape"],
+    json!("integer"),
+    "{items}"
+  );
+}
+
+/// ADR 0107 decision 3: `each-entry` has one shape for every value, so a rule for one key's value is
+/// converted from the pact's first member. A rule for its key holds every value, `rule-narrowed`;
+/// a rule for another key is dropped, `rule-unmapped`.
+#[test]
+fn a_rule_for_one_keys_value_below_each_value_is_reported() {
+  let narrowed = upgrade(&v4_response_body(
+    json!({ "chips": { "main": { "amount": 1000 } } }),
+    json!({ "$.chips": each_value(r#"{"main":{"amount":1000}}"#), "$.chips.main.amount": integer() }),
+  ));
+  let chips = &shape(&narrowed, 0, "response", "body")["members"]["chips"];
+  assert_eq!(
+    chips["values"]["members"]["amount"]["shape"],
+    json!("integer"),
+    "{chips}"
+  );
+  let about = |findings: &[Finding], code: &str, key: &str| {
+    findings
+      .iter()
+      .any(|f| f.code == code && f.message.contains(&format!("'{key}'")))
+  };
+  assert!(
+    about(&narrowed.findings, "rule-narrowed", "main"),
+    "{:?}",
+    codes(&narrowed.findings)
+  );
+  assert!(!codes(&narrowed.findings).contains(&"rule-unmapped"));
+
+  let dropped = upgrade(&v4_response_body(
+    json!({ "chips": { "main": { "amount": 1000 } } }),
+    json!({ "$.chips": each_value(r#"{"main":{"amount":1000}}"#), "$.chips.side.amount": integer() }),
+  ));
+  let chips = &shape(&dropped, 0, "response", "body")["members"]["chips"];
+  assert_ne!(
+    chips["values"]["members"]["amount"]["shape"],
+    json!("integer"),
+    "{chips}"
+  );
+  assert!(
+    about(&dropped.findings, "rule-unmapped", "side"),
+    "{:?}",
+    codes(&dropped.findings)
+  );
+}

@@ -1,0 +1,73 @@
+(
+  :"chips by name" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/chips'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/json'
+          )
+        )
+      ),
+      :body (
+        :"$.chips" (
+          %expect:object (
+            $.response.body.chips
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.chips
+            ),
+            %flow:if (
+              %check:equals (
+                ~>.key,
+                'main'
+              ),
+              :"$.chips.main" (
+                :"$.chips.main.amount" (
+                  %match:integer (
+                    ~>.value.amount
+                  )
+                )
+              ),
+              :"$.chips{*}" (
+                :"$.chips{*}.amount" (
+                  %match:integer (
+                    ~>.value.amount
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

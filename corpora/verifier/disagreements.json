@@ -2,20 +2,6 @@
   "$comment": "Every verdict today's verifier and janus verify disagree on over this corpus, each with what accounts for it: the staged-plan item that closes it, or the ADR that makes it deliberate. `verifier-diff run` fails on a disagreement not listed here, and on an entry nothing disagrees on any more. Staged plan S1.1.",
   "disagreements": [
     {
-      "case": "generators/form-body",
-      "key": "run",
-      "today": "fail",
-      "janus": "pass",
-      "reason": "ADR 0038 decision 5: a form body's generators are applied, as pact_models' FormUrlEncodedHandler and pact-jvm apply them; pact_verifier builds pact_matching without its form_urlencoded feature, so today's verifier sends the recorded body (pact-foundation/pact-reference#588)"
-    },
-    {
-      "case": "generators/form-body",
-      "key": "0/0",
-      "today": "fail",
-      "janus": "pass",
-      "reason": "ADR 0038 decision 5: a form body's generators are applied, as pact_models' FormUrlEncodedHandler and pact-jvm apply them; pact_verifier builds pact_matching without its form_urlencoded feature, so today's verifier sends the recorded body (pact-foundation/pact-reference#588)"
-    },
-    {
       "case": "connection/header-case",
       "key": "run",
       "today": "fail",

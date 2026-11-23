@@ -1,0 +1,103 @@
+{
+  "description": "a v4 eachValue rule on an object with a rule below its values (`$.chips.*.amount`): a value whose amount is a decimal is a mismatch at that amount, as pact_verifier_cli 1.5.0 finds it (pact-reference#586, ADR 0107)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "matching-rules-consumer"
+      },
+      "provider": {
+        "name": "matching-rules-provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "key": "v4-each-value-nested-map-mismatch",
+          "description": "chips by name",
+          "request": {
+            "method": "GET",
+            "path": "/chips"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": [
+                "application/json"
+              ]
+            },
+            "body": {
+              "content": {
+                "chips": {
+                  "main": {
+                    "amount": 1000
+                  }
+                }
+              },
+              "contentType": "application/json",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.chips": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "eachValue",
+                      "rules": [
+                        {
+                          "match": "type"
+                        }
+                      ],
+                      "value": "{\"main\":{\"amount\":1000}}"
+                    }
+                  ]
+                },
+                "$.chips.*.amount": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/chips",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "chips": {
+        "main": {
+          "amount": 500
+        },
+        "pair": {
+          "amount": 1.5
+        }
+      }
+    }
+  },
+  "result": {
+    "status": "mismatched",
+    "mismatches": [
+      {
+        "path": "$.response.body.chips.pair.amount",
+        "message": "Expected an integer but got 1.5",
+        "action": "match:integer"
+      }
+    ]
+  }
+}

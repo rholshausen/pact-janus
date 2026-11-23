@@ -1,0 +1,60 @@
+(
+  :items (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method
+          ),
+          'GET'
+        )
+      ),
+      :path (
+        %match:equality (
+          $.request.path,
+          '/items'
+        )
+      ),
+      :query (
+        %legacy:only-entries (
+          $.request.query
+        )
+      )
+    ),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status,
+          200
+        )
+      ),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type,
+            'application/json'
+          )
+        )
+      ),
+      :body (
+        :"$.items" (
+          %expect:array (
+            $.response.body.items
+          ),
+          %flow:for-each (
+            ** (
+              $.response.body.items
+            ),
+            :"$.items[*]" (
+              :"$.items[*].amount" (
+                %match:integer (
+                  ~>.amount
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+)

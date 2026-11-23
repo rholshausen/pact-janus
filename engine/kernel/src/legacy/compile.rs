@@ -1215,27 +1215,36 @@ impl<'a> BodyCtx<'a> {
   /// The names a rule gives to members of the object under this context: a rule path that reaches
   /// here and goes on through a named member.
   fn names_ruled_below(&self) -> BTreeSet<String> {
-    let Some(category) = self.category else {
-      return BTreeSet::new();
-    };
-    let depth = self.fragments.len();
-    category
-      .rules
-      .keys()
-      .filter_map(|rule_path| {
-        let tokens = rule_path.tokens();
-        let reaches = tokens.len() > depth
-          && tokens
-            .iter()
-            .zip(&self.fragments)
-            .all(|(token, fragment)| token_weight(token, fragment, false) > 0);
-        match tokens.get(depth) {
-          Some(PathToken::Field(name)) if reaches => Some(name.clone()),
-          _ => None,
-        }
-      })
-      .collect()
+    names_ruled_below(self.category, &self.fragments)
   }
+}
+
+/// The names a rule in `category` gives to members of the object at `fragments`: a rule path that
+/// reaches there and goes on through a named member.
+pub(super) fn names_ruled_below(
+  category: Option<&MatchingRuleCategory>,
+  fragments: &[String],
+) -> BTreeSet<String> {
+  let Some(category) = category else {
+    return BTreeSet::new();
+  };
+  let depth = fragments.len();
+  category
+    .rules
+    .keys()
+    .filter_map(|rule_path| {
+      let tokens = rule_path.tokens();
+      let reaches = tokens.len() > depth
+        && tokens
+          .iter()
+          .zip(fragments)
+          .all(|(token, fragment)| token_weight(token, fragment, false) > 0);
+      match tokens.get(depth) {
+        Some(PathToken::Field(name)) if reaches => Some(name.clone()),
+        _ => None,
+      }
+    })
+    .collect()
 }
 
 /// An object whose own path carries one of [`is_map_entry_rule`]'s rules, as today's
@@ -1243,7 +1252,7 @@ impl<'a> BodyCtx<'a> {
 /// logic says:
 ///
 /// - `Values` and `ArrayContains` compare every actual entry ([`compile_entry_values`]);
-/// - `EachValue` does the same with only its own rules, at `<path>.*`;
+/// - `EachValue` does the same with its own rules merged into the values' ([`each_value_category`]);
 /// - any other rule, `EachKey` among them, checks the object as a whole and walks it by name
 ///   ([`compile_object_walk`]).
 fn compile_object_entries(
@@ -1265,7 +1274,7 @@ fn compile_object_entries(
       MatchingRule::EachValue(definition) => {
         let (rules, unresolved) = definition_rules(definition);
         nodes.extend(unresolved);
-        let category = each_value_category(&ctx.fragments, rules);
+        let category = each_value_category(ctx.category, &ctx.fragments, rules);
         nodes.extend(compile_entry_values(members, &ctx.with_category(Some(&category))));
       }
       other => {
@@ -1476,7 +1485,7 @@ fn compile_array_rules(items: &[RuntimeValue], list: &RuleList, cascaded: bool, 
       MatchingRule::EachValue(_) if cascaded => (Vec::new(), false),
       MatchingRule::EachValue(definition) => {
         let (rules, mut unresolved) = definition_rules(definition);
-        let category = each_value_category(&ctx.fragments, rules);
+        let category = each_value_category(ctx.category, &ctx.fragments, rules);
         unresolved.extend(contents(&ctx.with_category(Some(&category))));
         (unresolved, false)
       }
@@ -1626,23 +1635,71 @@ pub(super) fn definition_rules(definition: &MatchingRuleDefinition) -> (Vec<Matc
   (rules, unresolved)
 }
 
-/// The rules `EachValue` matches a collection's values with, and nothing else: its own, at `*` below
-/// the collection, as today's `EachValue` builds a new matching context.
-pub(super) fn each_value_category(fragments: &[String], rules: Vec<MatchingRule>) -> MatchingRuleCategory {
+/// The rules `EachValue` matches a collection's values with, as today's `each_value_context` builds
+/// them (ADR 0107): every rule of `category` defined below the collection at `fragments`, so a rule
+/// for the values' members (`$.chips.*.amount`, `$.items[*].amount`) or for one key's value
+/// (`$.chips.main.amount`) still applies, and the `EachValue` rule's own `rules` for the values. Those
+/// are merged into each group already defined for the values (`<path>.*` or `<path>[*]`), its rules
+/// after them and none twice, since only one group is chosen for a path; a group with OR logic is
+/// replaced by them, since merging would make them optional. With no such group, they are a group at
+/// `<path>.*`. A rule at the collection's own path or above it is not kept: it does not reach the
+/// values from inside the new context.
+pub(super) fn each_value_category(
+  category: Option<&MatchingRuleCategory>,
+  fragments: &[String],
+  rules: Vec<MatchingRule>,
+) -> MatchingRuleCategory {
   let mut at = DocPath::root();
   for fragment in fragments.iter().skip(1) {
     at = at.join(fragment.as_str());
   }
-  let mut category = MatchingRuleCategory::empty("body");
-  category.rules.insert(
-    at.join("*"),
-    RuleList {
-      rules,
+  let depth = fragments.len();
+  let mut nested = MatchingRuleCategory::empty("body");
+  if let Some(category) = category {
+    for (rule_path, list) in &category.rules {
+      let tokens = rule_path.tokens();
+      let below = tokens.len() > depth
+        && tokens
+          .iter()
+          .zip(fragments)
+          .all(|(token, fragment)| token_weight(token, fragment, false) > 0);
+      if below {
+        nested.rules.insert(rule_path.clone(), list.clone());
+      }
+    }
+  }
+  let mut value_paths: Vec<DocPath> = nested
+    .rules
+    .keys()
+    .filter(|rule_path| {
+      let tokens = rule_path.tokens();
+      tokens.len() == depth + 1 && matches!(tokens.last(), Some(PathToken::Star | PathToken::StarIndex))
+    })
+    .cloned()
+    .collect();
+  if value_paths.is_empty() {
+    value_paths.push(at.join("*"));
+  }
+  for value_path in value_paths {
+    let mut merged = RuleList {
+      rules: rules.clone(),
       rule_logic: RuleLogic::And,
       cascaded: false,
-    },
-  );
-  category
+    };
+    if let Some(existing) = nested
+      .rules
+      .get(&value_path)
+      .filter(|existing| existing.rule_logic == RuleLogic::And)
+    {
+      for rule in &existing.rules {
+        if !merged.rules.contains(rule) {
+          merged.rules.push(rule.clone());
+        }
+      }
+    }
+    nested.rules.insert(value_path, merged);
+  }
+  nested
 }
 
 // --- XML: elements, attributes and text (ADR 0039) ---

@@ -27,6 +27,12 @@ jobs:
   latest-broker:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      # Today's verifier retries a failed state call eight times, over about two minutes; janus verify
+      # tries three (ADR 0044). The same count here keeps state-callbacks/fails-once passing and
+      # stops every state call the corpus fails on purpose costing two minutes
+      # (pact_verifier_cli 1.5.0 reads this variable).
+      PACT_PROVIDER_STATE_CHANGE_RETRIES: "2"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

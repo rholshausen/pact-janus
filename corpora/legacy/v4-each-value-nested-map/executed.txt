@@ -1,0 +1,93 @@
+(
+  :"chips by name" (
+    :request (
+      :method (
+        %match:equality (
+          %value:upper-case (
+            $.request.method => 'GET'
+          ) => 'GET',
+          'GET'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :path (
+        %match:equality (
+          $.request.path => '/chips',
+          '/chips'
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :query (
+        %legacy:only-entries (
+          $.request.query => {}
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true),
+    :response (
+      :status (
+        %match:equality (
+          $.response.status => 200,
+          200
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :headers (
+        :"$.Content-Type" (
+          %legacy:header-value (
+            $.response.headers.content-type => 'application/json',
+            'application/json'
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true),
+      :body (
+        :"$.chips" (
+          %expect:object (
+            $.response.body.chips => {'main': {'amount': 500}, 'pair': {'amount': 100}}
+          ) => BOOL(true),
+          %flow:for-each (
+            ** (
+              $.response.body.chips => {'main': {'amount': 500}, 'pair': {'amount': 100}}
+            ) => [{'main': {'amount': 500}}, {'pair': {'amount': 100}}],
+            %flow:if (
+              %check:equals (
+                ~>.key => 'main',
+                'main'
+              ) => BOOL(true),
+              :"$.chips.main" (
+                :"$.chips.main.amount" (
+                  %match:integer (
+                    ~>.value.amount => 500
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true),
+              :"$.chips{*}" (
+                :"$.chips{*}.amount" (
+                  %match:integer (
+                    ~>.value.amount
+                  )
+                )
+              )
+            ) => BOOL(true),
+            %flow:if (
+              %check:equals (
+                ~>.key => 'pair',
+                'main'
+              ) => BOOL(false),
+              :"$.chips.main" (
+                :"$.chips.main.amount" (
+                  %match:integer (
+                    ~>.value.amount
+                  )
+                )
+              ),
+              :"$.chips{*}" (
+                :"$.chips{*}.amount" (
+                  %match:integer (
+                    ~>.value.amount => 100
+                  ) => BOOL(true)
+                ) => BOOL(true)
+              ) => BOOL(true)
+            ) => BOOL(true)
+          ) => BOOL(true)
+        ) => BOOL(true)
+      ) => BOOL(true)
+    ) => BOOL(true)
+  ) => BOOL(true)
+)

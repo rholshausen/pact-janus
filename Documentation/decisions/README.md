@@ -58,7 +58,7 @@ superseding ADR instead.
 | [0039](0039-read-xml-bodies-by-element-name-through-a-built-in-xml-component.md) | Read XML bodies by element name, through a built-in XML component | accepted; decision 2 amended by 0075 |
 | [0040](0040-read-multipart-bodies-by-part-name-through-a-built-in-multipart-component.md) | Read multipart bodies by part name, through a built-in multipart component | accepted (decision 3 superseded by 0103) |
 | [0041](0041-refuse-a-filter-that-names-no-recorded-variant-and-report-a-narrowed-run-as-filtered.md) | Refuse a filter that names no recorded variant, and report a narrowed run as filtered | accepted |
-| [0042](0042-compile-the-collection-rules-of-a-v1-v4-pact-as-todays-verifier-applies-them.md) | Compile the collection rules of a v1–v4 pact as today's verifier applies them | accepted |
+| [0042](0042-compile-the-collection-rules-of-a-v1-v4-pact-as-todays-verifier-applies-them.md) | Compile the collection rules of a v1–v4 pact as today's verifier applies them | accepted (its reading of `EachValue` and that part of decision 2 superseded by 0107) |
 | [0043](0043-check-a-pacts-content-type-once-on-the-header.md) | Check a pact's Content-Type once, on the header | accepted |
 | [0044](0044-reach-a-hook-endpoint-as-a-provider-is-and-try-a-state-call-three-times.md) | Reach a hook endpoint as a provider is, and try a state call three times | accepted |
 | [0045](0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md) | Refuse an interaction that needs a pact plugin by name, and verify the rest | accepted |
@@ -123,6 +123,7 @@ superseding ADR instead.
 | [0104](0104-the-component-interface-is-generally-available-for-content-and-matcher-components-over-wasm.md) | The component interface is generally available for content and matcher components over WASM | accepted |
 | [0105](0105-run-each-components-conformance-cases-through-every-binding-it-is-reached-by.md) | Run each component's conformance cases through every binding it is reached by | accepted |
 | [0106](0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md) | Bridge pact-plugins through a child process that speaks the subprocess binding | accepted |
+| [0107](0107-apply-the-rules-below-an-eachvalue-matcher-as-the-verifier-pinned-at-1-5-0-does.md) | Apply the rules below an `eachValue` matcher, as the verifier pinned at 1.5.0 does | accepted |
 
 ## Decision backlog
 

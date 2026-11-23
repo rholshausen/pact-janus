@@ -1,0 +1,104 @@
+{
+  "description": "a v4 eachValue rule on an array with a rule for its items (`$.items[*]`) and one below them (`$.items[*].amount`): the eachValue rule's own rules are merged into the items' group, and every item is held to them and to the rule below it, as pact_verifier_cli 1.5.0 applies them (pact-reference#586, ADR 0107)",
+  "input": {
+    "kind": "pact-interaction",
+    "pact": {
+      "consumer": {
+        "name": "matching-rules-consumer"
+      },
+      "provider": {
+        "name": "matching-rules-provider"
+      },
+      "interactions": [
+        {
+          "type": "Synchronous/HTTP",
+          "key": "v4-each-value-nested-list",
+          "description": "items",
+          "request": {
+            "method": "GET",
+            "path": "/items"
+          },
+          "response": {
+            "status": 200,
+            "headers": {
+              "Content-Type": [
+                "application/json"
+              ]
+            },
+            "body": {
+              "content": {
+                "items": [
+                  {
+                    "amount": 1000
+                  }
+                ]
+              },
+              "contentType": "application/json",
+              "encoded": false
+            },
+            "matchingRules": {
+              "body": {
+                "$.items": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "eachValue",
+                      "rules": [
+                        {
+                          "match": "type"
+                        }
+                      ],
+                      "value": "[{\"amount\":1000}]"
+                    }
+                  ]
+                },
+                "$.items[*]": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "type"
+                    }
+                  ]
+                },
+                "$.items[*].amount": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "integer"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "pactSpecification": {
+          "version": "4.0"
+        }
+      }
+    },
+    "index": 0
+  },
+  "values": {
+    "$.request.method": "GET",
+    "$.request.path": "/items",
+    "$.request.query": {},
+    "$.response.status": 200,
+    "$.response.headers.content-type": "application/json",
+    "$.response.body": {
+      "items": [
+        {
+          "amount": 500
+        },
+        {
+          "amount": 100
+        }
+      ]
+    }
+  },
+  "result": {
+    "status": "matched"
+  }
+}

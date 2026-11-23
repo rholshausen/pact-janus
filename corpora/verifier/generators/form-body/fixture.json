@@ -1,5 +1,5 @@
 {
-  "description": "Generators in a form body: the state-change call answers {\"customer\": 1234}, which reaches a ProviderState generator, and a random integer replaces the recorded quantity. The provider recognises both, so a verifier that sent the recorded body instead gets a 404. Today's verifier does, and Janus does not: a deliberate difference in the ledger (ADR 0038 decision 5)",
+  "description": "Generators in a form body: the state-change call answers {\"customer\": 1234}, which reaches a ProviderState generator, and a random integer replaces the recorded quantity. The provider recognises both, so a verifier that sent the recorded body instead gets a 404. pact_verifier_cli 1.3.5 did, which was a difference in the ledger (ADR 0038 decision 5); 1.5.0 applies a form body's generators (pact-reference#588), so both verifiers pass",
   "source": "staged plan S1.21's exit; pact_models' FormUrlEncodedHandler, and pact-jvm's FormUrlEncodedContentTypeHandler; ADR 0038",
   "pacts": [
     "pact.json"

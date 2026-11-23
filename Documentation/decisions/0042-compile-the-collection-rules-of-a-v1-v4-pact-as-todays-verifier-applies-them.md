@@ -1,6 +1,7 @@
 # 0042 — Compile the collection rules of a v1–v4 pact as today's verifier applies them
 
-- **Status**: accepted
+- **Status**: accepted; its reading of `EachValue` ("replaces the whole matching context with its own
+  rules") and that part of decision 2 superseded by [ADR 0107](0107-apply-the-rules-below-an-eachvalue-matcher-as-the-verifier-pinned-at-1-5-0-does.md), after pact-reference#586
 - **Date**: 2026-10-23
 - **Plan tasks**: S1.24 (the build); S1.25 (`janus upgrade`, which this leaves as it was)
 - **Evidence**: pact-reference's `pact_matching` at the version `pact_verifier_cli` 1.3.5 uses

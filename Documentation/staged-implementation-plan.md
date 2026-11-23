@@ -1068,6 +1068,10 @@ item in 1a is done when S1.1 agrees.
   differently and no fixture shows one; `janus upgrade` still converts them approximately (S1.25);
   and a mismatch inside an entry template is reported at a relative path (`~>.value.id`), as one in
   any rule-driven array already is, for the CLI output review.
+  Since 2026-11-23, with S1.1's pin at `pact_verifier_cli` 1.5.0, `eachValue` also applies the rules
+  below its values, merging its own into theirs, as that release does after pact-reference#586
+  ([ADR 0107](decisions/0107-apply-the-rules-below-an-eachvalue-matcher-as-the-verifier-pinned-at-1-5-0-does.md),
+  rholshausen/pact-janus#16); `legacy/v4-each-value-nested-map` and `-list` are its corpus cases.
 - **S1.25 `janus upgrade` converts text, binary, form, XML and multipart bodies** — **S**. Split from
   S1.6, which made text and binary bodies verify; S1.21 added form bodies, S1.22 XML ones and S1.23
   multipart ones, which upgrade the same way. `janus upgrade` still carries a body that is not JSON
