@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795396353399,
+  "lastUpdate": 1795396355413,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -65982,6 +65982,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 118.5,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "608d4d7f026fa230b3e047dcbabbf671acbe0aba",
+          "message": "fix: an eachValue rule applies the rules below its values, as pact_verifier_cli 1.5.0 does (ADR 0107)\n\nS1.1's harness pins pact_verifier_cli 1.5.0, the first release with the fix for\npact-foundation/pact-reference#586. The each-value-nested tripwire disagreed on six interactions,\nand generators/form-body's two ledger entries went stale, since 1.5.0 applies a form body's\ngenerators (pact-reference#588).\n\n- The legacy compiler's each_value_category builds an eachValue rule's context as pact_matching\n  2.2.0's each_value_context does (1f1c2e61, 2e47687e, 17aa4910): every rule below the\n  collection, with the eachValue rules merged into the values' group, none twice, or replacing a\n  group whose logic is OR. A rule for one key below the values gets its own branch.\n- janus upgrade converts with the same rules. each-entry has one shape for every value, so a rule\n  for one key's value is converted from the pact's first member: a rule for its key holds every\n  value (rule-narrowed), a rule for another key is dropped (rule-unmapped).\n- ADR 0107 supersedes ADR 0042's reading of EachValue; the contract-file spec, S1.24's note and\n  the verifier README say so. corpora/legacy/v4-each-value-nested-map and -list, with mismatches,\n  pin the plans; the fixture runs its mutations, and all 155 verdicts agree, pact and upgraded.\n- CI sets PACT_PROVIDER_STATE_CHANGE_RETRIES=2 for today's verifier in the verifier-diff and\n  latest-broker jobs, three tries as janus verify's state hook makes (ADR 0044): the harness\n  takes 33 s instead of 136 s locally, with the same verdicts.\n\nCloses #16\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T12:06:04+11:00",
+          "tree_id": "4586bfa5a1965de5aa398d78d1ee466d394cb6b3",
+          "url": "https://github.com/rholshausen/pact-janus/commit/608d4d7f026fa230b3e047dcbabbf671acbe0aba"
+        },
+        "date": 1795396354938,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 70997,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 57058,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 61.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 49.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 168.5,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 130.9,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
