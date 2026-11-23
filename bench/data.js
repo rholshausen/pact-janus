@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795410194358,
+  "lastUpdate": 1795410196711,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -66516,6 +66516,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 130.9,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "2c67c480c505d060cd6d64a11ce33b771fabe5c5",
+          "message": "feat: S5.2b, the subprocess loader: a component the engine spawns, whose process is the unit of recreation (ADR 0108)\n\n- engine/component-host's SubprocessLoader, registered by janus and janus-engine, so engine/hello\n  lists subprocess. A source is reference (the program, a bare name found on the engine's PATH),\n  args (through no shell) and cwd, which the configuration loader defaults to the configuration\n  file's directory (finding 20). A digest, auth or signature on one is refused.\n- Out of process the unit of recreation is the process (finding 18, spec §3.4): a deadline kills\n  it (component-timeout), an exit fails its calls at once (component-exited), and the error names\n  the transport instances that went with it; a later call on one fails at once with lost: true.\n  A process that comes back as another version is component-malformed, and a frame no call can\n  own fails the only waiting call at once. Empty environment plus the env grant (and SystemRoot).\n- The kernel's wire::TransportClient binds the transport interface over a pipe, with the kind's\n  declarations read from the handshake; a poll's own wait is added to its deadline. The exchange\n  loop logs why an instance stopped serving.\n- third-party/janus-csv-js: the CSV component again, in dependency-free JavaScript, passing\n  janus-csv's own 12 conformance cases through the subprocess binding and verifying the CSV\n  contract with janus verify --config.\n- janus component check --config <file> <name> runs a declared component's cases through the\n  binding a run loads it with.\n- tests/subprocess.rs holds spike 8.3's containment tests against a misbehaving Node fixture;\n  cli/tests/janus_engine.rs kills janus-engine and sees its component exit. CI sets up Node on\n  all three systems; the tests skip without it unless CI is set.\n\nThe loader is rewritten from spike 8.3's (src/lib.rs at b8d5010, this repository).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T15:54:33+11:00",
+          "tree_id": "69f252d3e7ff80a5f2007613d3606aa8a7355590",
+          "url": "https://github.com/rholshausen/pact-janus/commit/2c67c480c505d060cd6d64a11ce33b771fabe5c5"
+        },
+        "date": 1795410196107,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 20414,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 16714,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 45.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 30.2,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 104,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 71.9,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
