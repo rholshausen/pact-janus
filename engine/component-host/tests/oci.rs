@@ -51,6 +51,8 @@ fn declaration(reference: &str, digest: Option<&str>) -> ComponentDeclaration {
     source: Source {
       kind: "oci".to_string(),
       reference: Some(reference.to_string()),
+      args: Vec::new(),
+      cwd: None,
       digest: digest.map(str::to_string),
       auth: None,
       signature: None,

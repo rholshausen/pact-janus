@@ -21,7 +21,7 @@ run. Every ```` ```json ```` block is one frame, validated against the v1 schema
 ```json
 { "type": "response", "id": "r-1",
   "ok": { "protocol-version": 1, "engine": { "name": "janus-engine", "version": "0.1.0" },
-          "capabilities": { "broker": {}, "background": {}, "components": { "loaders": ["in-tree", "wasm"] } } } }
+          "capabilities": { "broker": {}, "background": {}, "components": { "loaders": ["in-tree", "wasm", "subprocess"] } } } }
 ```
 
 `→` start the run. The source is the broker: which provider, which consumer versions (the

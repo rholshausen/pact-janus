@@ -48,6 +48,8 @@ fn load(name: &str, path: &str) -> Arc<dyn ContentComponent> {
     source: Source {
       kind: "file".to_string(),
       reference: Some(path.to_string()),
+      args: Vec::new(),
+      cwd: None,
       digest: None,
       auth: None,
       signature: None,

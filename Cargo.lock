@@ -2454,6 +2454,7 @@ dependencies = [
  "regex",
  "ring",
  "rstest",
+ "rustix",
  "serde_json",
  "sha2 0.11.1",
  "sigstore-verify",

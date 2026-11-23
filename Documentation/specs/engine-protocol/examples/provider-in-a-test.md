@@ -19,7 +19,7 @@ engine, `←` is engine to host.
 { "type": "response", "id": "r-1",
   "ok": { "protocol-version": 1, "engine": { "name": "janus-engine", "version": "0.4.1" },
           "capabilities": { "config-loading": {}, "broker": {}, "background": {},
-                            "components": { "loaders": ["in-tree", "wasm"] } } } }
+                            "components": { "loaders": ["in-tree", "wasm", "subprocess"] } } } }
 ```
 
 `→` the test named `verifier.janus.yaml`; the SDK made its path absolute against its own working

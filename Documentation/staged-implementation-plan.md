@@ -3020,6 +3020,30 @@ The component model, opened to the ecosystem.
     *Exit:* a component written in another language loads in `janus-engine` and `janus` on Linux, macOS and
     Windows, passes its conformance cases through the `subprocess` binding, and passes spike 8.3's
     containment tests.
+    *Done 2026-11-23* ([ADR 0108](decisions/0108-a-subprocess-component-is-a-program-and-its-arguments-and-its-process-is-the-unit-of-recreation.md)):
+    - Finding 20: a `subprocess` source is `reference` (the program), `args` (passed through no shell) and
+      `cwd`, an `exec` hook's spelling. The configuration loader gives a source with no `cwd` the
+      configuration's directory, so `args: [components/csv.mjs]` means one file from anywhere; a bare
+      program name is the engine's `PATH`'s. A `digest`, `auth` or `signature` on one is refused.
+    - Finding 18: out of process the unit of recreation is the process (spec §3.4). A timeout kills it, an
+      exit is `component-exited` at once, and the error names the transport instances that went with it
+      (`details.instances`); a later call on one fails at once with `details.lost: true`. A process that
+      comes back as another version is `component-malformed`. A frame no call can own, while one call
+      waits, fails that call at once (spike 8.3 finding 3).
+    - `engine/component-host`'s `SubprocessLoader`, which `janus` and `janus-engine` register, so
+      `engine/hello` lists `subprocess`. Content and matcher calls go through `wire::PipeClient`, transport
+      calls through the new `wire::TransportClient`; a `poll-inbound`'s own wait is added to its deadline.
+      The exchange loop now logs why an instance stopped serving.
+    - `third-party/janus-csv-js` is the CSV component written again in dependency-free JavaScript. It
+      passes `third-party/janus-csv/conformance/`, the Rust component's own 12 cases, through the
+      subprocess binding, and `janus verify --config` verifies the CSV contract with it.
+      `janus component check --config <file> <name>` runs a declared component's cases through the binding
+      a run loads it with.
+    - `engine/component-host/tests/subprocess.rs` holds spike 8.3's containment tests against
+      `tests/fixtures/subprocess/misbehaving.mjs`: a hang and a busy loop at their deadline, an exit at
+      once, a malformed frame, stray stdout, EOF on drop, the `env` grant, `cwd`, and one hung call taking
+      every instance with it and saying which. `cli/tests/janus_engine.rs` kills `janus-engine` and sees
+      its component exit. CI sets up Node on all three systems; the tests skip without it elsewhere.
   - **S5.2c The bridge and its handshake** — **M**. `plugin-bridge/` with its own lockfile, loading one
     plugin through `pact-plugin-driver` and answering `component/hello` with its catalogue translated
     (ADR 0106 decision 4), and `matcher/apply` of `compare-contents` with `CompareContents`. CI runs it
@@ -3103,9 +3127,11 @@ The component model, opened to the ecosystem.
     replaces `fragments.rs`. The grammar-version rules still govern every plan document the engine
     reads (`plan/versions.rs`).
 - **S5.5 Out-of-process components**, if the community wants them beyond the bridge — **S**. The loader
-  and findings 18 and 20 moved to S5.2b (ADR 0106). What is left is opening the `subprocess` binding to
-  third parties: transports out of process (spike 8.3's case), the author guide's section on it, and the
-  general-availability statement ADR 0104 left out.
+  and findings 18 and 20 moved to S5.2b (ADR 0106), which built them, transports included (ADR 0108).
+  What is left is opening the `subprocess` binding to third parties: the author guide's section on it
+  (how many instances to share a process, given ADR 0108 decision 4; the framing loop; the empty
+  environment), a worked out-of-process transport, and the general-availability statement ADR 0104 left
+  out.
 - **S5.6 A multipart part reaches the registry's components** — **M**. The built-in multipart component
   decodes and encodes each part's body through the built-in JSON, XML, text and form components it holds
   itself, and any other part is bytes (ADR 0040 decision 3). Stage 1a needs nothing more, because today's
@@ -3456,7 +3482,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user (done: ADR 0101) | findings 12–14 |
 | S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099); generally available, with a guide (done: S5.1d, ADR 0104) | findings 15–17 |
 | S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 | S1.8 |
-| S5.5 | Out-of-process containment and command form (moved to S5.2b by ADR 0106) | findings 18, 20 |
+| S5.5 | Out-of-process containment and command form (moved to S5.2b by ADR 0106; done: ADR 0108); the subprocess binding has no author guide and is not generally available | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components (done: ADR 0103) | ADR 0040 decision 3 |
 | S5.8 | A component's substitutions do not reach content embedded in a slot | ADR 0103 |
 | S5.9 | A declared component's generators and variant dimensions are refused at load: nothing calls them | ADR 0104 |

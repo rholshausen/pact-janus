@@ -174,7 +174,13 @@ pub(crate) fn run(
         Some(inbound) => inbound,
         None => continue, // the poll simply timed out with nothing waiting
       },
-      Err(_) => break, // the instance is gone (stopped) or the transport itself failed
+      // The instance is gone: stopped, or lost with the process that held it (ADR 0108 decision 4).
+      Err(error) => {
+        if !stop.load(Ordering::Relaxed) {
+          tracing::warn!(%instance, code = %error.code, details = ?error.details, "the transport instance stopped serving: {}", error.message);
+        }
+        break;
+      }
     };
     handle_arrival(
       transport.as_ref(),

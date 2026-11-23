@@ -182,6 +182,197 @@ impl<P: Pipe> MatcherComponent for PipeClient<P> {
   }
 }
 
+/// The transport interface over a [`Pipe`] (spec §5, `schemas/v1/transport.schema.json`): the five
+/// primitives and a disposition, written as their documents and read back, with what the kind declares
+/// read from the handshake's `contributes.transports` (spec §3.3). The subprocess binding's transport
+/// (ADR 0108 decision 7); the WASM binding has none (spec §13).
+///
+/// The kernel asks a transport for its declarations, not a kind, so a component contributing several
+/// kinds is answered with the first kind's `exchange-parts` and the union of the rest.
+pub struct TransportClient<P> {
+  pipe: P,
+  content_slots: super::ContentSlots,
+  exchange_parts: super::ExchangeParts,
+  credential_members: crate::redaction::CredentialMembers,
+  outcome_slots: super::OutcomeSlots,
+}
+
+impl<P: Pipe> TransportClient<P> {
+  /// A client for the transports `hello` contributes, or why it cannot be one: a transport the engine
+  /// serves or drives declares which part starts an exchange (spec §5.7).
+  pub fn new(pipe: P, hello: &Value) -> Result<Self, String> {
+    let kinds: Vec<&Value> = hello
+      .pointer("/contributes/transports")
+      .and_then(Value::as_array)
+      .map(|kinds| kinds.iter().collect())
+      .unwrap_or_default();
+    let Some(first) = kinds.first() else {
+      return Err("it implements 'transport' and contributes no transport kind".to_string());
+    };
+    let exchange_parts = match first.get("exchange-parts") {
+      Some(parts) => super::ExchangeParts {
+        initiating: parts
+          .get("initiating")
+          .and_then(Value::as_str)
+          .filter(|name| !name.is_empty())
+          .ok_or("its transport's 'exchange-parts' names no 'initiating' part")?
+          .to_string(),
+        answering: optional_string(parts, "answering"),
+      },
+      None => {
+        return Err(format!(
+          "its transport kind '{}' declares no 'exchange-parts' (component-interfaces spec §5.7)",
+          first.get("kind").and_then(Value::as_str).unwrap_or("?")
+        ));
+      }
+    };
+    let mut content_slots = super::ContentSlots::new();
+    let mut outcome_slots = super::OutcomeSlots::new();
+    let mut credential_members = crate::redaction::CredentialMembers::new();
+    for kind in &kinds {
+      union_slots(&mut content_slots, kind.get("content-slots"));
+      union_slots(&mut outcome_slots, kind.get("outcome-slots"));
+      for (part, slots) in kind
+        .get("credential-members")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+      {
+        let part = credential_members.entry(part.clone()).or_default();
+        union_slots(part, Some(slots));
+      }
+    }
+    Ok(TransportClient {
+      pipe,
+      content_slots,
+      exchange_parts,
+      credential_members,
+      outcome_slots,
+    })
+  }
+
+  pub fn pipe(&self) -> &P {
+    &self.pipe
+  }
+}
+
+/// `name -> [names]`, merged into `into` without repeating a name.
+fn union_slots(into: &mut std::collections::BTreeMap<String, Vec<String>>, from: Option<&Value>) {
+  for (part, names) in from.and_then(Value::as_object).into_iter().flatten() {
+    let entry = into.entry(part.clone()).or_default();
+    for name in names.as_array().into_iter().flatten().filter_map(Value::as_str) {
+      if !entry.iter().any(|known| known == name) {
+        entry.push(name.to_string());
+      }
+    }
+  }
+}
+
+fn parts_of(value: Option<&Value>, what: &str) -> Result<super::Parts, ComponentError> {
+  serde_json::from_value(value.cloned().unwrap_or(Value::Null)).map_err(|err| {
+    ComponentError::synthesised(
+      "component-malformed",
+      format!("the component answered with {what} that are not parts: {err}"),
+    )
+  })
+}
+
+fn parts_json(parts: &super::Parts) -> Result<Value, ComponentError> {
+  serde_json::to_value(parts).map_err(|err| ComponentError::internal(err.to_string()))
+}
+
+impl<P: Pipe> super::TransportComponent for TransportClient<P> {
+  fn content_slots(&self) -> super::ContentSlots {
+    self.content_slots.clone()
+  }
+
+  fn exchange_parts(&self) -> super::ExchangeParts {
+    self.exchange_parts.clone()
+  }
+
+  fn credential_members(&self) -> crate::redaction::CredentialMembers {
+    self.credential_members.clone()
+  }
+
+  fn outcome_slots(&self) -> super::OutcomeSlots {
+    self.outcome_slots.clone()
+  }
+
+  fn start(&self, req: super::Start) -> Result<super::StartResult, ComponentError> {
+    let mut body = json!({ "instance": req.instance, "kind": req.kind, "role": req.role });
+    if let Some(options) = req.options {
+      body["options"] = options;
+    }
+    let result = self.pipe.call("transport/start", body)?;
+    let endpoint = result
+      .get("endpoint")
+      .cloned()
+      .ok_or_else(|| ComponentError::synthesised("component-malformed", "start returned no endpoint"))?;
+    Ok(super::StartResult { endpoint })
+  }
+
+  fn stop(&self, req: super::Stop) -> Result<super::StopResult, ComponentError> {
+    self
+      .pipe
+      .call("transport/stop", json!({ "instance": req.instance }))?;
+    Ok(super::StopResult {})
+  }
+
+  fn send(&self, req: super::Send) -> Result<super::SendResult, ComponentError> {
+    let mut body =
+      json!({ "instance": req.instance, "parts": parts_json(&req.parts)?, "await-reply": req.await_reply });
+    if let Some(timeout) = req.timeout_ms {
+      body["timeout-ms"] = json!(timeout);
+    }
+    let result = self.pipe.call("transport/send", body)?;
+    let reply = match result.get("reply") {
+      None | Some(Value::Null) => None,
+      Some(reply) => Some(parts_of(Some(reply), "a reply's parts")?),
+    };
+    Ok(super::SendResult { reply })
+  }
+
+  fn poll_inbound(&self, req: super::PollInbound) -> Result<super::PollInboundResult, ComponentError> {
+    let result = self.pipe.call(
+      "transport/poll-inbound",
+      json!({ "instance": req.instance, "timeout-ms": req.timeout_ms }),
+    )?;
+    let inbound = match result.get("inbound") {
+      None | Some(Value::Null) => None,
+      Some(inbound) => Some(super::Inbound {
+        event: inbound
+          .get("event")
+          .and_then(Value::as_str)
+          .ok_or_else(|| ComponentError::synthesised("component-malformed", "an inbound with no event"))?
+          .to_string(),
+        parts: parts_of(inbound.get("parts"), "an inbound's parts")?,
+        expects_reply: inbound
+          .get("expects-reply")
+          .and_then(Value::as_bool)
+          .unwrap_or(false),
+      }),
+    };
+    Ok(super::PollInboundResult { inbound })
+  }
+
+  fn reply(&self, req: super::Reply) -> Result<super::ReplyResult, ComponentError> {
+    self.pipe.call(
+      "transport/reply",
+      json!({ "instance": req.instance, "event": req.event, "parts": parts_json(&req.parts)? }),
+    )?;
+    Ok(super::ReplyResult {})
+  }
+
+  fn dispose(&self, req: super::Dispose) -> Result<super::DisposeResult, ComponentError> {
+    let mut body = json!({ "instance": req.instance, "event": req.event, "disposition": req.disposition });
+    if let Some(details) = req.details {
+      body["details"] = details;
+    }
+    self.pipe.call("transport/dispose", body)?;
+    Ok(super::DisposeResult {})
+  }
+}
+
 // --- the engine's end: requests written, results read ---
 
 fn decode_json(req: Decode) -> Result<Value, ComponentError> {

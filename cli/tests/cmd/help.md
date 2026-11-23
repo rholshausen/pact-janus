@@ -417,7 +417,7 @@ Usage: janus component [OPTIONS] <COMMAND>
 Commands:
   push   Publish a WASM component as an OCI artifact, described by the component's own handshake
   pull   Fetch a component into the cache, check every byte, and print how to declare it, pinned
-  check  Run conformance cases against a WASM component, through the binding a run loads it with
+  check  Run conformance cases against a component, through the binding a run loads it with
   help   Print this message or the help of the given subcommand(s)
 
 Options:
@@ -500,15 +500,17 @@ Global options:
 
 ```console
 $ janus component check --help
-Run conformance cases against a WASM component, through the binding a run loads it with
+Run conformance cases against a component, through the binding a run loads it with
 
-Usage: janus component check [OPTIONS] <COMPONENT_WASM> <CASES>...
+Usage: janus component check [OPTIONS] <COMPONENT> <CASES>...
 
 Arguments:
-  <COMPONENT_WASM>  The component to check
-  <CASES>...        Case files, or directories holding them (every .json file beneath)
+  <COMPONENT>  The component to check: a .wasm file, or with --config, the name of a declared
+               component
+  <CASES>...   Case files, or directories holding them (every .json file beneath)
 
 Options:
+      --config <FILE>    A verifier configuration whose components list declares COMPONENT
       --output <FORMAT>  text prints each case and what it found; json prints one document [default:
                          text] [possible values: text, json]
   -h, --help             Print help
@@ -520,8 +522,9 @@ Global options:
       --error-chain        Print every cause of an error, not only what failed and its root cause
 
 Each case is a conformance case (the component interfaces' conformance-case.schema.json): calls on
-the component, with what each must answer. The component is loaded with no grants, as a declaration
-that names none loads it.
+the component, with what each must answer. A .wasm file is loaded with no grants, as a declaration
+that names none loads it. With --config, COMPONENT names a component the configuration declares, of
+any source (a file, an OCI reference, a subprocess), loaded as a run loads it.
 
 ```
 

@@ -234,3 +234,104 @@ fn config_load_resolves_a_file_with_the_engines_environment() {
   let _ = child.wait();
   let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// `node` on `PATH`, or `None` where there is none and `CI` is not set (ADR 0108).
+fn node() -> Option<std::path::PathBuf> {
+  let names: &[&str] = if cfg!(windows) {
+    &["node.exe", "node.cmd"]
+  } else {
+    &["node"]
+  };
+  let found = std::env::var_os("PATH").and_then(|paths| {
+    std::env::split_paths(&paths).find_map(|dir| {
+      names
+        .iter()
+        .map(|name| dir.join(name))
+        .find(|candidate| candidate.is_file())
+    })
+  });
+  if found.is_none() {
+    assert!(
+      std::env::var_os("CI").is_none(),
+      "CI is set and node is not on PATH"
+    );
+    eprintln!("node is not on PATH: skipping a test of the subprocess binding");
+  }
+  found
+}
+
+fn alive(pid: u32) -> bool {
+  if cfg!(windows) {
+    let output = Command::new("tasklist")
+      .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+      .output()
+      .expect("tasklist runs");
+    String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
+  } else {
+    Command::new("kill")
+      .args(["-0", &pid.to_string()])
+      .stderr(Stdio::null())
+      .status()
+      .expect("kill runs")
+      .success()
+  }
+}
+
+/// Spec §9.3's orphan prevention, through the embedding every SDK runs (S5.2b, ADR 0108): `janus-engine`
+/// lists the subprocess loader, loads a component written in JavaScript, and when the engine is killed —
+/// no shutdown, no EOF of its own — the component sees its stdin close and exits.
+#[test]
+fn a_subprocess_component_exits_when_the_engine_that_started_it_is_killed() {
+  let Some(node) = node() else { return };
+  let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+    .join("../engine/component-host/tests/fixtures/subprocess");
+  let pid_file = std::env::temp_dir().join(format!("janus-orphan-{}.pid", std::process::id()));
+  let _ = std::fs::remove_file(&pid_file);
+
+  let mut child = Command::new(env!("CARGO_BIN_EXE_janus-engine"))
+    .env("RUST_LOG", "warn")
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::null())
+    .spawn()
+    .expect("janus-engine starts");
+  let mut stdin = child.stdin.take().expect("stdin");
+  let mut stdout = BufReader::new(child.stdout.take().expect("stdout"));
+
+  let hello =
+    json!({ "type": "request", "id": "r-1", "op": "engine/hello", "body": { "protocol-versions": [1] } });
+  stdin.write_all(&frame(&hello)).expect("write hello");
+  let hello = read_frame(&mut stdout);
+  assert_eq!(
+    hello["ok"]["capabilities"]["components"]["loaders"],
+    json!(["in-tree", "wasm", "subprocess"]),
+    "{hello}"
+  );
+
+  let create = json!({ "type": "request", "id": "r-2", "op": "consumer-session/create", "body": { "config": {
+    "consumer": { "name": "c" }, "provider": { "name": "p" },
+    "components": [ { "name": "misbehaving", "source": { "kind": "subprocess", "reference": node,
+      "args": ["misbehaving.mjs", "--pid-file", pid_file], "cwd": fixtures } } ] } } });
+  stdin.write_all(&frame(&create)).expect("write create");
+  let created = read_frame(&mut stdout);
+  assert!(created.get("ok").is_some(), "{created}");
+  let pid: u32 = std::fs::read_to_string(&pid_file)
+    .expect("the component wrote its pid")
+    .trim()
+    .parse()
+    .expect("a pid");
+  assert!(alive(pid), "the component is running");
+
+  child.kill().expect("the engine is killed");
+  let _ = child.wait();
+  let deadline = Instant::now() + Duration::from_secs(10);
+  while alive(pid) {
+    assert!(
+      Instant::now() < deadline,
+      "the component outlived the engine that started it"
+    );
+    std::thread::sleep(Duration::from_millis(20));
+  }
+  let _ = std::fs::remove_file(&pid_file);
+  drop(stdin);
+}

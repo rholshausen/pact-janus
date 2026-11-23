@@ -38,8 +38,17 @@ pub struct ComponentDeclaration {
 pub struct Source {
   /// Open vocabulary: `oci`, `file`, `subprocess` (spec §10.2).
   pub kind: String,
+  /// For `oci`, the artifact reference; for `file`, a path; for `subprocess`, the program (ADR 0108):
+  /// a bare name found on the engine's `PATH`, or a path, resolved against `cwd`.
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub reference: Option<String>,
+  /// A `subprocess` source's arguments, passed as written, through no shell (ADR 0108 decision 1).
+  #[serde(default, skip_serializing_if = "Vec::is_empty")]
+  pub args: Vec<String>,
+  /// The directory a `subprocess` source starts in: the configuration file's, as the host's loader
+  /// resolved it (ADR 0108 decision 2), or the engine's own when absent.
+  #[serde(default, skip_serializing_if = "Option::is_none")]
+  pub cwd: Option<String>,
   #[serde(default, skip_serializing_if = "Option::is_none")]
   pub digest: Option<String>,
   /// The credential for an `oci` source's registry (spec §10.3, ADR 0052), as the loader

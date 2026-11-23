@@ -38,7 +38,16 @@
         },
         "reference": {
           "type": "string",
-          "description": "For 'oci', the artifact reference; for 'file', a path; for 'subprocess', the command the engine spawns."
+          "description": "For 'oci', the artifact reference; for 'file', a path; for 'subprocess', the program the engine spawns: a name with no path separator is found on the engine's PATH, and anything else is a path, resolved against 'cwd' (spec.md §9.3, ADR 0108)."
+        },
+        "args": {
+          "type": "array",
+          "description": "For 'subprocess', the program's arguments, passed as written, through no shell (ADR 0108). A relative path among them is relative to 'cwd'.",
+          "items": { "type": "string" }
+        },
+        "cwd": {
+          "type": "string",
+          "description": "For 'subprocess', the directory the program starts in. A relative one is resolved against the configuration file's directory, which is the default, by the host's loader (lifecycle-hooks spec §7.1), so a run does not depend on where it was started (ADR 0108)."
         },
         "digest": {
           "type": "string",

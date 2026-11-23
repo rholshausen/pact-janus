@@ -58,6 +58,8 @@ pub fn native_engine() -> Engine {
     Ok(loader) => engine.register_component_loader(Arc::new(loader)),
     Err(err) => tracing::warn!(error = %err, "the WASM component loader is unavailable"),
   }
+  // Spec §9.3, ADR 0108: a component the engine spawns, the binding the plugin bridge is reached by.
+  engine.register_component_loader(Arc::new(pact_janus_component_host::SubprocessLoader::new()));
   engine.register_hook_invoker("exec", Arc::new(ExecHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_invoker("http", Arc::new(HttpHooks::new()) as Arc<dyn HookInvoker>);
   engine.register_hook_component("oauth2", Arc::new(pact_janus_component_oauth2::Oauth2Hook::new()));

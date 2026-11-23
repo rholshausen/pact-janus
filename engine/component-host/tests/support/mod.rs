@@ -45,3 +45,65 @@ fn third_party_wasm(dir: &str, file: &str) -> PathBuf {
   let wasm = crate_dir.join("target/wasm32-wasip2/release").join(file);
   wasm.canonicalize().expect("the component was built")
 }
+
+/// `node` on this machine's `PATH`, for the subprocess binding's tests (ADR 0108): `None` where there is
+/// none, so a contributor without Node skips them, unless `CI` is set, where every runner has Node and a
+/// missing one is a broken runner.
+pub fn node() -> Option<PathBuf> {
+  let names: &[&str] = if cfg!(windows) {
+    &["node.exe", "node.cmd"]
+  } else {
+    &["node"]
+  };
+  let found = std::env::var_os("PATH").and_then(|paths| {
+    std::env::split_paths(&paths).find_map(|dir| {
+      names
+        .iter()
+        .map(|name| dir.join(name))
+        .find(|candidate| candidate.is_file())
+    })
+  });
+  if found.is_none() {
+    assert!(
+      std::env::var_os("CI").is_none(),
+      "CI is set and node is not on PATH: the subprocess binding's tests need it"
+    );
+    eprintln!("node is not on PATH: skipping a test of the subprocess binding");
+  }
+  found
+}
+
+/// A file in this repository, by its path from the root.
+pub fn repo(path: &str) -> PathBuf {
+  PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").join(path)
+}
+
+/// Whether a process with this id is still running.
+pub fn alive(pid: u32) -> bool {
+  if cfg!(windows) {
+    let output = Command::new("tasklist")
+      .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+      .output()
+      .expect("tasklist runs");
+    String::from_utf8_lossy(&output.stdout).contains(&pid.to_string())
+  } else {
+    Command::new("kill")
+      .args(["-0", &pid.to_string()])
+      .stderr(std::process::Stdio::null())
+      .status()
+      .expect("kill runs")
+      .success()
+  }
+}
+
+/// Wait up to `within` for a process to be gone; whether it went.
+pub fn gone_within(pid: u32, within: std::time::Duration) -> bool {
+  let started = std::time::Instant::now();
+  while started.elapsed() < within {
+    if !alive(pid) {
+      return true;
+    }
+    std::thread::sleep(std::time::Duration::from_millis(20));
+  }
+  !alive(pid)
+}

@@ -1,7 +1,8 @@
 //! `janus component push|pull` (plan task 8.2, component-interfaces spec §10.3): publish a WASM
 //! component as an OCI artifact, and fetch one into the cache to find out what it is and what to pin.
 //! `janus component check` (staged plan S5.10, ADR 0105) runs a component's conformance cases (spec
-//! §9.4) against it.
+//! §9.4) against it: a `.wasm` file, or with `--config` any component a configuration declares, a
+//! subprocess one among them (ADR 0108).
 //!
 //! **The one command that does not go through the protocol**, and deliberately: publishing is not
 //! an engine operation, and a pull here is the WASM loader's own fetch-and-check, run by hand — the
@@ -24,9 +25,9 @@ use crate::Outcome;
 use crate::args::{CheckComponentArgs, ComponentCommand, Output, PullArgs, PushArgs};
 use crate::error::Error;
 use crate::style::{self, paint};
-use pact_janus_component_host::WasmLoader;
 use pact_janus_component_host::oci::Credentials;
 use pact_janus_component_host::signature::Trust;
+use pact_janus_component_host::{SubprocessLoader, WasmLoader};
 use pact_janus_kernel::component::conformance::{self, Binding, Case, Report};
 use pact_janus_kernel::component::{ComponentDeclaration, ComponentError, ComponentLoader, Signer};
 use serde_json::{Value, json};
@@ -272,15 +273,32 @@ fn check(loader: &WasmLoader, args: &CheckComponentArgs) -> Result<Outcome, Erro
     })
     .collect::<Result<Vec<_>, String>>()?;
 
-  let component = std::fs::canonicalize(&args.component)
-    .map_err(|err| format!("{}: {}", args.component.display(), crate::io::io_error(&err)))?;
-  let declaration: ComponentDeclaration = serde_json::from_value(json!({
-    "name": "checked",
-    "source": { "kind": "file", "reference": component.display().to_string() },
-  }))
-  .map_err(|err| err.to_string())?;
+  let declaration = match &args.config {
+    Some(config) => declared(config, &args.component.display().to_string())?,
+    None => {
+      let component = std::fs::canonicalize(&args.component)
+        .map_err(|err| format!("{}: {}", args.component.display(), crate::io::io_error(&err)))?;
+      serde_json::from_value(json!({
+        "name": "checked",
+        "source": { "kind": "file", "reference": component.display().to_string() },
+      }))
+      .map_err(|err| err.to_string())?
+    }
+  };
+  // ADR 0108 decision 9: the loader a run would load it with, so its cases run through that binding.
+  let subprocess = SubprocessLoader::new();
+  let loaders: [&dyn ComponentLoader; 2] = [loader, &subprocess];
+  let Some(loader) = loaders
+    .into_iter()
+    .find(|loader| loader.sources().contains(&declaration.source.kind.as_str()))
+  else {
+    return Err(Error::Failed(format!(
+      "component '{}' has a '{}' source, which no loader here loads",
+      declaration.name, declaration.source.kind
+    )));
+  };
   // A component that does not load is the subject failing: not a component, imports beyond the grants
-  // a declaration with none gives, a handshake that traps.
+  // a declaration with none gives, a handshake that traps, a program that is not there.
   let loaded = loader
     .load(&declaration)
     .map_err(|err| Error::Refused(format!("{}: {}", err.code, err.message)))?;
@@ -289,7 +307,7 @@ fn check(loader: &WasmLoader, args: &CheckComponentArgs) -> Result<Outcome, Erro
     .unwrap_or("?")
     .to_string();
   let binding = Binding {
-    name: "wasm".to_string(),
+    name: loader.name().to_string(),
     content: loaded.content,
     matcher: loaded.matcher,
     hello: Some(loaded.hello.clone()),
@@ -365,6 +383,34 @@ fn check(loader: &WasmLoader, args: &CheckComponentArgs) -> Result<Outcome, Erro
   } else {
     Outcome::SubjectFailed
   })
+}
+
+/// The declaration of `name` in the configuration at `config`, read as `janus verify --config` reads it.
+fn declared(config: &Path, name: &str) -> Result<ComponentDeclaration, Error> {
+  let components = crate::io::config_components(config)?;
+  let entry = components
+    .as_array()
+    .into_iter()
+    .flatten()
+    .find(|entry| entry.get("name").and_then(Value::as_str) == Some(name))
+    .ok_or_else(|| {
+      let names: Vec<&str> = components
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.get("name").and_then(Value::as_str))
+        .collect();
+      Error::Failed(format!(
+        "{} declares no component named '{name}'{}",
+        config.display(),
+        if names.is_empty() {
+          String::new()
+        } else {
+          format!(" (it declares {})", names.join(", "))
+        }
+      ))
+    })?;
+  serde_json::from_value(entry.clone()).map_err(|err| Error::Failed(format!("{}: {err}", config.display())))
 }
 
 /// A case file named, or every `.json` file beneath a directory named, in path order.

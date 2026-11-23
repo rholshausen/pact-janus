@@ -23,6 +23,8 @@ fn main() {
       source: Source {
         kind: "file".to_string(),
         reference: Some(path),
+        args: Vec::new(),
+        cwd: None,
         digest: None,
         auth: None,
         signature: None,

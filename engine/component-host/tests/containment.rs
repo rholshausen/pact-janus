@@ -58,6 +58,8 @@ fn declaration(network: bool, grants: Grants, deadline_ms: Option<u64>) -> Compo
     source: Source {
       kind: "file".to_string(),
       reference: Some(fixture(network)),
+      args: Vec::new(),
+      cwd: None,
       digest: None,
       auth: None,
       signature: None,

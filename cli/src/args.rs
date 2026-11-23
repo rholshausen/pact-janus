@@ -1074,7 +1074,7 @@ pub enum ComponentCommand {
   Push(PushArgs),
   /// Fetch a component into the cache, check every byte, and print how to declare it, pinned
   Pull(PullArgs),
-  /// Run conformance cases against a WASM component, through the binding a run loads it with
+  /// Run conformance cases against a component, through the binding a run loads it with
   Check(CheckComponentArgs),
 }
 
@@ -1083,17 +1083,22 @@ pub enum ComponentCommand {
   arg_required_else_help = true,
   after_help = "Each case is a conformance case (the component interfaces' \
                 conformance-case.schema.json): calls on the component, with what each must \
-                answer. The component is loaded with no grants, as a declaration that names none \
-                loads it."
+                answer. A .wasm file is loaded with no grants, as a declaration that names none \
+                loads it. With --config, COMPONENT names a component the configuration declares, \
+                of any source (a file, an OCI reference, a subprocess), loaded as a run loads it."
 )]
 pub struct CheckComponentArgs {
-  /// The component to check
-  #[arg(value_name = "COMPONENT_WASM")]
+  /// The component to check: a .wasm file, or with --config, the name of a declared component
+  #[arg(value_name = "COMPONENT")]
   pub component: PathBuf,
 
   /// Case files, or directories holding them (every .json file beneath)
   #[arg(value_name = "CASES", required = true)]
   pub cases: Vec<PathBuf>,
+
+  /// A verifier configuration whose components list declares COMPONENT
+  #[arg(long, value_name = "FILE")]
+  pub config: Option<PathBuf>,
 
   /// text prints each case and what it found; json prints one document
   #[arg(long, value_enum, value_name = "FORMAT", default_value_t = Output::Text)]

@@ -1,4 +1,5 @@
-//! The WASM component loader (component-interfaces spec §9.2, §10; plan task 8.1).
+//! The component loaders: WASM (component-interfaces spec §9.2, §10; plan task 8.1), here, and the
+//! subprocess binding's (spec §9.3, staged plan S5.2b, ADR 0108), in [`subprocess`].
 //!
 //! An out-of-tree component is a WASI 0.2 component exporting the frozen pipe world
 //! (`Documentation/specs/component-interfaces/wit/component.wit`): one JSON request frame in, one
@@ -23,6 +24,9 @@
 
 pub mod oci;
 pub mod signature;
+pub mod subprocess;
+
+pub use subprocess::SubprocessLoader;
 
 use pact_janus_kernel::component::{
   ComponentDeclaration, ComponentError, ComponentLoader, ContentComponent, Fetched, Grants, Loaded,

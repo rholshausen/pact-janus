@@ -66,7 +66,11 @@ pub fn load(path: impl AsRef<Path>) -> Result<Value, LoadError> {
     path: path.display().to_string(),
     cause: err.into(),
   })?;
-  let base = path.parent().unwrap_or(Path::new("."));
+  // A bare file name's parent is the empty path, which names no directory to start a process in.
+  let base = path
+    .parent()
+    .filter(|parent| !parent.as_os_str().is_empty())
+    .unwrap_or(Path::new("."));
   load_document(&text, base, &environment())
 }
 
@@ -144,6 +148,22 @@ fn resolve_components(components: &Value, base: &Path) -> Result<Value, LoadErro
     {
       let full = resolve_path(reference, base);
       entry["source"]["reference"] = Value::String(full.display().to_string());
+    }
+    // ADR 0108 decision 2: a subprocess starts in the configuration's directory unless it says
+    // otherwise, so a path among its arguments means the same from wherever a run starts, and a
+    // program named by a path is found from there too. A bare program name is the engine's PATH's.
+    if entry.pointer("/source/kind").and_then(Value::as_str) == Some("subprocess") {
+      let cwd = match entry.pointer("/source/cwd").and_then(Value::as_str) {
+        Some(cwd) => resolve_path(cwd, base),
+        None => base.to_path_buf(),
+      };
+      if let Some(reference) = entry.pointer("/source/reference").and_then(Value::as_str)
+        && Path::new(reference).components().count() > 1
+      {
+        let full = resolve_path(reference, &cwd);
+        entry["source"]["reference"] = Value::String(full.display().to_string());
+      }
+      entry["source"]["cwd"] = Value::String(cwd.display().to_string());
     }
     // ADR 0099: a signature's trusted root is a file the loader reads, so it is resolved alike.
     if let Some(root) = entry
@@ -527,6 +547,27 @@ hooks:
         { "name": "csv", "source": { "kind": "file", "reference": joined("/projects/orders", "components/csv.wasm"), "digest": "sha256:ab" },
           "grants": { "network": false }, "limits": { "deadline-ms": 500 } },
         { "name": "xml", "source": { "kind": "oci", "reference": "ghcr.io/acme/janus-xml:1" } } ])
+    );
+  }
+
+  /// ADR 0108 decision 2: a subprocess starts in the configuration's directory, or in its own `cwd`
+  /// resolved against it; a program named by a path is resolved against that, and a bare name, which is
+  /// the engine's PATH's, and the arguments pass as written.
+  #[test]
+  fn a_subprocess_starts_in_the_configuration_files_directory() {
+    let document = json!({
+      "components": [
+        { "name": "csv", "source": { "kind": "subprocess", "reference": "node", "args": ["components/csv.mjs"] } },
+        { "name": "tsv", "source": { "kind": "subprocess", "reference": "bin/tsv", "cwd": "tools" } } ]
+    });
+    let resolved = resolve(&document, Path::new("/projects/orders"), &env(&[])).expect("resolves");
+    assert_eq!(
+      resolved["components"],
+      json!([
+        { "name": "csv", "source": { "kind": "subprocess", "reference": "node", "args": ["components/csv.mjs"],
+                                     "cwd": Path::new("/projects/orders").display().to_string() } },
+        { "name": "tsv", "source": { "kind": "subprocess", "reference": joined(&joined("/projects/orders", "tools"), "bin/tsv"),
+                                     "cwd": joined("/projects/orders", "tools") } } ])
     );
   }
 

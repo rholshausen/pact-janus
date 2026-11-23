@@ -108,6 +108,12 @@ jobs:
       - name: Build prerequisites (Windows)
         if: runner.os == 'Windows'
         run: echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> "$GITHUB_ENV"
+      # S5.2b (ADR 0108): the subprocess binding is tested against components written in JavaScript
+      # (third-party/janus-csv-js, and the misbehaving fixture), on every operating system. The tests
+      # skip without Node on a contributor's machine, and fail without it here, where CI is set.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
       # Plan task 8.2: a real OCI registry for the component-distribution tests. They also run
       # against a registry in their own process, which can be told to lie; this one is the evidence
       # that a registry nobody here wrote agrees with the client. Linux only, because only Linux

@@ -1,6 +1,6 @@
 [package]
 name = "pact_janus_component_host"
-description = "The WASM component loader (component-interfaces spec §9.2, §10, plan task 8.1): out-of-tree components, instantiated under wasmtime with deny-by-default grants, per-call deadlines and loud poisoning. Native embeddings only — a WASM guest cannot host WASM components (ADR 0013), which is why this is not in the kernel."
+description = "The component loaders: WASM (component-interfaces spec §9.2, §10, plan task 8.1), out-of-tree components instantiated under wasmtime with deny-by-default grants, per-call deadlines and loud poisoning; and subprocess (spec §9.3, ADR 0108), a component the engine spawns. Native embeddings only — a WASM guest can host neither (ADR 0013), which is why this is not in the kernel."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -26,6 +26,11 @@ ring = "0.17"
 regex = "1"
 wasmtime = { version = "50", default-features = false, features = ["component-model", "cranelift", "runtime", "std", "parallel-compilation", "cache"] }
 wasmtime-wasi = { version = "50", default-features = false }
+
+# Ends a subprocess component's process group at its deadline (ADR 0108), as the hooks host ends an exec
+# hook's. Already in the tree, through wasmtime and the hooks host.
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["process"] }
 
 [dev-dependencies]
 pretty_assertions = "1"

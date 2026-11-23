@@ -336,8 +336,13 @@ Three sources are the source of truth and take precedence over this file when th
 > component's own cases through the WASM binding (`third-party/janus-csv/conformance/`).
 > S5.2 is split into eight (ADR 0106): today's pact-plugins are bridged by `janus-plugin-bridge`, a child
 > process in its own workspace (`plugin-bridge/`), built on `pact-plugin-driver`, so gRPC and protobuf stay
-> out of every Janus binary. It speaks the subprocess binding (S5.2b builds the loader), one process and
-> one component, `pact-plugin-<name>`, per plugin.
+> out of every Janus binary. It speaks the subprocess binding, one process and one component,
+> `pact-plugin-<name>`, per plugin. S5.2b (ADR 0108) built the subprocess loader, which `janus` and
+> `janus-engine` register: a `subprocess` source is a program, its `args` (no shell) and a `cwd`, the
+> configuration's directory unless it names one; out of process the unit of recreation is the process,
+> and a timeout or exit names the transport instances that went with it. `third-party/janus-csv-js`, the
+> CSV component again in JavaScript, passes the Rust one's conformance cases through it, and
+> `janus component check --config <file> <name>` runs a declared component's cases.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -347,7 +352,8 @@ engine/          Rust workspace members: kernel, built-in component crates, hook
                  the host side of hooks (loader, exec and http implementations), which lives
                  outside the kernel because it needs a filesystem, a process and a socket — and
                  component-host, the wasmtime loader for out-of-tree WASM components (task 8.1),
-                 outside the kernel because a WASM guest cannot host WASM (ADR 0013);
+                 and the subprocess loader for a component the engine spawns (S5.2b, ADR 0108),
+                 outside the kernel because a WASM guest can host neither (ADR 0013);
                  broker-client, the Pact Broker client the kernel's broker trait is implemented
                  by (ADR 0032, S1.3), outside the kernel because it speaks HTTP;
                  http-client, the one HTTP client the HTTP transport's drive role and the broker
@@ -402,7 +408,10 @@ third-party/     Components written as a third party would, from the published i
                  nothing in it: third-party/janus-csv, the text/csv content component task 8.1
                  built from the docs (Documentation/prototype/third-party-component-report.md),
                  with its conformance cases in conformance/ (ADR 0105), and third-party/janus-ndjson, the application/x-ndjson one S5.1d's author wrote
-                 from Documentation/component-author-guide.md alone (ADR 0104)
+                 from Documentation/component-author-guide.md alone (ADR 0104); and
+                 third-party/janus-csv-js, the CSV component again in JavaScript with no
+                 dependencies, reached through the subprocess binding and held to janus-csv's
+                 cases (S5.2b, ADR 0108)
 spikes/          The prototype's time-boxed experiments: each one's FINDINGS.md, at the path the
                  ADRs cite, and no code (S0.12 deleted it; `b8d5010` is the last commit with it)
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
@@ -636,6 +645,7 @@ janus component pull <reference> [--digest <sha256:...>] [--output text|json]
                      [--certificate-identity <id> | --certificate-identity-regexp <re>]
                      [--certificate-oidc-issuer <url>] [--trusted-root <file>]   # who signed it (S5.1c, ADR 0099)
 janus component check <component.wasm> <case-or-dir>... [--output text|json]   # its conformance cases (S5.10, ADR 0105)
+janus component check --config verifier.janus.yaml <name> <case-or-dir>...    # a declared one, a subprocess too (ADR 0108)
 janus completions <shell>
 janus version                      # every command also takes --log-level <level>, --no-colour, --error-chain
 ```
@@ -668,10 +678,12 @@ Out-of-tree components (plan task 8.1, design 2.6 §10) are **declared**, never 
 `components` list in the project configuration (`verifier.janus.yaml` for `janus verify --config`;
 the SDKs' `components` option on the consumer side), each entry naming its source — `file` is a
 local `.wasm` implementing `Documentation/specs/component-interfaces/wit/component.wit`, `oci` a
-registry reference (plan task 8.2, ADR 0021) with a `digest` to pin it, `subprocess` a command
-spawned over the protocol's stdio framing — specified (design 2.6 §9.3) but loaded by nothing:
-spike 8.3's loader proved the binding and was deleted with the rest of the spike code (S0.12), and a
-real one is S5.5. A declared component may contribute a transport,
+registry reference (plan task 8.2, ADR 0021) with a `digest` to pin it, `subprocess` a program
+spawned over the protocol's stdio framing (design 2.6 §9.3, S5.2b, ADR 0108): `reference` is the
+program, `args` its arguments, through no shell, and `cwd` where it starts, the configuration file's
+directory unless it says otherwise. The engine starts it with an empty environment plus its `env` grant,
+bounds every call with a deadline that ends in a kill, and starts it again for the next call; the tests
+that need Node skip without it unless `CI` is set. A declared component may contribute a transport,
 looked up by the `kind`s its handshake names. A declared content component may say what a value
 operator means for its content type (ADR 0100): its handshake's `content-types` entry has
 `substitutions` (`"integer": "csv:integer"`), and in a slot it decodes the engine compiles the shape
@@ -679,8 +691,8 @@ itself, pinning included, emitting the component's action, run through `matcher/
 operator's core one would be. The loader refuses a substitution it cannot honour as `component-invalid`.
 A component writes no plan: plan fragments (ADR 0022) are withdrawn, and `content/compile` only lets a
 component refuse a shape, as `compile-failed`. `janus`
-and `janus-engine` both register the WASM loader (`engine/component-host`), and `engine/hello` says
-so (`components.loaders`). A declared component that cannot be loaded, or an interaction requiring
+and `janus-engine` both register the WASM and subprocess loaders (`engine/component-host`), and
+`engine/hello` says so (`components.loaders`). A declared component that cannot be loaded, or an interaction requiring
 one nobody declared, fails before anything runs, as `component-unavailable` naming it. The worked
 third-party component is `third-party/janus-csv`: its own workspace, built with
 `cargo build --release --target wasm32-wasip2` from its directory, and built again by the tests

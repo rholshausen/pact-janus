@@ -2664,6 +2664,137 @@ fn component_check_reports_each_case_the_component_fails() {
 }
 
 // ---------------------------------------------------------------------------------------------
+// the subprocess binding (S5.2b, ADR 0108)
+// ---------------------------------------------------------------------------------------------
+
+/// `node` on `PATH`, or `None` where there is none and `CI` is not set: every CI runner has Node.
+fn node() -> Option<String> {
+  let names: &[&str] = if cfg!(windows) {
+    &["node.exe", "node.cmd"]
+  } else {
+    &["node"]
+  };
+  let found = std::env::var_os("PATH").and_then(|paths| {
+    std::env::split_paths(&paths).find_map(|dir| {
+      names
+        .iter()
+        .map(|name| dir.join(name))
+        .find(|candidate| candidate.is_file())
+    })
+  });
+  if found.is_none() {
+    assert!(
+      std::env::var_os("CI").is_none(),
+      "CI is set and node is not on PATH"
+    );
+    eprintln!("node is not on PATH: skipping a test of the subprocess binding");
+  }
+  found.map(|path| path.display().to_string())
+}
+
+/// The JavaScript CSV component declared as a project would: `node` by name, found on the engine's
+/// `PATH`, and its script by a path relative to the configuration file, which the process starts beside.
+fn csv_js_config(name: &str, hooks: &str) -> String {
+  let path = temp(name);
+  let script = pathdiff(&repo("third-party/janus-csv-js/csv.mjs"), &std::env::temp_dir());
+  std::fs::write(
+    &path,
+    format!("version: 1\ncomponents:\n  - name: csv\n    source: {{ kind: subprocess, reference: node, args: ['{script}'] }}\n{hooks}"),
+  )
+  .expect("writing the config");
+  path
+}
+
+/// S5.2b's exit, through `janus`: the CSV component written in JavaScript, loaded through the subprocess
+/// binding, verifies the CSV contract the Rust one does.
+#[test]
+fn verify_loads_a_subprocess_component_written_in_javascript_and_verifies_a_csv_contract() {
+  if node().is_none() {
+    return;
+  }
+  let provider = provider();
+  let port = provider.base_url().rsplit(':').next().unwrap_or("0").to_string();
+  let config = csv_js_config(
+    &format!("verifier-csv-js-{port}.yaml"),
+    &format!(
+      "hooks:\n  state-setup:\n    - name: fixtures\n      run:\n        kind: http\n        url: \"{}/_pact/provider-states\"\n        format: pact-state-change\n",
+      provider.base_url()
+    ),
+  );
+  let output = janus(&[
+    "verify",
+    &csv_contract(),
+    "--provider-url",
+    provider.base_url(),
+    "--config",
+    &config,
+  ]);
+  let text = stdout(&output);
+  assert_eq!(code(&output), 0, "stdout: {text}\nstderr: {}", stderr(&output));
+  assert!(text.contains("VERIFIED: 1 verified, 0 failed"), "{text}");
+}
+
+/// ADR 0108 decision 9: with `--config`, `component check` names a declared component, and runs the Rust
+/// CSV component's own cases against the JavaScript one through the subprocess binding.
+#[test]
+fn component_check_runs_a_declared_subprocess_components_cases_through_the_subprocess_binding() {
+  if node().is_none() {
+    return;
+  }
+  let config = csv_js_config("component-check-csv-js.yaml", "");
+  let output = janus(&[
+    "component",
+    "check",
+    "--config",
+    &config,
+    "csv",
+    &repo("third-party/janus-csv/conformance"),
+  ]);
+  assert_eq!(code(&output), 0, "{}\n{}", stdout(&output), stderr(&output));
+  assert_data_eq!(
+    stdout(&output),
+    str![[r#"
+csv 1.0.0 (content, matcher): 12 case(s) through the subprocess binding
+✓ csv/another-content-type
+✓ csv/column
+✓ csv/compile
+✓ csv/decode-failed
+✓ csv/decode-with-a-header-row
+✓ csv/decode-without-a-header-row
+✓ csv/detect
+✓ csv/encode-no-rows-from-the-shape
+✓ csv/encode
+✓ csv/handshake
+✓ csv/substituted-actions
+✓ csv/unknown-action
+12 passed, 0 failed
+
+"#]]
+  );
+}
+
+/// A name the configuration does not declare is the command failing to run, and it says what it does
+/// declare.
+#[test]
+fn component_check_names_what_a_configuration_declares_when_it_does_not_declare_the_component() {
+  let config = csv_js_config("component-check-undeclared.yaml", "");
+  let output = janus(&[
+    "component",
+    "check",
+    "--config",
+    &config,
+    "tsv",
+    &repo("third-party/janus-csv/conformance"),
+  ]);
+  assert_eq!(code(&output), 2, "{}", stderr(&output));
+  assert!(
+    stderr(&output).contains("declares no component named 'tsv' (it declares csv)"),
+    "{}",
+    stderr(&output)
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
 // OCI distribution (plan task 8.2)
 // ---------------------------------------------------------------------------------------------
 

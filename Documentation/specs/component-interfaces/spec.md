@@ -292,6 +292,10 @@ an identifier. All of these are normative engine behaviour, following spike 1.4 
 - **A trap poisons the instance, loudly.** After a trap, timeout or panic the engine MUST NOT reuse the
   instance; it recreates one (spike 1.4: 0.1 ms) and reports the failure as a value. Continuing on a
   half-dead instance is the failure mode this rule exists to make impossible.
+- **Out of process, the unit of recreation is the process** ([ADR 0108](../../decisions/0108-a-subprocess-component-is-a-program-and-its-arguments-and-its-process-is-the-unit-of-recreation.md)).
+  The only way to stop a call in another process is to stop the process, so a timeout or an exit ends
+  every instance the process held, and the engine says which (§9.3). An author decides how many instances
+  share a process, and so how much one hung call can take with it.
 - **`component/shutdown`** (body `{}`) is offered before an instance is dropped where the binding can
   deliver it. A component MUST NOT *require* it: an instance may vanish without notice, and anything
   that must be released — a listening socket, a broker subscription — is released by the interface
@@ -1157,12 +1161,28 @@ findings transfer to a component process unchanged:
 
 Normative rules:
 
-- The engine spawns the process from the declaration's `source` and MUST bound every call in time,
-  escalating to a kill when a deadline passes (§3.4).
-- The component MUST exit on stdin EOF, and MUST NOT write anything but frames to stdout.
+- The engine spawns the process from the declaration's `source`: `reference` is the program, `args` its
+  arguments, passed as written through no shell, and `cwd` the directory it starts in (§10.2, [ADR
+  0108](../../decisions/0108-a-subprocess-component-is-a-program-and-its-arguments-and-its-process-is-the-unit-of-recreation.md)).
+  A `reference` with no path separator is found on the engine's `PATH`; one with a separator is a path,
+  resolved against `cwd`. A `subprocess` source takes no `digest`, `auth` or `signature`: there are no
+  bytes to pin and no registry, and a member that is not checked is refused rather than ignored.
+- The engine MUST bound every call in time, escalating to a kill when a deadline passes (§3.4), as
+  `component-timeout`. A call that is meant to wait, `transport/poll-inbound` or `transport/send` with a
+  `timeout-ms`, has that wait added to its deadline. When the process's stdout closes, every call waiting
+  on it fails at once as `component-exited`, not at its deadline.
+- The component MUST exit on stdin EOF, and MUST NOT write anything but frames to stdout. An engine
+  SHOULD skip what is not a frame and stay in sync; a frame no call can be matched to, while exactly one
+  call waits, fails that call as `component-malformed`.
 - Correlation is by frame id, as everywhere else. **One process MAY host several instances** — every
-  operation carries its `instance` (§3.4) — so a component with expensive start-up is not obliged to
-  be one process per instance.
+  transport operation carries its `instance` (§3.4) — so a component with expensive start-up is not
+  obliged to be one process per instance. Out of process the unit of recreation is the process (§3.4):
+  the engine ends it on a timeout and starts a new one, handshaken before anything else, for the next
+  call. A transport instance lives in the process that answered its `transport/start`, until its
+  `transport/stop`. The error that ends a process names the instances it held as `details.instances`,
+  and a later call on one of them fails at once as `component-exited` with `details.lost: true`, rather
+  than reaching a process that never started it. A new process that introduces itself as another
+  component or version fails that call as `component-malformed`.
 
 Two things this binding does not have, stated plainly rather than implied:
 
@@ -1176,7 +1196,10 @@ Two things this binding does not have, stated plainly rather than implied:
   the program is resolved on the *engine's* `PATH`, since the component's own has none; and on Windows
   `SystemRoot` is always passed, or Winsock does not start.
 - **It is the escape hatch, not the second default.** It exists for the cases WASM cannot serve.
-  Task 8.3 proves the boundary exists; nothing else should reach for it.
+  Task 8.3 proved the boundary exists, and the pact-plugins bridge reaches for it
+  ([ADR 0106](../../decisions/0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md)),
+  because a plugin is a process already. `janus` and `janus-engine` load it (staged plan S5.2b); it is
+  opened to third-party authors with its own guide in staged plan S5.5.
 
 On interoperability with today's pact-plugins: what is retained is the *architecture* — an
 out-of-process component the engine drives — and not the wire, because the frames differ completely
@@ -1255,10 +1278,21 @@ Components are **declared**, never discovered. An engine that goes looking for s
 ```
 
 `source.kind` is an open vocabulary: `oci`, `file` (a local `.wasm`, for development and for task 8.1),
-`subprocess` (a command the engine spawns). A `file` reference is resolved against the configuration
-file's directory by the loader (design 2.7 §7.1), so the engine receives an absolute path; a `digest`
-on a `file` source is the SHA-256 of the file's bytes and is checked before instantiation exactly as
-an OCI manifest digest is (§10.3). Where this configuration file lives and how it merges with the rest
+`subprocess` (a program the engine spawns, with its `args` and `cwd`, §9.3):
+
+```json component-config
+{ "components": [
+    { "name": "csv",
+      "source": { "kind": "subprocess", "reference": "node", "args": ["components/csv.mjs"] },
+      "limits": { "deadline-ms": 10000 } } ] }
+```
+
+A `file` reference is resolved against the configuration file's directory by the loader (design 2.7
+§7.1), so the engine receives an absolute path. A `subprocess` source's `cwd` is resolved against it
+too, and is that directory when the source names none, so a path among its `args` means the same from
+wherever a run starts ([ADR 0108](../../decisions/0108-a-subprocess-component-is-a-program-and-its-arguments-and-its-process-is-the-unit-of-recreation.md)).
+A `digest` on a `file` source is the SHA-256 of the file's bytes and is checked before instantiation
+exactly as an OCI manifest digest is (§10.3). Where this configuration file lives and how it merges with the rest
 of a project's configuration is design 2.7's business — it shares a file with hook configuration — and
 this specification owns only the component entries.
 
