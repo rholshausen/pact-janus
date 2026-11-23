@@ -209,11 +209,20 @@ fn the_environment_is_exactly_the_env_grant() {
   declaration.grants.env = vec!["CARGO_PKG_NAME".to_string(), "JANUS_NOT_SET_ANYWHERE".to_string()];
   let loaded = load(&declaration);
   let names = decode(loaded.content.expect("content").as_ref(), "x/env").expect("answered");
+  // macOS's CoreFoundation sets `__CF_USER_TEXT_ENCODING` inside every process that starts without it,
+  // so the component has it however empty an environment it was given: the platform's, not the engine's.
+  let names: Vec<&str> = names
+    .as_array()
+    .expect("names")
+    .iter()
+    .filter_map(Value::as_str)
+    .filter(|name| !(cfg!(target_os = "macos") && *name == "__CF_USER_TEXT_ENCODING"))
+    .collect();
   let mut expected = vec!["CARGO_PKG_NAME"];
   if cfg!(windows) {
     expected.push("SystemRoot");
   }
-  assert_eq!(names, json!(expected));
+  assert_eq!(names, expected);
 }
 
 /// ADR 0108 decision 2: the process starts in its `cwd`.
