@@ -1,5 +1,7 @@
 ## 0.2.5 (2026-11-22)
 
+The SDK runs janus-engine 0.8.0, where it ran 0.7.0: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.8.0) says what changed.
+
 ### Fixes
 
 #### The generated bindings carry the broker's provider-shape operations
