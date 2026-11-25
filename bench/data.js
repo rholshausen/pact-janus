@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795651108524,
+  "lastUpdate": 1795651111094,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -68118,6 +68118,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 99.8,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "396d4323d1db755f64c75dcd4dd3bd23df878964",
+          "message": "feat: S5.2c, janus-plugin-bridge serves a pact plugin as a component, its content matcher one compare-contents action (ADR 0109)\n\n- plugin-bridge/: janus-plugin-bridge <plugin> <version>, a Cargo workspace of its own on\n  pact-plugin-driver 1.2.7, excluded from ours, so the driver's gRPC, protobuf and Lua enter no\n  Janus binary. It speaks component frames over stdio (spec §9.3), loads the plugin at the\n  handshake, and is pact-plugin-<name> at the loaded plugin's version; a plugin that cannot be\n  loaded, or arguments naming none, are `unavailable` there. It shuts the plugin down at stdin EOF.\n- The handshake implements `matcher` and contributes <component>:compare-contents when the plugin\n  has a content matcher. Every catalogue entry is described under the new `pact-plugin` capability\n  (spec §9.3.1, the handshake schema's PactPluginCapability): type, key, values, the content-type\n  patterns a content matcher claims, and the action a served entry is reached through.\n- compare-contents takes the actual body and one argument, what the pact says about the body\n  (content-type, expected, rules in the v4 pact form, allow-unexpected-keys, plugin-configuration).\n  The request is built as match_contents builds it, and every answer the plugin gives is read as\n  that call reads it, so mismatches are one error naming each by the plugin's path. A plugin the\n  call cannot reach (no connection, or gRPC Unavailable/Cancelled/DeadlineExceeded) is not a\n  mismatch: the call is `unavailable` and the bridge exits, so the engine starts a new one.\n- Conformance cases for the CSV plugin (interface 2), the protobuf plugin (interface 1, from the\n  area-calculator example) and a Lua fixture plugin the bridge's own tests load, downloading\n  nothing. plugin-bridge/pact-plugins.json pins the CSV 0.1.0 and protobuf 0.8.1 releases by\n  digest for five platforms, and .github/scripts/pact-plugins.sh installs them. CI's rust job runs\n  the bridge's tests, one of which kills the CSV plugin under a running bridge, and its cases\n  through janus component check on Linux, macOS and Windows.\n\nThe request building and answer reading follow pact-plugin-driver 1.2.7's content.rs\n(ContentMatcher::match_contents and process_compare_contents_response), and the content-type\npattern match its catalogue_manager.rs (matches_pattern), both in pact-foundation/pact-plugins.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-26T10:51:15+11:00",
+          "tree_id": "08c453a48cb760a14aa66e18adc626194615f893",
+          "url": "https://github.com/rholshausen/pact-janus/commit/396d4323d1db755f64c75dcd4dd3bd23df878964"
+        },
+        "date": 1795651110482,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 28360,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 24759,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 56.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 39.4,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 133.4,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 97.9,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
