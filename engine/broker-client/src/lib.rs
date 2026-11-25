@@ -31,7 +31,7 @@
 //!
 //! A publication is compressed only when the broker says it can read one so (RFC 7694: an
 //! `Accept-Encoding` naming `gzip` on the index's response), and sent again uncompressed if it then
-//! answers 415. No broker says so today: Pact Broker 2.121.2 reads a gzipped body as JSON and
+//! answers 415. No broker says so today: Pact Broker 2.124.0 reads a gzipped body as JSON and
 //! refuses it (staged plan S1.3).
 //!
 //! Every failure is a value, the client's own error document (engine-protocol spec §10.2):

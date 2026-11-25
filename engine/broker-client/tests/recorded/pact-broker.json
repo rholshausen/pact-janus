@@ -1,5 +1,5 @@
 {
-  "pact-broker-version": "2.121.2",
+  "pact-broker-version": "2.124.0",
   "steps": [
     {
       "step": "web publishes a v3 pact on main",
@@ -2886,7 +2886,7 @@
                 },
                 {
                   "type": "info",
-                  "text": "     {\n       \"response\": {\n         \"body\": {\n-          \"status\": \"SHIPPED\"\n+          \"status\": \"CANCELLED\"\n         }\n       }\n     },"
+                  "text": "@@ -13,7 +13,7 @@\n       \"response\": {\n         \"body\": {\n           \"id\": 1,\n-          \"status\": \"SHIPPED\"\n+          \"status\": \"CANCELLED\"\n         },\n         \"headers\": {\n           \"Content-Type\": \"application/json\""
                 }
               ],
               "errors": {

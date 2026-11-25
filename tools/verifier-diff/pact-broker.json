@@ -1,7 +1,7 @@
 {
   "$comment": "The Pact Broker the harness's broker fixtures run against (staged plan S1.3): the Ruby broker's own image, by digest. .github/scripts/pact-broker.sh starts exactly this image, and the harness refuses a broker reporting another version unless told to. Moving it can move the disagreement ledger, so it is a deliberate change: take the digest of the new tag from Docker Hub, and rerun.",
   "image": "pactfoundation/pact-broker",
-  "tag": "3.0.0-pactbroker2.121.2",
-  "digest": "sha256:420341d4fbfb00a621c313f47e530ad75703f969bbc7520d0d72bc71bb53cef9",
-  "broker-version": "2.121.2"
+  "tag": "3.2.0-pactbroker2.124.0",
+  "digest": "sha256:b5b9af2e571e2f6a2f9e2ebe85f0e09158ae5e707349d5afce66bfc7cb7437a5",
+  "broker-version": "2.124.0"
 }
