@@ -343,6 +343,13 @@ Three sources are the source of truth and take precedence over this file when th
 > and a timeout or exit names the transport instances that went with it. `third-party/janus-csv-js`, the
 > CSV component again in JavaScript, passes the Rust one's conformance cases through it, and
 > `janus component check --config <file> <name>` runs a declared component's cases.
+> S5.2c (ADR 0109): `plugin-bridge/` is `janus-plugin-bridge <plugin> <version>`, a workspace of its own on
+> `pact-plugin-driver`, serving one plugin as the component `pact-plugin-<name>`. It loads the plugin at
+> the handshake, contributes `<component>:compare-contents` for a content matcher, a whole body compared
+> as the driver compares it for today's verifier, and describes the plugin's catalogue under the
+> handshake's `pact-plugin` capability (spec §9.3.1). A plugin it cannot reach is `unavailable`, not a
+> mismatch, and the bridge exits so the engine starts a new one. Its conformance cases pass against the CSV and protobuf plugins, pinned by
+> digest in `plugin-bridge/pact-plugins.json`, and a Lua fixture plugin; no engine declares one yet (S5.2d).
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -412,6 +419,11 @@ third-party/     Components written as a third party would, from the published i
                  third-party/janus-csv-js, the CSV component again in JavaScript with no
                  dependencies, reached through the subprocess binding and held to janus-csv's
                  cases (S5.2b, ADR 0108)
+plugin-bridge/   janus-plugin-bridge (S5.2c, ADR 0106, ADR 0109): one of today's pact-plugins served
+                 to the engine as the component pact-plugin-<name> over the subprocess binding. Its own
+                 Cargo workspace and lockfile, excluded from ours, so pact-plugin-driver's gRPC, protobuf
+                 and Lua never enter a Janus binary; conformance/ holds its cases per plugin, tests/fixtures
+                 a Lua plugin its tests load, pact-plugins.json the plugin releases CI runs it against
 spikes/          The prototype's time-boxed experiments: each one's FINDINGS.md, at the path the
                  ADRs cite, and no code (S0.12 deleted it; `b8d5010` is the last commit with it)
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
@@ -587,6 +599,20 @@ line in the changelog entry of an SDK release waiting for it), to open a pull re
 
 ```bash
 cargo run -p pact_janus_engine_pin -- <version>   # gh attestation verify on SHA256SUMS, then the pin and pin.ts
+```
+
+The plugin bridge (S5.2c, ADR 0109) is its own workspace: `cd plugin-bridge && cargo test` runs its tests
+against a Lua fixture plugin, downloading nothing; the one that kills a plugin process needs
+`JANUS_PACT_PLUGINS` to name a directory of the pinned plugins, and skips without it unless `CI` is set.
+Its conformance cases need the pinned plugins and a built `janus`, as CI's `rust` job runs them (Node is
+not needed; `jq` and `curl` are):
+
+```bash
+.github/scripts/pact-plugins.sh <dir>                    # the pinned csv and protobuf plugins, digests checked
+cp -r plugin-bridge/tests/fixtures/plugins/lines-0.1.0 <dir>/
+(cd plugin-bridge && cargo build)
+JANUS_PLUGIN_BRIDGE=$PWD/plugin-bridge/target/debug/janus-plugin-bridge PACT_PLUGIN_DIR=<dir> PACT_DO_NOT_TRACK=true \
+  janus component check --config plugin-bridge/conformance/plugins.janus.yaml pact-plugin-csv plugin-bridge/conformance/csv
 ```
 
 The one test that still builds Rust is the TypeScript CSV consumer's (`third-party/janus-csv`);

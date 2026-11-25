@@ -1207,7 +1207,110 @@ either way. Keeping gRPC would have bought the transport and not the protocol, a
 framing, a code-generation dependency, and an orphan problem this project has already solved. If an
 existing gRPC plugin ecosystem ever needs bridging, a shim process speaking both is a smaller thing
 than a second specified pipe. `grpc` remains available as a loader name should evidence ever demand it
-— the vocabulary is open (§10.1) — but v1 specifies one out-of-process pipe.
+— the vocabulary is open (§10.1) — but v1 specifies one out-of-process pipe. Today's plugins are
+bridged by exactly such a shim (§9.3.1).
+
+#### 9.3.1 A pact-plugins bridge
+
+`janus-plugin-bridge` serves one of today's pact-plugins as a component reached through this binding
+([ADR 0106](../../decisions/0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md),
+[ADR 0109](../../decisions/0109-a-bridged-plugins-content-matcher-is-one-compare-contents-action-and-its-catalogue-a-handshake-capability.md)).
+It lives in `plugin-bridge/`, a workspace of its own, so the plugin driver's gRPC stays out of every
+engine. A bridge is declared once per plugin, named `pact-plugin-<name>`, with the plugin's name and
+version as its arguments, and granted what the plugin driver reads from its environment:
+
+```json component-config
+{ "components": [
+    { "name": "pact-plugin-csv",
+      "source": { "kind": "subprocess", "reference": "janus-plugin-bridge", "args": ["csv", "0.1.0"] },
+      "grants": { "env": ["PACT_PLUGIN_DIR", "PACT_DO_NOT_TRACK"] },
+      "limits": { "deadline-ms": 30000 } } ] }
+```
+
+The bridge loads the plugin at the handshake and answers with its catalogue translated. Its version is
+the loaded plugin's. It implements `matcher`, and contributes only what it answers: one action,
+`<component>:compare-contents`, when the plugin registers a content matcher. Every catalogue entry is
+described under the **`pact-plugin` capability**, which is how the engine learns which bodies a plugin
+compares, from the plugin:
+
+```json component-hello-result
+{
+  "component-protocol-version": 1,
+  "component": { "name": "pact-plugin-csv", "version": "0.1.0" },
+  "interfaces": ["matcher"],
+  "contributes": { "actions": [ { "name": "pact-plugin-csv:compare-contents" } ] },
+  "capabilities": {
+    "pact-plugin": {
+      "name": "csv", "version": "0.1.0", "interface-version": 2,
+      "bridge": { "name": "janus-plugin-bridge", "version": "0.1.0" },
+      "catalogue": [
+        { "type": "content-generator", "key": "csv", "content-types": ["text/csv", "application/csv"],
+          "values": { "content-types": "text/csv;application/csv" } },
+        { "type": "content-matcher", "key": "csv", "content-types": ["text/csv", "application/csv"],
+          "action": "pact-plugin-csv:compare-contents",
+          "values": { "content-types": "text/csv;application/csv" } }
+      ]
+    }
+  }
+}
+```
+
+A catalogue entry's `type` is the driver's name for it (`content-matcher`, `content-generator`,
+`transport`, `matcher`, `interaction`, `generator`), its `values` are the plugin's own, and `action`
+names what an entry is reached through when the bridge serves it; the others are described and not
+contributed, until the bridge answers for them (staged plan S5.2e–S5.2g). Each of `content-types` is a
+**pattern**, claimed as pact-plugin-driver claims it: a regular expression, anchored at both ends, over a
+media type's type and subtype with any suffix, parameters stripped (`text/csv` claims
+`text/csv;charset=utf-8`).
+
+`compare-contents` is a plugin's content matcher applied to a whole body. The value under test is the
+actual body's octets. Its one argument says what a pact says about the body:
+
+| Member | |
+|---|---|
+| `content-type` | required: the expected body's, as the pact records it, parameters included. It selects the content matcher. |
+| `expected` | the expected body, a `MatchValue`; absent when the pact has none |
+| `actual-content-type` | the actual body's; the expected one's when absent |
+| `rules` | the pact's rules for the body, in the v4 pact form, keyed by path as the pact writes them |
+| `allow-unexpected-keys` | `false` when absent |
+| `plugin-configuration` | `interaction` and `pact`: what today's verifier hands the plugin, the interaction's configuration for it (for the part compared, when kept by part) and the pact metadata's |
+
+```json matcher-apply
+{
+  "action": "pact-plugin-csv:compare-contents",
+  "values": [ { "content": "Bob,many,2026-11-26\n", "encoded": "text" } ],
+  "config": { "arguments": [ {
+    "content-type": "text/csv;charset=utf-8",
+    "expected": { "content": "Name,100,2000-01-01\n", "encoded": "text" },
+    "rules": { "column:2": { "combine": "AND", "matchers": [ { "match": "number" } ] } },
+    "plugin-configuration": { "interaction": { "csvHeaders": false }, "pact": {} }
+  } ] }
+}
+```
+
+The answer is one result. Mismatches are one `error`, whose message names each, prefixed by the path the
+plugin gave it, in path order, and whose `mismatches` keep each whole. Whatever the plugin answered is
+read as the driver reads it for today's verifier, so a content-type mismatch, the plugin's own error
+string and a failure the plugin answered the call with are mismatches:
+
+```json matcher-apply-result
+{
+  "results": [ {
+    "status": "error",
+    "message": "row:    1, column: 1: Expected 'many' to match a number",
+    "mismatches": [ { "path": "row:    1, column: 1", "message": "Expected 'many' to match a number",
+                      "expected": "100", "actual": "many" } ]
+  } ]
+}
+```
+
+An action the bridge did not contribute is `unknown-action`, a content type none of the plugin's content
+matchers claims is `unsupported-content-type`, an argument it cannot read is `invalid-config`, and a
+plugin that cannot be loaded is `unavailable` at the handshake, with the driver's causes as its `chain`.
+The plugin lives as long as the bridge's standard input. A plugin the call cannot reach (no connection,
+or gRPC's `Unavailable`, `Cancelled` or `DeadlineExceeded`) is not a mismatch, since nothing about the
+provider's body is known: that call is `unavailable`, and the bridge exits once it has answered, so the
+engine's next call starts a new bridge and a new plugin (§3.4).
 
 ### 9.4 Dual-binding conformance
 

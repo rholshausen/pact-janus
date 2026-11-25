@@ -3050,6 +3050,34 @@ The component model, opened to the ecosystem.
     against plugin binaries pinned by digest and cached, never installed from the index during a test.
     *Exit:* `janus component check` passes the bridge's cases against pact-plugins' CSV plugin and the
     protobuf plugin.
+    *Done 2026-11-26* ([ADR 0109](decisions/0109-a-bridged-plugins-content-matcher-is-one-compare-contents-action-and-its-catalogue-a-handshake-capability.md)):
+    - `plugin-bridge/` is `janus-plugin-bridge <plugin> <version>`, a workspace of its own on
+      `pact-plugin-driver` 1.2.7, excluded from ours. It loads the plugin at the handshake and is
+      `pact-plugin-<name>` at the loaded plugin's version; a plugin that cannot be loaded, or arguments
+      that name none, are `unavailable` there, with the driver's causes as the `chain`. It shuts the plugin
+      down when its stdin ends.
+    - The handshake implements `matcher` and contributes one action, `<component>:compare-contents`, when
+      the plugin registers a content matcher. Every catalogue entry is described under the `pact-plugin`
+      capability (spec §9.3.1, the handshake schema's `PactPluginCapability`): its type, key, values, the
+      `content-types` patterns a content matcher claims, and the `action` a served entry is reached
+      through. Transports and generators are described and not contributed (S5.2e–S5.2g).
+    - `compare-contents` takes the actual body as the value under test and one argument, what the pact
+      says about the body: `content-type`, `expected`, `rules` in the v4 pact form, `allow-unexpected-keys`
+      and `plugin-configuration` (`interaction`, `pact`). It builds the request as the driver's
+      `match_contents` does, and reads whatever the plugin answers as that call does: mismatches are one
+      `error` whose message names each by the plugin's path, and whose `mismatches` keep each whole; how
+      the engine reports them is S5.2d's. A plugin the call cannot reach is not a mismatch: the call is
+      `unavailable` and the bridge exits, so the engine starts a new one (`tests/bridge.rs` kills the CSV
+      plugin to see it).
+    - `plugin-bridge/conformance/` holds cases for the CSV plugin (interface 2), the protobuf plugin
+      (interface 1, from the area-calculator example) and `lines`, a Lua plugin in
+      `tests/fixtures/plugins/` the driver runs in the bridge's process, so the bridge's own tests download
+      nothing. `plugin-bridge/pact-plugins.json` pins the CSV 0.1.0 and protobuf 0.8.1 releases by digest
+      for five platforms, and `.github/scripts/pact-plugins.sh` installs them; CI's `rust` job runs the
+      bridge's tests and its cases, through `janus component check --config`, on Linux, macOS and
+      Windows.
+    - Not done, on purpose: no engine declares a bridge for a pact yet, nor compiles a body to the action
+      (S5.2d); the plugin's mismatch paths are its own, untranslated.
   - **S5.2d Verifying a v1–v4 pact's plugin content** — **M**. The legacy compiler compiles a body whose
     content type a plugin claims to `compare-contents`, and an ADR decides how one action reports
     several located mismatches (plan grammar §2.3). `janus verify` adds a bridge declaration for each
@@ -3481,7 +3509,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user (done: ADR 0101) | findings 12–14 |
 | S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099); generally available, with a guide (done: S5.1d, ADR 0104) | findings 15–17 |
-| S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 | S1.8 |
+| S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 (the subprocess loader done: S5.2b, ADR 0108; the bridge and its handshake done: S5.2c, ADR 0109) | S1.8 |
 | S5.5 | Out-of-process containment and command form (moved to S5.2b by ADR 0106; done: ADR 0108); the subprocess binding has no author guide and is not generally available | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components (done: ADR 0103) | ADR 0040 decision 3 |
 | S5.8 | A component's substitutions do not reach content embedded in a slot | ADR 0103 |

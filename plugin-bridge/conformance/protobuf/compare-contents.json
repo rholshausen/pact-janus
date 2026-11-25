@@ -1,0 +1,207 @@
+{
+  "name": "pact-plugin-protobuf/compare-contents",
+  "component": "pact-plugin-protobuf",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-protobuf:compare-contents",
+        "values": [
+          {
+            "content": "DQAA2EE=",
+            "encoded": "base64"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "content-type": "application/protobuf;message=.area_calculator.AreaResponse",
+              "expected": {
+                "content": "DQAAQEE=",
+                "encoded": "base64"
+              },
+              "rules": {
+                "$.value": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                }
+              },
+              "plugin-configuration": {
+                "interaction": {
+                  "descriptorKey": "4e235bb52f3ad1726b673ee1c50d6212",
+                  "expectations": {
+                    "value": "matching(number, 12)"
+                  },
+                  "service": ".area_calculator.Calculator/calculate"
+                },
+                "pact": {
+                  "4e235bb52f3ad1726b673ee1c50d6212": {
+                    "protoDescriptors": "Cv0PChVhcmVhX2NhbGN1bGF0b3IucHJvdG8SD2FyZWFfY2FsY3VsYXRvciLUAgoMU2hhcGVNZXNzYWdlEjEKBnNxdWFyZRgBIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5TcXVhcmVIAFIGc3F1YXJlEjoKCXJlY3RhbmdsZRgCIAEoCzIaLmFyZWFfY2FsY3VsYXRvci5SZWN0YW5nbGVIAFIJcmVjdGFuZ2xlEjEKBmNpcmNsZRgDIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5DaXJjbGVIAFIGY2lyY2xlEjcKCHRyaWFuZ2xlGAQgASgLMhkuYXJlYV9jYWxjdWxhdG9yLlRyaWFuZ2xlSABSCHRyaWFuZ2xlEkYKDXBhcmFsbGVsb2dyYW0YBSABKAsyHi5hcmVhX2NhbGN1bGF0b3IuUGFyYWxsZWxvZ3JhbUgAUg1wYXJhbGxlbG9ncmFtEhgKB2NyZWF0ZWQYBiABKAlSB2NyZWF0ZWRCBwoFc2hhcGUiKQoGU3F1YXJlEh8KC2VkZ2VfbGVuZ3RoGAEgASgCUgplZGdlTGVuZ3RoIjkKCVJlY3RhbmdsZRIWCgZsZW5ndGgYASABKAJSBmxlbmd0aBIUCgV3aWR0aBgCIAEoAlIFd2lkdGgiIAoGQ2lyY2xlEhYKBnJhZGl1cxgBIAEoAlIGcmFkaXVzIk8KCFRyaWFuZ2xlEhUKBmVkZ2VfYRgBIAEoAlIFZWRnZUESFQoGZWRnZV9iGAIgASgCUgVlZGdlQhIVCgZlZGdlX2MYAyABKAJSBWVkZ2VDIkgKDVBhcmFsbGVsb2dyYW0SHwoLYmFzZV9sZW5ndGgYASABKAJSCmJhc2VMZW5ndGgSFgoGaGVpZ2h0GAIgASgCUgZoZWlnaHQiJAoMQXJlYVJlc3BvbnNlEhQKBXZhbHVlGAEgASgCUgV2YWx1ZTJXCgpDYWxjdWxhdG9yEkkKCWNhbGN1bGF0ZRIdLmFyZWFfY2FsY3VsYXRvci5TaGFwZU1lc3NhZ2UaHS5hcmVhX2NhbGN1bGF0b3IuQXJlYVJlc3BvbnNlStEJCgYSBAAALQEKCAoBAhIDAgAYCgoKAgQAEgQIABEBCgoKAwQAARIDCAgUCgsKBAQAAgASAwoEFgoMCgUEAAIAARIDCgsRCgwKBQQAAgADEgMKFBUKDAoFBAACAAYSAwoECgoLCgQEAAIBEgMLBBwKDAoFBAACAQESAwsOFwoMCgUEAAIBAxIDCxobCgwKBQQAAgEGEgMLBA0KCwoEBAACAhIDDAQWCgwKBQQAAgIBEgMMCxEKDAoFBAACAgMSAwwUFQoMCgUEAAICBhIDDAQKCgsKBAQAAgMSAw0EGgoMCgUEAAIDARIDDQ0VCgwKBQQAAgMDEgMNGBkKDAoFBAACAwYSAw0EDAoLCgQEAAIEEgMOBCQKDAoFBAACBAESAw4SHwoMCgUEAAIEAxIDDiIjCgwKBQQAAgQGEgMOBBEKPQoEBAACBRIDEAIVIjAgU2ltcGxlIHN0cmluZyBmaWVsZCB0byBzaG93IGdlbmVyYXRvcnMgd29ya2luZwoKDAoFBAACBQESAxAJEAoMCgUEAAIFAxIDEBMUCgwKBQQAAgUFEgMQAggKDAoEBAAIABIECQIPAwoMCgUEAAgAARIDCQgNCgoKAgQBEgQTABUBCgoKAwQBARIDEwgOCgsKBAQBAgASAxQCGAoMCgUEAQIAARIDFAgTCgwKBQQBAgADEgMUFhcKDAoFBAECAAUSAxQCBwoKCgIEAhIEFwAaAQoKCgMEAgESAxcIEQoLCgQEAgIAEgMYAhMKDAoFBAICAAESAxgIDgoMCgUEAgIAAxIDGBESCgwKBQQCAgAFEgMYAgcKCwoEBAICARIDGQISCgwKBQQCAgEBEgMZCA0KDAoFBAICAQMSAxkQEQoMCgUEAgIBBRIDGQIHCgoKAgQDEgQcAB4BCgoKAwQDARIDHAgOCgsKBAQDAgASAx0CEwoMCgUEAwIAARIDHQgOCgwKBQQDAgADEgMdERIKDAoFBAMCAAUSAx0CBwoKCgIEBBIEIAAkAQoKCgMEBAESAyAIEAoLCgQEBAIAEgMhAhMKDAoFBAQCAAESAyEIDgoMCgUEBAIAAxIDIRESCgwKBQQEAgAFEgMhAgcKCwoEBAQCARIDIgITCgwKBQQEAgEBEgMiCA4KDAoFBAQCAQMSAyIREgoMCgUEBAIBBRIDIgIHCgsKBAQEAgISAyMCEwoMCgUEBAICARIDIwgOCgwKBQQEAgIDEgMjERIKDAoFBAQCAgUSAyMCBwoKCgIEBRIEJgApAQoKCgMEBQESAyYIFQoLCgQEBQIAEgMnAhgKDAoFBAUCAAESAycIEwoMCgUEBQIAAxIDJxYXCgwKBQQFAgAFEgMnAgcKCwoEBAUCARIDKAITCgwKBQQFAgEBEgMoCA4KDAoFBAUCAQMSAygREgoMCgUEBQIBBRIDKAIHCgoKAgQGEgQrAC0BCgoKAwQGARIDKwgUCgsKBAQGAgASAywCEgoMCgUEBgIAARIDLAgNCgwKBQQGAgADEgMsEBEKDAoFBAYCAAUSAywCBwoKCgIGABIEBAAGAQoKCgMGAAESAwQIEgoLCgQGAAIAEgMFAjgKDAoFBgACAAESAwUGDwoMCgUGAAIAAhIDBREdCgwKBQYAAgADEgMFKDQKCAoBDBIDAAASYgZwcm90bzM=",
+                    "protoFile": "syntax = \"proto3\";\n\npackage area_calculator;\n\nservice Calculator {\n  rpc calculate (ShapeMessage) returns (AreaResponse) {}\n}\n\nmessage ShapeMessage {\n  oneof shape {\n    Square square = 1;\n    Rectangle rectangle = 2;\n    Circle circle = 3;\n    Triangle triangle = 4;\n    Parallelogram parallelogram = 5;\n  }\n  string created = 6; // Simple string field to show generators working\n}\n\nmessage Square {\n  float edge_length = 1;\n}\n\nmessage Rectangle {\n  float length = 1;\n  float width = 2;\n}\n\nmessage Circle {\n  float radius = 1;\n}\n\nmessage Triangle {\n  float edge_a = 1;\n  float edge_b = 2;\n  float edge_c = 3;\n}\n\nmessage Parallelogram {\n  float base_length = 1;\n  float height = 2;\n}\n\nmessage AreaResponse {\n  float value = 1;\n}\n"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-protobuf:compare-contents",
+        "values": [
+          {
+            "content": "EgoNAACgQBUAAMBA",
+            "encoded": "base64"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "content-type": "application/protobuf;message=.area_calculator.ShapeMessage",
+              "expected": {
+                "content": "EgoNAABAQBUAAIBA",
+                "encoded": "base64"
+              },
+              "rules": {
+                "$.rectangle.length": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                },
+                "$.rectangle.width": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                }
+              },
+              "plugin-configuration": {
+                "interaction": {
+                  "descriptorKey": "4e235bb52f3ad1726b673ee1c50d6212",
+                  "expectations": {
+                    "rectangle": {
+                      "length": "matching(number, 3)",
+                      "width": "matching(number, 4)"
+                    }
+                  },
+                  "service": ".area_calculator.Calculator/calculate"
+                },
+                "pact": {
+                  "4e235bb52f3ad1726b673ee1c50d6212": {
+                    "protoDescriptors": "Cv0PChVhcmVhX2NhbGN1bGF0b3IucHJvdG8SD2FyZWFfY2FsY3VsYXRvciLUAgoMU2hhcGVNZXNzYWdlEjEKBnNxdWFyZRgBIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5TcXVhcmVIAFIGc3F1YXJlEjoKCXJlY3RhbmdsZRgCIAEoCzIaLmFyZWFfY2FsY3VsYXRvci5SZWN0YW5nbGVIAFIJcmVjdGFuZ2xlEjEKBmNpcmNsZRgDIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5DaXJjbGVIAFIGY2lyY2xlEjcKCHRyaWFuZ2xlGAQgASgLMhkuYXJlYV9jYWxjdWxhdG9yLlRyaWFuZ2xlSABSCHRyaWFuZ2xlEkYKDXBhcmFsbGVsb2dyYW0YBSABKAsyHi5hcmVhX2NhbGN1bGF0b3IuUGFyYWxsZWxvZ3JhbUgAUg1wYXJhbGxlbG9ncmFtEhgKB2NyZWF0ZWQYBiABKAlSB2NyZWF0ZWRCBwoFc2hhcGUiKQoGU3F1YXJlEh8KC2VkZ2VfbGVuZ3RoGAEgASgCUgplZGdlTGVuZ3RoIjkKCVJlY3RhbmdsZRIWCgZsZW5ndGgYASABKAJSBmxlbmd0aBIUCgV3aWR0aBgCIAEoAlIFd2lkdGgiIAoGQ2lyY2xlEhYKBnJhZGl1cxgBIAEoAlIGcmFkaXVzIk8KCFRyaWFuZ2xlEhUKBmVkZ2VfYRgBIAEoAlIFZWRnZUESFQoGZWRnZV9iGAIgASgCUgVlZGdlQhIVCgZlZGdlX2MYAyABKAJSBWVkZ2VDIkgKDVBhcmFsbGVsb2dyYW0SHwoLYmFzZV9sZW5ndGgYASABKAJSCmJhc2VMZW5ndGgSFgoGaGVpZ2h0GAIgASgCUgZoZWlnaHQiJAoMQXJlYVJlc3BvbnNlEhQKBXZhbHVlGAEgASgCUgV2YWx1ZTJXCgpDYWxjdWxhdG9yEkkKCWNhbGN1bGF0ZRIdLmFyZWFfY2FsY3VsYXRvci5TaGFwZU1lc3NhZ2UaHS5hcmVhX2NhbGN1bGF0b3IuQXJlYVJlc3BvbnNlStEJCgYSBAAALQEKCAoBAhIDAgAYCgoKAgQAEgQIABEBCgoKAwQAARIDCAgUCgsKBAQAAgASAwoEFgoMCgUEAAIAARIDCgsRCgwKBQQAAgADEgMKFBUKDAoFBAACAAYSAwoECgoLCgQEAAIBEgMLBBwKDAoFBAACAQESAwsOFwoMCgUEAAIBAxIDCxobCgwKBQQAAgEGEgMLBA0KCwoEBAACAhIDDAQWCgwKBQQAAgIBEgMMCxEKDAoFBAACAgMSAwwUFQoMCgUEAAICBhIDDAQKCgsKBAQAAgMSAw0EGgoMCgUEAAIDARIDDQ0VCgwKBQQAAgMDEgMNGBkKDAoFBAACAwYSAw0EDAoLCgQEAAIEEgMOBCQKDAoFBAACBAESAw4SHwoMCgUEAAIEAxIDDiIjCgwKBQQAAgQGEgMOBBEKPQoEBAACBRIDEAIVIjAgU2ltcGxlIHN0cmluZyBmaWVsZCB0byBzaG93IGdlbmVyYXRvcnMgd29ya2luZwoKDAoFBAACBQESAxAJEAoMCgUEAAIFAxIDEBMUCgwKBQQAAgUFEgMQAggKDAoEBAAIABIECQIPAwoMCgUEAAgAARIDCQgNCgoKAgQBEgQTABUBCgoKAwQBARIDEwgOCgsKBAQBAgASAxQCGAoMCgUEAQIAARIDFAgTCgwKBQQBAgADEgMUFhcKDAoFBAECAAUSAxQCBwoKCgIEAhIEFwAaAQoKCgMEAgESAxcIEQoLCgQEAgIAEgMYAhMKDAoFBAICAAESAxgIDgoMCgUEAgIAAxIDGBESCgwKBQQCAgAFEgMYAgcKCwoEBAICARIDGQISCgwKBQQCAgEBEgMZCA0KDAoFBAICAQMSAxkQEQoMCgUEAgIBBRIDGQIHCgoKAgQDEgQcAB4BCgoKAwQDARIDHAgOCgsKBAQDAgASAx0CEwoMCgUEAwIAARIDHQgOCgwKBQQDAgADEgMdERIKDAoFBAMCAAUSAx0CBwoKCgIEBBIEIAAkAQoKCgMEBAESAyAIEAoLCgQEBAIAEgMhAhMKDAoFBAQCAAESAyEIDgoMCgUEBAIAAxIDIRESCgwKBQQEAgAFEgMhAgcKCwoEBAQCARIDIgITCgwKBQQEAgEBEgMiCA4KDAoFBAQCAQMSAyIREgoMCgUEBAIBBRIDIgIHCgsKBAQEAgISAyMCEwoMCgUEBAICARIDIwgOCgwKBQQEAgIDEgMjERIKDAoFBAQCAgUSAyMCBwoKCgIEBRIEJgApAQoKCgMEBQESAyYIFQoLCgQEBQIAEgMnAhgKDAoFBAUCAAESAycIEwoMCgUEBQIAAxIDJxYXCgwKBQQFAgAFEgMnAgcKCwoEBAUCARIDKAITCgwKBQQFAgEBEgMoCA4KDAoFBAUCAQMSAygREgoMCgUEBQIBBRIDKAIHCgoKAgQGEgQrAC0BCgoKAwQGARIDKwgUCgsKBAQGAgASAywCEgoMCgUEBgIAARIDLAgNCgwKBQQGAgADEgMsEBEKDAoFBAYCAAUSAywCBwoKCgIGABIEBAAGAQoKCgMGAAESAwQIEgoLCgQGAAIAEgMFAjgKDAoFBgACAAESAwUGDwoMCgUGAAIAAhIDBREdCgwKBQYAAgADEgMFKDQKCAoBDBIDAAASYgZwcm90bzM=",
+                    "protoFile": "syntax = \"proto3\";\n\npackage area_calculator;\n\nservice Calculator {\n  rpc calculate (ShapeMessage) returns (AreaResponse) {}\n}\n\nmessage ShapeMessage {\n  oneof shape {\n    Square square = 1;\n    Rectangle rectangle = 2;\n    Circle circle = 3;\n    Triangle triangle = 4;\n    Parallelogram parallelogram = 5;\n  }\n  string created = 6; // Simple string field to show generators working\n}\n\nmessage Square {\n  float edge_length = 1;\n}\n\nmessage Rectangle {\n  float length = 1;\n  float width = 2;\n}\n\nmessage Circle {\n  float radius = 1;\n}\n\nmessage Triangle {\n  float edge_a = 1;\n  float edge_b = 2;\n  float edge_c = 3;\n}\n\nmessage Parallelogram {\n  float base_length = 1;\n  float height = 2;\n}\n\nmessage AreaResponse {\n  float value = 1;\n}\n"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-protobuf:compare-contents",
+        "values": [
+          {
+            "content": "CgUNAACgQA==",
+            "encoded": "base64"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "content-type": "application/protobuf;message=.area_calculator.ShapeMessage",
+              "expected": {
+                "content": "EgoNAABAQBUAAIBA",
+                "encoded": "base64"
+              },
+              "rules": {
+                "$.rectangle.length": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                },
+                "$.rectangle.width": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                }
+              },
+              "plugin-configuration": {
+                "interaction": {
+                  "descriptorKey": "4e235bb52f3ad1726b673ee1c50d6212",
+                  "expectations": {
+                    "rectangle": {
+                      "length": "matching(number, 3)",
+                      "width": "matching(number, 4)"
+                    }
+                  },
+                  "service": ".area_calculator.Calculator/calculate"
+                },
+                "pact": {
+                  "4e235bb52f3ad1726b673ee1c50d6212": {
+                    "protoDescriptors": "Cv0PChVhcmVhX2NhbGN1bGF0b3IucHJvdG8SD2FyZWFfY2FsY3VsYXRvciLUAgoMU2hhcGVNZXNzYWdlEjEKBnNxdWFyZRgBIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5TcXVhcmVIAFIGc3F1YXJlEjoKCXJlY3RhbmdsZRgCIAEoCzIaLmFyZWFfY2FsY3VsYXRvci5SZWN0YW5nbGVIAFIJcmVjdGFuZ2xlEjEKBmNpcmNsZRgDIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5DaXJjbGVIAFIGY2lyY2xlEjcKCHRyaWFuZ2xlGAQgASgLMhkuYXJlYV9jYWxjdWxhdG9yLlRyaWFuZ2xlSABSCHRyaWFuZ2xlEkYKDXBhcmFsbGVsb2dyYW0YBSABKAsyHi5hcmVhX2NhbGN1bGF0b3IuUGFyYWxsZWxvZ3JhbUgAUg1wYXJhbGxlbG9ncmFtEhgKB2NyZWF0ZWQYBiABKAlSB2NyZWF0ZWRCBwoFc2hhcGUiKQoGU3F1YXJlEh8KC2VkZ2VfbGVuZ3RoGAEgASgCUgplZGdlTGVuZ3RoIjkKCVJlY3RhbmdsZRIWCgZsZW5ndGgYASABKAJSBmxlbmd0aBIUCgV3aWR0aBgCIAEoAlIFd2lkdGgiIAoGQ2lyY2xlEhYKBnJhZGl1cxgBIAEoAlIGcmFkaXVzIk8KCFRyaWFuZ2xlEhUKBmVkZ2VfYRgBIAEoAlIFZWRnZUESFQoGZWRnZV9iGAIgASgCUgVlZGdlQhIVCgZlZGdlX2MYAyABKAJSBWVkZ2VDIkgKDVBhcmFsbGVsb2dyYW0SHwoLYmFzZV9sZW5ndGgYASABKAJSCmJhc2VMZW5ndGgSFgoGaGVpZ2h0GAIgASgCUgZoZWlnaHQiJAoMQXJlYVJlc3BvbnNlEhQKBXZhbHVlGAEgASgCUgV2YWx1ZTJXCgpDYWxjdWxhdG9yEkkKCWNhbGN1bGF0ZRIdLmFyZWFfY2FsY3VsYXRvci5TaGFwZU1lc3NhZ2UaHS5hcmVhX2NhbGN1bGF0b3IuQXJlYVJlc3BvbnNlStEJCgYSBAAALQEKCAoBAhIDAgAYCgoKAgQAEgQIABEBCgoKAwQAARIDCAgUCgsKBAQAAgASAwoEFgoMCgUEAAIAARIDCgsRCgwKBQQAAgADEgMKFBUKDAoFBAACAAYSAwoECgoLCgQEAAIBEgMLBBwKDAoFBAACAQESAwsOFwoMCgUEAAIBAxIDCxobCgwKBQQAAgEGEgMLBA0KCwoEBAACAhIDDAQWCgwKBQQAAgIBEgMMCxEKDAoFBAACAgMSAwwUFQoMCgUEAAICBhIDDAQKCgsKBAQAAgMSAw0EGgoMCgUEAAIDARIDDQ0VCgwKBQQAAgMDEgMNGBkKDAoFBAACAwYSAw0EDAoLCgQEAAIEEgMOBCQKDAoFBAACBAESAw4SHwoMCgUEAAIEAxIDDiIjCgwKBQQAAgQGEgMOBBEKPQoEBAACBRIDEAIVIjAgU2ltcGxlIHN0cmluZyBmaWVsZCB0byBzaG93IGdlbmVyYXRvcnMgd29ya2luZwoKDAoFBAACBQESAxAJEAoMCgUEAAIFAxIDEBMUCgwKBQQAAgUFEgMQAggKDAoEBAAIABIECQIPAwoMCgUEAAgAARIDCQgNCgoKAgQBEgQTABUBCgoKAwQBARIDEwgOCgsKBAQBAgASAxQCGAoMCgUEAQIAARIDFAgTCgwKBQQBAgADEgMUFhcKDAoFBAECAAUSAxQCBwoKCgIEAhIEFwAaAQoKCgMEAgESAxcIEQoLCgQEAgIAEgMYAhMKDAoFBAICAAESAxgIDgoMCgUEAgIAAxIDGBESCgwKBQQCAgAFEgMYAgcKCwoEBAICARIDGQISCgwKBQQCAgEBEgMZCA0KDAoFBAICAQMSAxkQEQoMCgUEAgIBBRIDGQIHCgoKAgQDEgQcAB4BCgoKAwQDARIDHAgOCgsKBAQDAgASAx0CEwoMCgUEAwIAARIDHQgOCgwKBQQDAgADEgMdERIKDAoFBAMCAAUSAx0CBwoKCgIEBBIEIAAkAQoKCgMEBAESAyAIEAoLCgQEBAIAEgMhAhMKDAoFBAQCAAESAyEIDgoMCgUEBAIAAxIDIRESCgwKBQQEAgAFEgMhAgcKCwoEBAQCARIDIgITCgwKBQQEAgEBEgMiCA4KDAoFBAQCAQMSAyIREgoMCgUEBAIBBRIDIgIHCgsKBAQEAgISAyMCEwoMCgUEBAICARIDIwgOCgwKBQQEAgIDEgMjERIKDAoFBAQCAgUSAyMCBwoKCgIEBRIEJgApAQoKCgMEBQESAyYIFQoLCgQEBQIAEgMnAhgKDAoFBAUCAAESAycIEwoMCgUEBQIAAxIDJxYXCgwKBQQFAgAFEgMnAgcKCwoEBAUCARIDKAITCgwKBQQFAgEBEgMoCA4KDAoFBAUCAQMSAygREgoMCgUEBQIBBRIDKAIHCgoKAgQGEgQrAC0BCgoKAwQGARIDKwgUCgsKBAQGAgASAywCEgoMCgUEBgIAARIDLAgNCgwKBQQGAgADEgMsEBEKDAoFBAYCAAUSAywCBwoKCgIGABIEBAAGAQoKCgMGAAESAwQIEgoLCgQGAAIAEgMFAjgKDAoFBgACAAESAwUGDwoMCgUGAAIAAhIDBREdCgwKBQYAAgADEgMFKDQKCAoBDBIDAAASYgZwcm90bzM=",
+                    "protoFile": "syntax = \"proto3\";\n\npackage area_calculator;\n\nservice Calculator {\n  rpc calculate (ShapeMessage) returns (AreaResponse) {}\n}\n\nmessage ShapeMessage {\n  oneof shape {\n    Square square = 1;\n    Rectangle rectangle = 2;\n    Circle circle = 3;\n    Triangle triangle = 4;\n    Parallelogram parallelogram = 5;\n  }\n  string created = 6; // Simple string field to show generators working\n}\n\nmessage Square {\n  float edge_length = 1;\n}\n\nmessage Rectangle {\n  float length = 1;\n  float width = 2;\n}\n\nmessage Circle {\n  float radius = 1;\n}\n\nmessage Triangle {\n  float edge_a = 1;\n  float edge_b = 2;\n  float edge_c = 3;\n}\n\nmessage Parallelogram {\n  float base_length = 1;\n  float height = 2;\n}\n\nmessage AreaResponse {\n  float value = 1;\n}\n"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "error",
+              "message": "$.square: Expected field 'square' to be missing, but received a value for it",
+              "mismatches": [
+                {
+                  "path": "$.square",
+                  "message": "Expected field 'square' to be missing, but received a value for it"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

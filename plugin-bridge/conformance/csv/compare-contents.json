@@ -1,0 +1,180 @@
+{
+  "name": "pact-plugin-csv/compare-contents",
+  "component": "pact-plugin-csv",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-csv:compare-contents",
+        "values": [
+          {
+            "content": "Bob,200,2026-11-26\n",
+            "encoded": "text"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "content-type": "text/csv;charset=utf-8",
+              "expected": {
+                "content": "Name,100,2000-01-01\n",
+                "encoded": "text"
+              },
+              "rules": {
+                "column:1": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "type"
+                    }
+                  ]
+                },
+                "column:2": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                },
+                "column:3": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "format": "yyyy-MM-dd",
+                      "match": "datetime"
+                    }
+                  ]
+                }
+              },
+              "plugin-configuration": {
+                "interaction": {
+                  "csvHeaders": false
+                },
+                "pact": {}
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-csv:compare-contents",
+        "values": [
+          {
+            "content": "Bob,many,26/11/2026\n",
+            "encoded": "text"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "content-type": "text/csv;charset=utf-8",
+              "expected": {
+                "content": "Name,100,2000-01-01\n",
+                "encoded": "text"
+              },
+              "rules": {
+                "column:1": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "type"
+                    }
+                  ]
+                },
+                "column:2": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "match": "number"
+                    }
+                  ]
+                },
+                "column:3": {
+                  "combine": "AND",
+                  "matchers": [
+                    {
+                      "format": "yyyy-MM-dd",
+                      "match": "datetime"
+                    }
+                  ]
+                }
+              },
+              "plugin-configuration": {
+                "interaction": {
+                  "csvHeaders": false
+                },
+                "pact": {}
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "error",
+              "message": "row:    1, column: 1: Expected 'many' to match a number; row:    1, column: 2: Expected '26/11/2026' to match a timestamp pattern of 'yyyy-MM-dd'",
+              "mismatches": [
+                {
+                  "path": "row:    1, column: 1",
+                  "message": "Expected 'many' to match a number",
+                  "expected": "100",
+                  "actual": "many"
+                },
+                {
+                  "path": "row:    1, column: 2",
+                  "message": "Expected '26/11/2026' to match a timestamp pattern of 'yyyy-MM-dd'",
+                  "expected": "2000-01-01",
+                  "actual": "26/11/2026"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-csv:compare-contents",
+        "values": [
+          {
+            "content": "",
+            "encoded": "text"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "content-type": "application/json"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document",
+          "details": {
+            "content-type": "application/json"
+          }
+        }
+      }
+    }
+  ]
+}

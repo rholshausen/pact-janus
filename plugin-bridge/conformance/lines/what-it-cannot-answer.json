@@ -1,0 +1,99 @@
+{
+  "name": "pact-plugin-lines/what-it-cannot-answer",
+  "component": "pact-plugin-lines",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-lines:other",
+        "values": [
+          {
+            "content": ""
+          }
+        ]
+      },
+      "expect": {
+        "error": {
+          "code": "unknown-action",
+          "category": "document",
+          "details": {
+            "action": "pact-plugin-lines:other"
+          }
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-lines:compare-contents",
+        "values": [
+          {
+            "content": "",
+            "encoded": "text"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "content-type": "text/csv"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document",
+          "details": {
+            "content-type": "text/csv"
+          }
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-lines:compare-contents",
+        "values": [
+          {
+            "content": "",
+            "encoded": "text"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "expected": {
+                "content": ""
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "invalid-config",
+          "category": "document"
+        }
+      }
+    },
+    {
+      "op": "matcher/compare",
+      "body": {
+        "operator": "pact-plugin-lines:other",
+        "provider": {},
+        "consumer": {}
+      },
+      "expect": {
+        "error": {
+          "code": "operation-unsupported",
+          "category": "protocol",
+          "details": {
+            "op": "matcher/compare"
+          }
+        }
+      }
+    }
+  ]
+}

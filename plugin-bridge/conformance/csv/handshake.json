@@ -1,0 +1,62 @@
+{
+  "name": "pact-plugin-csv/handshake",
+  "component": "pact-plugin-csv",
+  "calls": [
+    {
+      "op": "component/hello",
+      "body": {
+        "component-protocol-versions": [
+          1
+        ]
+      },
+      "expect": {
+        "ok": {
+          "component-protocol-version": 1,
+          "component": {
+            "name": "pact-plugin-csv",
+            "version": "0.1.0"
+          },
+          "interfaces": [
+            "matcher"
+          ],
+          "contributes": {
+            "actions": [
+              {
+                "name": "pact-plugin-csv:compare-contents"
+              }
+            ]
+          },
+          "capabilities": {
+            "pact-plugin": {
+              "name": "csv",
+              "version": "0.1.0",
+              "interface-version": 2,
+              "bridge": {
+                "name": "janus-plugin-bridge"
+              },
+              "catalogue": [
+                {
+                  "type": "content-generator",
+                  "key": "csv",
+                  "content-types": [
+                    "text/csv",
+                    "application/csv"
+                  ]
+                },
+                {
+                  "type": "content-matcher",
+                  "key": "csv",
+                  "content-types": [
+                    "text/csv",
+                    "application/csv"
+                  ],
+                  "action": "pact-plugin-csv:compare-contents"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

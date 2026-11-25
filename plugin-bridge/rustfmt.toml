@@ -1,0 +1,4 @@
+# Match the established Pact Rust style (pact-reference uses 2-space indentation).
+tab_spaces = 2
+max_width = 110
+newline_style = "Unix"

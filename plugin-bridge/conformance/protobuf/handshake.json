@@ -1,0 +1,66 @@
+{
+  "name": "pact-plugin-protobuf/handshake",
+  "component": "pact-plugin-protobuf",
+  "calls": [
+    {
+      "op": "component/hello",
+      "body": {
+        "component-protocol-versions": [
+          1
+        ]
+      },
+      "expect": {
+        "ok": {
+          "component-protocol-version": 1,
+          "component": {
+            "name": "pact-plugin-protobuf",
+            "version": "0.8.1"
+          },
+          "interfaces": [
+            "matcher"
+          ],
+          "contributes": {
+            "actions": [
+              {
+                "name": "pact-plugin-protobuf:compare-contents"
+              }
+            ]
+          },
+          "capabilities": {
+            "pact-plugin": {
+              "name": "protobuf",
+              "version": "0.8.1",
+              "interface-version": 1,
+              "bridge": {
+                "name": "janus-plugin-bridge"
+              },
+              "catalogue": [
+                {
+                  "type": "content-generator",
+                  "key": "protobuf",
+                  "content-types": [
+                    "application/protobuf",
+                    "application/grpc"
+                  ]
+                },
+                {
+                  "type": "content-matcher",
+                  "key": "protobuf",
+                  "content-types": [
+                    "application/protobuf",
+                    "application/grpc"
+                  ],
+                  "action": "pact-plugin-protobuf:compare-contents"
+                },
+                {
+                  "type": "transport",
+                  "key": "grpc"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

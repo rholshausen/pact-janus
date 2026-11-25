@@ -1,0 +1,26 @@
+# The bridge declared for each plugin whose conformance cases are beside this file (staged plan S5.2c,
+# ADR 0106, ADR 0109), as a provider would declare it: one component per plugin, named
+# pact-plugin-<name>, the plugin's name and version as the bridge's arguments.
+#
+#   JANUS_PLUGIN_BRIDGE=<the built janus-plugin-bridge> PACT_PLUGIN_DIR=<plugins> PACT_DO_NOT_TRACK=true \
+#     janus component check --config plugin-bridge/conformance/plugins.janus.yaml \
+#       pact-plugin-csv plugin-bridge/conformance/csv
+#
+# PACT_PLUGIN_DIR holds the plugins: `.github/scripts/pact-plugins.sh <dir>` installs the pinned csv and
+# protobuf releases, and lines is plugin-bridge/tests/fixtures/plugins/lines-0.1.0, copied in. A
+# subprocess component starts with an empty environment plus what it is granted (spec §9.3), so the
+# bridge is granted the plugin directory, and PACT_DO_NOT_TRACK, which keeps the plugin driver from
+# sending usage metrics. Starting a plugin process is slower than a call, so the deadline is wider.
+version: 1
+components:
+  - name: pact-plugin-lines
+    source: { kind: subprocess, reference: "${JANUS_PLUGIN_BRIDGE}", args: [lines, 0.1.0] }
+    grants: { env: [PACT_PLUGIN_DIR, PACT_DO_NOT_TRACK] }
+  - name: pact-plugin-csv
+    source: { kind: subprocess, reference: "${JANUS_PLUGIN_BRIDGE}", args: [csv, 0.1.0] }
+    grants: { env: [PACT_PLUGIN_DIR, PACT_DO_NOT_TRACK] }
+    limits: { deadline-ms: 30000 }
+  - name: pact-plugin-protobuf
+    source: { kind: subprocess, reference: "${JANUS_PLUGIN_BRIDGE}", args: [protobuf, 0.8.1] }
+    grants: { env: [PACT_PLUGIN_DIR, PACT_DO_NOT_TRACK] }
+    limits: { deadline-ms: 30000 }

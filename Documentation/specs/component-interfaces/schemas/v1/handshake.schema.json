@@ -74,7 +74,55 @@
     "Capabilities": {
       "title": "Capabilities",
       "description": "Open capability map, as protocol spec §5.3. Member names are an open vocabulary; each value is an object, '{}' when presence is the signal. Both sides ignore names they do not know.",
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "pact-plugin": { "$ref": "#/$defs/PactPluginCapability" }
+      }
+    },
+    "PactPluginCapability": {
+      "title": "PactPluginCapability",
+      "description": "What a pact-plugins bridge's handshake says about the plugin it serves (spec.md §9.3.1, ADR 0109): the plugin, the bridge, and every entry of the plugin's catalogue, bridged or not. It is how the engine learns which bodies a plugin compares, from the plugin.",
+      "type": "object",
+      "required": ["name", "version", "catalogue"],
+      "properties": {
+        "name": { "type": "string", "description": "The plugin's name. The component is 'pact-plugin-<name>'." },
+        "version": { "type": "string", "description": "The version of the plugin the bridge loaded, which is the component's." },
+        "interface-version": { "type": "integer", "description": "The plugin interface version its manifest declares." },
+        "bridge": {
+          "type": "object",
+          "description": "The bridge serving it.",
+          "properties": { "name": { "type": "string" }, "version": { "type": "string" } }
+        },
+        "catalogue": { "type": "array", "items": { "$ref": "#/$defs/PactPluginCatalogueEntry" } }
+      }
+    },
+    "PactPluginCatalogueEntry": {
+      "title": "PactPluginCatalogueEntry",
+      "description": "One entry of a plugin's catalogue, as the plugin registered it.",
+      "type": "object",
+      "required": ["type", "key"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The plugin driver's name for the entry's type.",
+          "x-known-values": ["content-matcher", "content-generator", "transport", "matcher", "interaction", "generator"]
+        },
+        "key": { "type": "string" },
+        "content-types": {
+          "type": "array",
+          "description": "For a content matcher or generator, the content types it claims: its 'content-types' value split at ';'. Each is a pattern, a regular expression anchored at both ends and matched against a media type's type and subtype with any suffix, parameters stripped, as pact-plugin-driver matches it.",
+          "items": { "type": "string" }
+        },
+        "action": {
+          "type": "string",
+          "description": "The contributed action an entry the bridge serves is reached through. Absent for an entry it describes and does not serve."
+        },
+        "values": {
+          "type": "object",
+          "description": "The entry's values, as the plugin registered them.",
+          "additionalProperties": { "type": "string" }
+        }
+      }
     },
     "Contributions": {
       "title": "Contributions",

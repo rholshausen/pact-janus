@@ -97,6 +97,9 @@ jobs:
           targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
         with:
+          workspaces: |
+            . -> target
+            plugin-bridge -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
       # The kernel embeds QuickJS for scripted hooks (ADR 0015), and `rquickjs`'s bindgen build —
       # the one that reaches the WASI targets — needs libclang. The only non-Rust build requirement
@@ -198,6 +201,43 @@ jobs:
           cargo clippy --all-targets -- -D warnings
           cargo test
           cargo build --release --target wasm32-wasip2
+      # S5.2c (ADR 0106, ADR 0109): janus-plugin-bridge is a workspace of its own, so pact-plugin-driver's
+      # gRPC never enters this one, and the steps above never see it. It is tested against the
+      # pact-plugins releases plugin-bridge/pact-plugins.json pins: each checked against its digest,
+      # cached by the pin, and never installed from the plugin index during a test.
+      - name: Pinned pact plugins (cache)
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pact-plugins
+          key: pact-plugins-${{ runner.os }}-${{ hashFiles('plugin-bridge/pact-plugins.json') }}
+      - name: Pinned pact plugins
+        shell: bash
+        run: |
+          temp="$RUNNER_TEMP"
+          if [ "$RUNNER_OS" = Windows ]; then temp="$(cygpath -m "$RUNNER_TEMP")"; fi
+          .github/scripts/pact-plugins.sh "$temp/pact-plugins"
+          cp -r plugin-bridge/tests/fixtures/plugins/lines-0.1.0 "$temp/pact-plugins/"
+          echo "JANUS_PACT_PLUGINS=$temp/pact-plugins" >> "$GITHUB_ENV"
+      # Its own tests load a Lua plugin and download nothing; the one that kills a plugin process uses the
+      # pinned CSV plugin JANUS_PACT_PLUGINS names (Unix only).
+      - name: Plugin bridge
+        working-directory: plugin-bridge
+        run: |
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked
+          cargo build --locked
+      # Its conformance cases run through `janus component check`, as a run loads it.
+      - name: Plugin bridge conformance cases
+        shell: bash
+        run: |
+          root="$PWD" exe=""
+          if [ "$RUNNER_OS" = Windows ]; then root="$(cygpath -m "$PWD")" exe=".exe"; fi
+          export PACT_PLUGIN_DIR="$JANUS_PACT_PLUGINS" PACT_DO_NOT_TRACK=true
+          export JANUS_PLUGIN_BRIDGE="$root/plugin-bridge/target/debug/janus-plugin-bridge$exe"
+          for plugin in lines csv protobuf; do
+            "target/debug/janus$exe" component check --config plugin-bridge/conformance/plugins.janus.yaml \
+              "pact-plugin-$plugin" "plugin-bridge/conformance/$plugin"
+          done
 
   verifier-diff:
     # Staged plan S1.1: today's verifier (pact_verifier_cli, pinned in

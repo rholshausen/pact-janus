@@ -1,0 +1,58 @@
+{
+  "name": "pact-plugin-lines/handshake",
+  "component": "pact-plugin-lines",
+  "calls": [
+    {
+      "op": "component/hello",
+      "body": {
+        "component-protocol-versions": [
+          1
+        ]
+      },
+      "expect": {
+        "ok": {
+          "component-protocol-version": 1,
+          "component": {
+            "name": "pact-plugin-lines",
+            "version": "0.1.0"
+          },
+          "interfaces": [
+            "matcher"
+          ],
+          "contributes": {
+            "actions": [
+              {
+                "name": "pact-plugin-lines:compare-contents"
+              }
+            ]
+          },
+          "capabilities": {
+            "pact-plugin": {
+              "name": "lines",
+              "version": "0.1.0",
+              "interface-version": 1,
+              "bridge": {
+                "name": "janus-plugin-bridge"
+              },
+              "catalogue": [
+                {
+                  "type": "content-matcher",
+                  "key": "lines",
+                  "content-types": [
+                    "text/x-lines",
+                    "application/x-lines\\+text"
+                  ],
+                  "action": "pact-plugin-lines:compare-contents"
+                },
+                {
+                  "type": "transport",
+                  "key": "lines"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

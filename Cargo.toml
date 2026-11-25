@@ -30,7 +30,7 @@ members = [
 # The benchmark harness is durable but standalone — it drags the whole
 # pact_ffi dependency tree, which the main workspace should not pay for.
 # Each third-party component is its own workspace, depending on nothing here.
-exclude = ["benchmarks", "third-party"]
+exclude = ["benchmarks", "plugin-bridge", "third-party"]
 
 [workspace.package]
 version = "0.8.0"

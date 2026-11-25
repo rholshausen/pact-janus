@@ -1,0 +1,39 @@
+[package]
+name = "pact_janus_plugin_bridge"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/rholshausen/pact-janus"
+description = "janus-plugin-bridge: one of today's pact-plugins, served to the Janus engine as a component over the subprocess binding (ADR 0106)"
+publish = false
+
+# A workspace of its own, on purpose (ADR 0106 decision 1): the plugin driver brings gRPC, protobuf,
+# tokio, a vendored Lua and an installer, and none of it may enter the tree of a Janus binary or the
+# root Cargo.lock. The root workspace excludes this directory.
+[workspace]
+
+[[bin]]
+name = "janus-plugin-bridge"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+bytes = "1"
+# The driver today's verifier and pact_ffi load plugins with, so discovery, manifests, process start,
+# Lua plugins, interface versions 1 and 2 and installing from the index behave as they do there.
+pact-plugin-driver = "1.2.7"
+pact_models = { version = "~1.3.14", default-features = false }
+regex = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
+tokio = { version = "1", features = ["rt-multi-thread"] }
+# The driver's own gRPC library, named here only to tell a plugin that could not be reached from one that
+# answered with a failure (ADR 0109 decision 6).
+tonic = "0.14"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "tracing-log"] }
+
+[dev-dependencies]
+pretty_assertions = "1"
+rstest = "0.28"
+tempfile = "3"

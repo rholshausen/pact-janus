@@ -1,0 +1,67 @@
+{
+  "$comment": "The pact-plugins releases the bridge's conformance cases are run against in CI (staged plan S5.2c, ADR 0106). .github/scripts/pact-plugins.sh installs each into a plugin directory for its platform, refusing a manifest or executable with any other digest, so no test installs a plugin from the index. Moving a pin is a deliberate change: take the digests from the release's .sha256 files and rerun the cases.",
+  "plugins": [
+    {
+      "name": "csv",
+      "version": "0.1.0",
+      "release": "https://github.com/pact-foundation/pact-plugins/releases/download/csv-plugin-0.1.0",
+      "manifest": {
+        "file": "pact-plugin.json",
+        "sha256": "7fac33341e807b0b91df845d6489ee26b9ce3bbb3773a22650f59dc779f9abc6"
+      },
+      "executables": {
+        "linux-x86_64": {
+          "file": "pact-csv-plugin-linux-x86_64.gz",
+          "sha256": "6460d8bff3d9590f7f6e500bbe9952641ae50bf06064387c2611227251f604ec"
+        },
+        "linux-aarch64": {
+          "file": "pact-csv-plugin-linux-aarch64.gz",
+          "sha256": "768a8a2cc635b863bd75177fac94080cbda5ca2419e4b99e59e56b6e40f3dc21"
+        },
+        "macos-x86_64": {
+          "file": "pact-csv-plugin-macos-x86_64.gz",
+          "sha256": "44ef98b3f6745ae35474774d5f9be17c06d992fa60c84a4abad7a83da77ca531"
+        },
+        "macos-aarch64": {
+          "file": "pact-csv-plugin-macos-aarch64.gz",
+          "sha256": "42c30c4dabc4adedde759094958bfb1a198af8fafb304acad0bac044c5b303ec"
+        },
+        "windows-x86_64": {
+          "file": "pact-csv-plugin-windows-x86_64.exe.gz",
+          "sha256": "4b12384d17911d3930772be6ee89b3c684ae240bd3b6e4fbe956f8dd985b76c9"
+        }
+      }
+    },
+    {
+      "name": "protobuf",
+      "version": "0.8.1",
+      "release": "https://github.com/pact-foundation/pact-protobuf-plugin/releases/download/v-0.8.1",
+      "manifest": {
+        "file": "pact-plugin.json",
+        "sha256": "ef99f043a98942018046800e7a3f1d344365bcddd406200b26130a3fb4ad91c4"
+      },
+      "executables": {
+        "linux-x86_64": {
+          "file": "pact-protobuf-plugin-linux-x86_64.gz",
+          "sha256": "d0fc6b3d99b17995ed5bf024f03f51790f332741c7acf745b97619dd4ee43fe0"
+        },
+        "linux-aarch64": {
+          "file": "pact-protobuf-plugin-linux-aarch64.gz",
+          "sha256": "c9387916e75e8815dc56d3b47fbb05d6de9fd757abce853f90a240bc5ae1b896"
+        },
+        "macos-x86_64": {
+          "file": "pact-protobuf-plugin-macos-x86_64.gz",
+          "sha256": "5af6b4a35f058f358f9fe9da34dcf2d60337bc80dd58f3bdebae2dab672d32d1"
+        },
+        "macos-aarch64": {
+          "file": "pact-protobuf-plugin-macos-aarch64.gz",
+          "sha256": "de8197cb7e6f5d79e7a8850fb54b3bf42913ac1537f9a64adfcd5e69785f3fd3"
+        },
+        "windows-x86_64": {
+          "file": "pact-protobuf-plugin-windows-x86_64.exe.gz",
+          "sha256": "9fb1b3ada938a88b932491df00015dd6f0ec1bd2ff9d6519e640020032da5cc2"
+        }
+      }
+    }
+  ]
+}

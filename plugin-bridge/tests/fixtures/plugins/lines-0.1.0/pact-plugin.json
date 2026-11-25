@@ -1,0 +1,8 @@
+{
+  "manifestVersion": 1,
+  "pluginInterfaceVersion": 1,
+  "name": "lines",
+  "version": "0.1.0",
+  "executableType": "lua",
+  "entryPoint": "plugin.lua"
+}
