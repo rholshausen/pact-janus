@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795646879798,
+  "lastUpdate": 1795646882376,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -67584,6 +67584,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 80.5,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "e781ab2fd95aa08eeb763620057778e25fda5285",
+          "message": "chore: the broker harness pins Pact Broker 2.124.0\n\nThe weekly Latest Pact Broker run found 2.124.0 answering one thing\ndifferently: the info notice on a 409 for republished content is now a\nunified diff, with a hunk header and three lines of context, where\n2.121.2 sent a fragment. The client relays notices verbatim, so only\nthe recording moves. Every other broker check passed against it, and\nverifier-diff's ledger is unchanged. 2.124.0 still refuses a gzipped\npublication and advertises no Accept-Encoding, so the client's comment\nnames it.\n\nNo-Changeset: nothing that ships changes (a test recording, the\nharness's pin and a doc comment).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-26T09:32:57+11:00",
+          "tree_id": "f8fdb2b483fb707fddfa3c44bc2f5e3a67806955",
+          "url": "https://github.com/rholshausen/pact-janus/commit/e781ab2fd95aa08eeb763620057778e25fda5285"
+        },
+        "date": 1795646881545,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 30016,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 27013,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 56.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 39.8,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 139.8,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 99.8,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
