@@ -20,6 +20,7 @@ mod catalogue;
 mod compare;
 mod error;
 mod frames;
+mod generate;
 
 use bridge::{Bridge, Wanted};
 use std::io::{self, BufReader};

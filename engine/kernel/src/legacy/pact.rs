@@ -20,13 +20,13 @@
 //! generators to apply is kept as a [`RequestTemplate`], so the verification path never holds a
 //! `pact_models` type (the module docs of [`crate::legacy`]).
 
-use super::compile::{LegacyBody, LegacyMessage, LegacyPart, LegacyRequest, LegacyResponse};
+use super::compile::{LegacyBody, LegacyMessage, LegacyPart, LegacyRequest, LegacyResponse, PluginBody};
 use crate::common::ContentTypes;
 use crate::component::{
   ComponentError, Generate, GeneratorComponent, PactGenerators, Part, Parts, SlotValue,
 };
 use crate::contract::{ContractError, Problem};
-use crate::plan::{CapturedValues, RuntimeValue};
+use crate::plan::{ActionApplier, CapturedValues, NodeResult, RuntimeValue};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_models::bodies::OptionalBody;
@@ -94,6 +94,7 @@ pub fn looks_like_a_pact(doc: &Value) -> bool {
 /// `provider_states` is the v3 list even when the pact is v1/v2 — `as_v4_http` below normalises a
 /// single `providerState` string into a one-element list with no parameters, so nothing
 /// downstream branches on the pact's version to find out what state an interaction needs.
+#[derive(Clone)]
 pub struct LegacyInteraction {
   pub description: String,
   /// The interaction's id (`_id`): a Pact Broker adds one to every interaction it serves, and a
@@ -105,12 +106,19 @@ pub struct LegacyInteraction {
   pub provider_states: Vec<ProviderState>,
   pub request: HttpRequest,
   pub response: HttpResponse,
+  /// Its response body, when a pact plugin compares it (ADR 0110 decision 3): set by
+  /// [`super::plugins::bridged`] for an interaction that needs a plugin, and read by [`interaction_response`].
+  pub plugin_body: Option<PluginBody>,
+  /// Its request body's generators, when a pact plugin's content generator applies them (ADR 0110
+  /// decision 7): set by [`super::plugins::bridged`].
+  pub request_generator: Option<PluginGenerate>,
 }
 
-/// A v4 interaction that needs a pact-plugins plugin (protobuf, gRPC, Avro, CSV…), which this engine
-/// cannot load until a bridge to them exists (staged plan S1.8, S5.2). It is refused by name rather
-/// than verified with the built-in components, which would compare a body the plugin owns as text or
-/// bytes and so verify half of it.
+/// A v4 interaction that needs a pact-plugins plugin (protobuf, gRPC, Avro, CSV…). It is verified
+/// through the plugin's bridge when the run has one that can verify all of it, and refused by name
+/// otherwise ([`super::plugins::bridged`], ADR 0110 decision 5), rather than verified with the built-in
+/// components, which would compare a body the plugin owns as text or bytes and so verify half of it.
+#[derive(Clone)]
 pub struct PluginInteraction {
   pub description: String,
   pub id: Option<String>,
@@ -118,6 +126,37 @@ pub struct PluginInteraction {
   pub provider_states: Vec<ProviderState>,
   /// The plugins it needs, by the names the pact gives them, sorted.
   pub plugins: Vec<String>,
+  /// The interaction as it is verified once its plugin bodies are its bridges' to compare: HTTP or a
+  /// message. `None` for a kind that is neither.
+  pub inner: Option<Box<PactInteraction>>,
+  /// Its `pluginConfiguration`: each plugin's configuration for it, as the plugin wrote it.
+  pub configuration: BTreeMap<String, Value>,
+  /// The transport a v4 interaction names, which may be a plugin's (gRPC).
+  pub transport: Option<String>,
+  /// Whether one of its rules is a plugin's: a matcher-only plugin's (staged plan S5.2g).
+  pub plugin_rules: bool,
+}
+
+/// A plugin a pact's metadata names (`metadata.plugins`): what a run declares its bridge with, and the
+/// configuration its content matcher is handed for every interaction of the pact.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PactPlugin {
+  pub name: String,
+  pub version: String,
+  pub configuration: Value,
+}
+
+/// The plugins `pact`'s metadata names, in the order it names them.
+pub fn pact_plugins(pact: &dyn Pact) -> Vec<PactPlugin> {
+  pact
+    .plugin_data()
+    .into_iter()
+    .map(|plugin| PactPlugin {
+      name: plugin.name,
+      version: plugin.version,
+      configuration: Value::Object(plugin.configuration.into_iter().collect()),
+    })
+    .collect()
 }
 
 /// The part a v1–v4 message is produced as (staged plan S1.7): what a `produce-message` hook in
@@ -129,6 +168,7 @@ pub const MESSAGE_PART: &str = crate::hooks::points::PRODUCED_PART;
 /// A v3 message, or a v4 asynchronous or synchronous message, that needs no plugin (staged plan
 /// S1.7). Verified as today's verifier verifies one: the provider is asked for the message, and what
 /// it produces is compared with the one the pact expects.
+#[derive(Clone)]
 pub struct MessageInteraction {
   pub description: String,
   pub id: Option<String>,
@@ -151,10 +191,14 @@ pub struct MessageInteraction {
   /// How many responses a synchronous message expects; 1 for an asynchronous one. Today's verifier
   /// compares one, so a synchronous message expecting more always fails, as it does today.
   pub responses: usize,
+  /// Its expected contents, when a pact plugin compares them (ADR 0110 decision 3): set by
+  /// [`super::plugins::bridged`], and read by [`interaction_message`].
+  pub plugin_body: Option<PluginBody>,
 }
 
 /// One interaction of a v1–v4 pact that the engine takes on: one it verifies, or one it refuses by
 /// name.
+#[derive(Clone)]
 pub enum PactInteraction {
   Http(Box<LegacyInteraction>),
   Message(Box<MessageInteraction>),
@@ -201,29 +245,52 @@ pub fn interactions(pact: &dyn Pact) -> Vec<PactInteraction> {
     .interactions()
     .into_iter()
     .filter_map(|interaction| {
+      let plain = plain_interaction(interaction.as_ref());
       let plugins = plugins_needed(interaction.as_ref(), &named);
-      if !plugins.is_empty() {
-        return Some(PactInteraction::NeedsPlugins(PluginInteraction {
-          description: interaction.description(),
-          id: interaction.id(),
-          pending: interaction.pending(),
-          provider_states: interaction.provider_states(),
-          plugins,
-        }));
+      if plugins.is_empty() {
+        return plain;
       }
-      if let Some(http) = interaction.as_v4_http() {
-        return Some(PactInteraction::Http(Box::new(LegacyInteraction {
-          description: http.description,
-          id: http.id,
-          pending: http.pending,
-          provider_states: http.provider_states,
-          request: http.request,
-          response: http.response,
-        })));
-      }
-      message_interaction(interaction.as_ref()).map(|message| PactInteraction::Message(Box::new(message)))
+      let v4 = interaction.as_v4();
+      Some(PactInteraction::NeedsPlugins(PluginInteraction {
+        description: interaction.description(),
+        id: interaction.id(),
+        pending: interaction.pending(),
+        provider_states: interaction.provider_states(),
+        plugins,
+        inner: plain.map(Box::new),
+        configuration: v4
+          .as_ref()
+          .map(|v4| {
+            v4.plugin_config()
+              .into_iter()
+              .map(|(name, config)| (name, Value::Object(config.into_iter().collect())))
+              .collect()
+          })
+          .unwrap_or_default(),
+        transport: v4.as_ref().and_then(|v4| v4.transport()),
+        plugin_rules: has_plugin_rules(interaction.as_ref()),
+      }))
     })
     .collect()
+}
+
+/// An interaction as it is verified when it needs no plugin, or once its plugin bodies are its bridges'.
+fn plain_interaction(
+  interaction: &(dyn pact_models::interaction::Interaction + Send + Sync + RefUnwindSafe),
+) -> Option<PactInteraction> {
+  if let Some(http) = interaction.as_v4_http() {
+    return Some(PactInteraction::Http(Box::new(LegacyInteraction {
+      description: http.description,
+      id: http.id,
+      pending: http.pending,
+      provider_states: http.provider_states,
+      request: http.request,
+      response: http.response,
+      plugin_body: None,
+      request_generator: None,
+    })));
+  }
+  message_interaction(interaction).map(|message| PactInteraction::Message(Box::new(message)))
 }
 
 /// A message interaction as [`MessageInteraction`] holds one, and the request today's verifier
@@ -255,6 +322,7 @@ fn message_interaction(
       expected: sync.response.first().cloned(),
       sent: Some(sync.request.clone()),
       responses: sync.response.len(),
+      plugin_body: None,
     });
   }
   let message = interaction.as_v4_async_message()?;
@@ -272,6 +340,7 @@ fn message_interaction(
     expected: Some(message.contents),
     sent: None,
     responses: 1,
+    plugin_body: None,
   })
 }
 
@@ -302,26 +371,30 @@ fn plugins_needed(
     .as_v4()
     .map(|v4| v4.plugin_config().into_keys().collect())
     .unwrap_or_default();
-  if plugins.is_empty()
-    && !named.is_empty()
-    && (interaction.as_v4_http().is_some_and(|http| {
-      has_plugin_rule(&http.request.matching_rules) || has_plugin_rule(&http.response.matching_rules)
-    }) || interaction
-      .as_v4_async_message()
-      .is_some_and(|message| has_plugin_rule(&message.contents.matching_rules))
-      || interaction.as_v4_sync_message().is_some_and(|message| {
-        has_plugin_rule(&message.request.matching_rules)
-          || message
-            .response
-            .iter()
-            .any(|response| has_plugin_rule(&response.matching_rules))
-      }))
-  {
+  if plugins.is_empty() && !named.is_empty() && has_plugin_rules(interaction) {
     plugins = named.to_vec();
   }
   plugins.sort();
   plugins.dedup();
   plugins
+}
+
+/// Whether one of an interaction's rules is a plugin's: one `pact_models` reads as `MatchingRule::Plugin`.
+fn has_plugin_rules(
+  interaction: &(dyn pact_models::interaction::Interaction + Send + Sync + RefUnwindSafe),
+) -> bool {
+  interaction.as_v4_http().is_some_and(|http| {
+    has_plugin_rule(&http.request.matching_rules) || has_plugin_rule(&http.response.matching_rules)
+  }) || interaction
+    .as_v4_async_message()
+    .is_some_and(|message| has_plugin_rule(&message.contents.matching_rules))
+    || interaction.as_v4_sync_message().is_some_and(|message| {
+      has_plugin_rule(&message.request.matching_rules)
+        || message
+          .response
+          .iter()
+          .any(|response| has_plugin_rule(&response.matching_rules))
+    })
 }
 
 fn has_plugin_rule(rules: &MatchingRules) -> bool {
@@ -393,6 +466,52 @@ pub fn legacy_response(response: &HttpResponse) -> Result<LegacyResponse, Unsupp
   })
 }
 
+/// An HTTP interaction's response as the compiler reads it: [`legacy_response`], but a body a pact
+/// plugin compares is its bridge's (ADR 0110 decision 3), never read by its type here.
+pub fn interaction_response(interaction: &LegacyInteraction) -> Result<LegacyResponse, Unsupported> {
+  let Some(plugin) = &interaction.plugin_body else {
+    return legacy_response(&interaction.response);
+  };
+  let response = &interaction.response;
+  Ok(LegacyResponse {
+    status: response.status as u64,
+    headers: convert_headers(response.headers.as_ref()),
+    body: Some(LegacyBody::Plugin(Box::new(plugin.clone()))),
+    content_type: body_type(response),
+    matching_rules: response.matching_rules.clone(),
+  })
+}
+
+/// A message interaction's expected message as the compiler reads it: [`legacy_message`], but contents
+/// a pact plugin compares are its bridge's (ADR 0110 decision 3).
+pub fn interaction_message(message: &MessageInteraction) -> Result<LegacyMessage, Unsupported> {
+  let mut expected = match &message.plugin_body {
+    // The contents are not read by their type: the plugin owns them.
+    Some(_) => legacy_message(
+      message
+        .expected
+        .as_ref()
+        .map(|contents| MessageContents {
+          contents: OptionalBody::Missing,
+          ..contents.clone()
+        })
+        .as_ref(),
+      message.responses,
+    )?,
+    None => return legacy_message(message.expected.as_ref(), message.responses),
+  };
+  expected.body = message
+    .plugin_body
+    .clone()
+    .map(|plugin| LegacyBody::Plugin(Box::new(plugin)));
+  expected.content_type = message
+    .expected
+    .as_ref()
+    .and_then(MessageContents::message_content_type)
+    .map(|content_type| content_type.to_string());
+  Ok(expected)
+}
+
 /// A message to design 3.5's own input type (staged plan S1.7): its metadata, its contents read by
 /// their content type as a body is, and its rules (`body` and `metadata`). The content type is
 /// the one today's verifier takes (`MessageContents::message_content_type`): the contents' own, else
@@ -438,7 +557,7 @@ pub fn legacy_message(
 /// under a root named for the interaction. There is no request half: what asks the provider for the
 /// message is a hook, not a part of the interaction.
 pub fn message_plan(message: &MessageInteraction) -> Result<crate::plan::Plan, Unsupported> {
-  let expected = legacy_message(message.expected.as_ref(), message.responses)?;
+  let expected = interaction_message(message)?;
   let plan = super::compile::compile_message(&expected, MESSAGE_PART);
   Ok(crate::plan::Plan {
     root: crate::plan::Node::container(Some(message.description.clone()), vec![plan.root]),
@@ -571,6 +690,8 @@ pub fn message_types(message: &LegacyMessage) -> ContentTypes {
       ContentType::parse(content_type.as_str()).is_ok_and(|parsed| BodyKind::of(&parsed) == BodyKind::Text);
     let declared = match body {
       LegacyBody::Document(RuntimeValue::Bytes(_)) if is_text => "application/octet-stream".to_string(),
+      // A plugin compares the octets as they arrived (ADR 0110 decision 3): nothing decodes them first.
+      LegacyBody::Plugin(_) => "application/octet-stream".to_string(),
       _ => content_type.clone(),
     };
     types.insert(
@@ -813,6 +934,8 @@ pub fn response_types(response: &LegacyResponse) -> ContentTypes {
       ContentType::parse(content_type.as_str()).is_ok_and(|parsed| BodyKind::of(&parsed) == BodyKind::Text);
     let declared = match &response.body {
       Some(LegacyBody::Document(RuntimeValue::Bytes(_))) if is_text => "application/octet-stream".to_string(),
+      // A plugin compares the octets as they arrived (ADR 0110 decision 3): nothing decodes them first.
+      Some(LegacyBody::Plugin(_)) => "application/octet-stream".to_string(),
       _ => content_type.clone(),
     };
     types.insert(
@@ -934,24 +1057,62 @@ fn has_request_generators(request: &HttpRequest) -> bool {
 /// a `ProviderState` generator reads what the exchange's states returned, so the request is
 /// generated after they are set up. Opaque outside the v1–v4 boundary.
 #[derive(Debug, Clone)]
-pub struct RequestTemplate(HttpRequest);
+pub struct RequestTemplate {
+  request: HttpRequest,
+  /// Its body's generators are a pact plugin's to apply, through this action (ADR 0110 decision 7).
+  plugin: Option<PluginGenerate>,
+}
+
+/// A request body a pact plugin's content generator fills (ADR 0110 decision 7): the action its bridge
+/// contributes, and the argument the pact gives it, to which the exchange's provider-state values are
+/// added as `test-context` when it is sent.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PluginGenerate {
+  pub action: String,
+  pub argument: Value,
+}
 
 impl RequestTemplate {
   /// The request, when it has a generator the provider side runs; `None` replays it as recorded.
   pub fn of(request: &HttpRequest) -> Option<RequestTemplate> {
-    has_request_generators(request).then(|| RequestTemplate(request.clone()))
+    has_request_generators(request).then(|| RequestTemplate {
+      request: request.clone(),
+      plugin: None,
+    })
+  }
+
+  /// This template, its body's generators applied through `plugin` when one is given.
+  pub fn with_plugin(self, plugin: Option<PluginGenerate>) -> RequestTemplate {
+    RequestTemplate { plugin, ..self }
   }
 
   /// The request with its generators applied, as the parts a transport sends, and every generator
-  /// that produced nothing.
+  /// that produced nothing. A plugin's content generator is applied through `actions`.
   pub fn generate(
     &self,
     provider_state: &Map<String, Value>,
     generators: &dyn GeneratorComponent,
+    actions: Option<&dyn ActionApplier>,
   ) -> (Parts, Vec<GeneratorFailure>) {
-    let (generated, failures) = generate_request(&self.0, provider_state, generators);
+    let plugin = self.plugin.as_ref().map(|plugin| (plugin, actions));
+    let (generated, failures) = generate_request(&self.request, provider_state, generators, plugin);
     (request_parts(&generated), failures)
   }
+}
+
+/// The body generators of `request`, in the v4 pact form keyed by path, which a pact plugin's content
+/// generator is handed (every one, as today's verifier hands them); `None` when it has none.
+pub fn body_generators(request: &HttpRequest) -> Option<Value> {
+  let generators = request.build_generators(&GeneratorCategory::BODY);
+  if generators.is_empty() {
+    return None;
+  }
+  let mut by_path: Vec<(String, Value)> = generators
+    .iter()
+    .filter_map(|(path, generator)| Some((path.to_string(), generator.to_json()?)))
+    .collect();
+  by_path.sort_by(|a, b| a.0.cmp(&b.0));
+  Some(Value::Object(by_path.into_iter().collect()))
 }
 
 /// One generator that produced no value, so the recorded one was sent (ADR 0034 decision 5).
@@ -975,6 +1136,7 @@ fn generate_request(
   request: &HttpRequest,
   provider_state: &Map<String, Value>,
   generators: &dyn GeneratorComponent,
+  plugin: Option<(&PluginGenerate, Option<&dyn ActionApplier>)>,
 ) -> (HttpRequest, Vec<GeneratorFailure>) {
   let mut request = request.clone();
   let mut failures = Vec::new();
@@ -1029,6 +1191,46 @@ fn generate_request(
       }
     }
     query.insert(name.to_string(), generated);
+  }
+
+  // ADR 0110 decision 7: a plugin's content generator fills the whole body, as today's verifier has it.
+  if let Some((plugin, actions)) = plugin
+    && let OptionalBody::Present(bytes, content_type, encoding) = &request.body
+  {
+    let mut argument = plugin.argument.clone();
+    argument["test-context"] = state.clone();
+    let applied = actions.and_then(|actions| {
+      actions.apply(
+        &plugin.action,
+        &[
+          RuntimeValue::Bytes(bytes.to_vec()),
+          RuntimeValue::from_json(&argument),
+        ],
+        Some("$.request.body"),
+      )
+    });
+    let generated = match applied {
+      Some(NodeResult::Value(RuntimeValue::Bytes(body))) => Ok(body),
+      Some(NodeResult::Value(RuntimeValue::String(body))) => Ok(body.into_bytes()),
+      Some(NodeResult::Error { message, .. }) => Err(message),
+      Some(_) => Err(format!(
+        "'{}' answered with something that is not a body",
+        plugin.action
+      )),
+      None => Err(format!(
+        "no component in this run contributes '{}'",
+        plugin.action
+      )),
+    };
+    match generated {
+      Ok(body) => request.body = OptionalBody::Present(body.into(), content_type.clone(), *encoding),
+      Err(message) => failures.push(GeneratorFailure {
+        target: "$.request.body".to_string(),
+        generator: plugin.action.clone(),
+        message: format!("{message}; the recorded body was sent"),
+      }),
+    }
+    return (request, failures);
   }
 
   let body_generators = provider_side(&request, &GeneratorCategory::BODY);

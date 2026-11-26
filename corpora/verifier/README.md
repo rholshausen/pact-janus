@@ -116,6 +116,12 @@ interaction of a pact it did not fetch is `absent` there too.
   XML body both verifiers write the same bytes, so the provider recognises them exactly.
 - `connection/`: the provider connection options, `--header`, `--base-path`, `--request-timeout` and
   TLS (S1.5).
+- `plugins/`: pacts whose bodies a pact-plugins plugin owns (S5.2d, ADR 0110): pact-plugins' CSV example,
+  over HTTP, its request body filled by the plugin's content generator, and its protobuf JVM example's
+  messages, each passing and failing. Both verifiers load the plugins
+  `plugin-bridge/pact-plugins.json` pins from `PACT_PLUGIN_DIR` (`.github/scripts/pact-plugins.sh`
+  installs them), and `janus verify` reaches them through `janus-plugin-bridge`, which
+  `JANUS_PLUGIN_BRIDGE` names, as CI's job sets them.
 - `bodies/`: bodies that are not JSON, and how a reply's content type is read (S1.6, ADR 0036): a
   reply with no `Content-Type`, one labelled with a type the pact's does not agree with, a regex on
   a text body and an `application/octet-stream` body; and XML (S1.22, ADR 0039): the rules pact-jvm's

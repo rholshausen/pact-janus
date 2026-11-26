@@ -152,6 +152,16 @@ entry's member, `$.body.prices.plum`. When the first child is itself an action, 
 `expect:size` over `legacy:xml-children($.body.order)` is located at `$.body.order`. A reader is told
 which element failed, and a host can point at it.
 
+One node can find several things wrong with one value: a pact plugin's content matcher compares a whole
+body and answers each difference it found, located in its own words. Its `error` may then carry
+`mismatches`, a list of what it found, each a `message` and an optional `at`, where the node locates it
+inside the value under test
+([ADR 0110](../../decisions/0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md)).
+The node keeps its one `message`, which names them all, and its one absolute `path`. `at` is not a
+path in this grammar's sense: it is in a document only the component decodes, and is passed on as
+written. A run reports each entry as a mismatch of its own, at the node's path, with its `at`; the
+executed form (§3.2) shows the node's own message.
+
 A `container`'s result is the conjunction of its children's: `error` if any child errored, otherwise
 `ok`. This is what makes a plan's root result the interaction's verdict, and what makes any subtree's
 result a meaningful sub-verdict — which is what `explain --executed` shows.

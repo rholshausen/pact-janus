@@ -32,7 +32,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "filter",
     "stop-on-first-failure",
     "report",
-    "unhandled-states"
+    "unhandled-states",
+    "plugin-bridge"
 })
 public class VerifyOptions {
 
@@ -89,6 +90,15 @@ public class VerifyOptions {
     @JsonProperty("unhandled-states")
     @JsonPropertyDescription("A provider state no state-setup hook admits (lifecycle-hooks spec \u00a73.2, ADR 0058). 'warn': a 'state-unhandled' warning, and the exchange runs without it, as pact-js runs it. 'fail': the variant fails before its exchange, with component-unavailable naming 'hook/state-setup', as pact-jvm fails it. Any other value is read as 'warn'.")
     private String unhandledStates;
+    /**
+     * PluginBridge
+     * <p>
+     * How to start janus-plugin-bridge (spec.md §8.3, ADR 0110 decision 6): a component declaration but its name, as component-interfaces spec §10.2 has one. Given it, the engine declares 'pact-plugin-<name>' for each pact plugin a v1–v4 pact's metadata names, the plugin's name and version appended to the source's 'args', unless the run's components already declare that name; for a pact fetched from a broker or by URL, when it arrives. A plugin interaction no bridge can verify is refused, as without one.
+     * 
+     */
+    @JsonProperty("plugin-bridge")
+    @JsonPropertyDescription("How to start janus-plugin-bridge (spec.md \u00a78.3, ADR 0110 decision 6): a component declaration but its name, as component-interfaces spec \u00a710.2 has one. Given it, the engine declares 'pact-plugin-<name>' for each pact plugin a v1\u2013v4 pact's metadata names, the plugin's name and version appended to the source's 'args', unless the run's components already declare that name; for a pact fetched from a broker or by URL, when it arrives. A plugin interaction no bridge can verify is refused, as without one.")
+    private PluginBridge pluginBridge;
     @JsonIgnore
     private Map<String, Object> additionalProperties = new LinkedHashMap<String, Object>();
 
@@ -226,6 +236,28 @@ public class VerifyOptions {
         this.unhandledStates = unhandledStates;
     }
 
+    /**
+     * PluginBridge
+     * <p>
+     * How to start janus-plugin-bridge (spec.md §8.3, ADR 0110 decision 6): a component declaration but its name, as component-interfaces spec §10.2 has one. Given it, the engine declares 'pact-plugin-<name>' for each pact plugin a v1–v4 pact's metadata names, the plugin's name and version appended to the source's 'args', unless the run's components already declare that name; for a pact fetched from a broker or by URL, when it arrives. A plugin interaction no bridge can verify is refused, as without one.
+     * 
+     */
+    @JsonProperty("plugin-bridge")
+    public PluginBridge getPluginBridge() {
+        return pluginBridge;
+    }
+
+    /**
+     * PluginBridge
+     * <p>
+     * How to start janus-plugin-bridge (spec.md §8.3, ADR 0110 decision 6): a component declaration but its name, as component-interfaces spec §10.2 has one. Given it, the engine declares 'pact-plugin-<name>' for each pact plugin a v1–v4 pact's metadata names, the plugin's name and version appended to the source's 'args', unless the run's components already declare that name; for a pact fetched from a broker or by URL, when it arrives. A plugin interaction no bridge can verify is refused, as without one.
+     * 
+     */
+    @JsonProperty("plugin-bridge")
+    public void setPluginBridge(PluginBridge pluginBridge) {
+        this.pluginBridge = pluginBridge;
+    }
+
     @JsonAnyGetter
     public Map<String, Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -268,6 +300,10 @@ public class VerifyOptions {
         sb.append('=');
         sb.append(((this.unhandledStates == null)?"<null>":this.unhandledStates));
         sb.append(',');
+        sb.append("pluginBridge");
+        sb.append('=');
+        sb.append(((this.pluginBridge == null)?"<null>":this.pluginBridge));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -284,6 +320,7 @@ public class VerifyOptions {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.filter == null)? 0 :this.filter.hashCode()));
+        result = ((result* 31)+((this.pluginBridge == null)? 0 :this.pluginBridge.hashCode()));
         result = ((result* 31)+((this.publish == null)? 0 :this.publish.hashCode()));
         result = ((result* 31)+((this.stopOnFirstFailure == null)? 0 :this.stopOnFirstFailure.hashCode()));
         result = ((result* 31)+((this.variant == null)? 0 :this.variant.hashCode()));
@@ -303,7 +340,7 @@ public class VerifyOptions {
             return false;
         }
         VerifyOptions rhs = ((VerifyOptions) other);
-        return (((((((((this.filter == rhs.filter)||((this.filter!= null)&&this.filter.equals(rhs.filter)))&&((this.publish == rhs.publish)||((this.publish!= null)&&this.publish.equals(rhs.publish))))&&((this.stopOnFirstFailure == rhs.stopOnFirstFailure)||((this.stopOnFirstFailure!= null)&&this.stopOnFirstFailure.equals(rhs.stopOnFirstFailure))))&&((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant))))&&((this.report == rhs.report)||((this.report!= null)&&this.report.equals(rhs.report))))&&((this.variants == rhs.variants)||((this.variants!= null)&&this.variants.equals(rhs.variants))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.unhandledStates == rhs.unhandledStates)||((this.unhandledStates!= null)&&this.unhandledStates.equals(rhs.unhandledStates))));
+        return ((((((((((this.filter == rhs.filter)||((this.filter!= null)&&this.filter.equals(rhs.filter)))&&((this.pluginBridge == rhs.pluginBridge)||((this.pluginBridge!= null)&&this.pluginBridge.equals(rhs.pluginBridge))))&&((this.publish == rhs.publish)||((this.publish!= null)&&this.publish.equals(rhs.publish))))&&((this.stopOnFirstFailure == rhs.stopOnFirstFailure)||((this.stopOnFirstFailure!= null)&&this.stopOnFirstFailure.equals(rhs.stopOnFirstFailure))))&&((this.variant == rhs.variant)||((this.variant!= null)&&this.variant.equals(rhs.variant))))&&((this.report == rhs.report)||((this.report!= null)&&this.report.equals(rhs.report))))&&((this.variants == rhs.variants)||((this.variants!= null)&&this.variants.equals(rhs.variants))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.unhandledStates == rhs.unhandledStates)||((this.unhandledStates!= null)&&this.unhandledStates.equals(rhs.unhandledStates))));
     }
 
 }

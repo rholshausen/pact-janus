@@ -30,6 +30,11 @@ impl Plugin {
   pub fn compare_contents(&self) -> String {
     format!("{}:compare-contents", self.component())
   }
+
+  /// The action a content generator is reached through (ADR 0110 decision 7).
+  pub fn generate_content(&self) -> String {
+    format!("{}:generate-content", self.component())
+  }
 }
 
 /// The component a plugin is served as (ADR 0106 decision 3).
@@ -91,7 +96,9 @@ pub fn claims(pattern: &str, media_type: &str) -> bool {
 /// The handshake a bridge answers `component/hello` with, for `plugin` and its catalogue.
 pub fn handshake(plugin: &Plugin, entries: &[Entry]) -> Value {
   let compare_contents = plugin.compare_contents();
+  let generate_content = plugin.generate_content();
   let matches_contents = entries.iter().any(|entry| entry.kind == "content-matcher");
+  let generates_contents = entries.iter().any(|entry| entry.kind == "content-generator");
   let mut sorted: Vec<&Entry> = entries.iter().collect();
   sorted.sort_by(|a, b| (&a.kind, &a.key).cmp(&(&b.kind, &b.key)));
   let catalogue: Vec<Value> = sorted
@@ -106,15 +113,21 @@ pub fn handshake(plugin: &Plugin, entries: &[Entry]) -> Value {
       if entry.kind == "content-matcher" {
         described.insert("action".to_string(), json!(compare_contents));
       }
+      if entry.kind == "content-generator" {
+        described.insert("action".to_string(), json!(generate_content));
+      }
       described.insert("values".to_string(), json!(entry.values));
       Value::Object(described)
     })
     .collect();
-  let actions: Vec<Value> = if matches_contents {
-    vec![json!({ "name": compare_contents })]
-  } else {
-    Vec::new()
-  };
+  let actions: Vec<Value> = [
+    (matches_contents, compare_contents),
+    (generates_contents, generate_content),
+  ]
+  .into_iter()
+  .filter(|(served, _)| *served)
+  .map(|(_, action)| json!({ "name": action }))
+  .collect();
   json!({
     "component-protocol-version": PROTOCOL_VERSION,
     "component": { "name": plugin.component(), "version": plugin.version },
@@ -182,7 +195,10 @@ mod tests {
     assert_eq!(hello["interfaces"], json!(["matcher"]));
     assert_eq!(
       hello["contributes"],
-      json!({ "actions": [{ "name": "pact-plugin-protobuf:compare-contents" }] })
+      json!({ "actions": [
+        { "name": "pact-plugin-protobuf:compare-contents" },
+        { "name": "pact-plugin-protobuf:generate-content" }
+      ] })
     );
     let described = &hello["capabilities"]["pact-plugin"];
     assert_eq!(described["name"], "protobuf");
@@ -194,6 +210,7 @@ mod tests {
           "type": "content-generator",
           "key": "protobuf",
           "content-types": ["application/protobuf", "application/grpc"],
+          "action": "pact-plugin-protobuf:generate-content",
           "values": { "content-types": "application/protobuf;application/grpc" }
         },
         {

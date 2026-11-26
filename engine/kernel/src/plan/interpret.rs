@@ -31,11 +31,24 @@ pub enum NodeResult {
   Value(RuntimeValue),
   /// `marks` is `message` with what it quotes marked (ADR 0054): set where the message quotes a value,
   /// absent where it is prose throughout.
+  /// `found` is what the node found, when it found several things it can locate on its own (plan-grammar
+  /// spec §2.3, ADR 0110): a component action's `mismatches`, each reported as a mismatch of its own.
+  /// `message` still names them all, and `path` is still the value under test's.
   Error {
     message: String,
     path: Option<String>,
     marks: Option<Box<Marked>>,
+    found: Vec<Found>,
   },
+}
+
+/// One of several mismatches a node found (plan-grammar spec §2.3, ADR 0110): what it says, and where the
+/// node's own words locate it inside the value under test. `at` is not a path in the grammar's sense: a
+/// pact plugin's location is in a document only the plugin decodes, and is passed on as written.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Found {
+  pub message: String,
+  pub at: Option<String>,
 }
 
 /// A plan node together with what executing it produced. `result: None` means this node was
@@ -172,6 +185,9 @@ pub struct Mismatch {
   /// The nearest enclosing action's name, when the error came from one — a `match:*`/`expect:*`
   /// failure always has one; a bare `%flow:error` node may not.
   pub action: Option<String>,
+  /// Where the node that found it locates it inside the value under test, when that node found several
+  /// (ADR 0110): a pact plugin's own words for a place in a body only it decodes.
+  pub at: Option<String>,
 }
 
 /// Extract the matched/mismatched verdict and every mismatch from an executed plan.
@@ -191,13 +207,31 @@ fn collect_mismatches(executed: &Executed, enclosing_action: Option<&str>, out: 
     ExecutedKind::Action { name, .. } => Some(name.as_str()),
     _ => enclosing_action,
   };
-  if let Some(NodeResult::Error { message, path, marks }) = &executed.result {
-    out.push(Mismatch {
-      path: path.clone(),
-      message: message.clone(),
-      marks: marks.clone(),
-      action: action_name.map(str::to_string),
-    });
+  if let Some(NodeResult::Error {
+    message,
+    path,
+    marks,
+    found,
+  }) = &executed.result
+  {
+    if found.is_empty() {
+      out.push(Mismatch {
+        path: path.clone(),
+        message: message.clone(),
+        marks: marks.clone(),
+        action: action_name.map(str::to_string),
+        at: None,
+      });
+    } else {
+      // ADR 0110: each mismatch the node found is a mismatch of its own, at the node's path.
+      out.extend(found.iter().map(|found| Mismatch {
+        path: path.clone(),
+        message: found.message.clone(),
+        marks: None,
+        action: action_name.map(str::to_string),
+        at: found.at.clone(),
+      }));
+    }
   }
   // A `flow:or` that passed (spec §2.4) needed only the alternative that did: the ones that failed
   // before it are kept for a reader of the executed plan, and are not mismatches (staged plan S2.18).
@@ -339,6 +373,7 @@ fn run_container_reading_undecodable(label: &Option<String>, children: &[Node], 
       message,
       path: Some(path),
       marks: None,
+      found: Vec::new(),
     }),
     None if skipped && executed_children.iter().all(|c| c.result.is_none()) => None,
     None => Some(NodeResult::Value(RuntimeValue::Bool(
@@ -590,10 +625,12 @@ fn apply_component(name: &str, children: &[Executed], actions: Option<&dyn Actio
         message,
         path: None,
         marks,
+        found,
       } => NodeResult::Error {
         message,
         path: locus(children),
         marks,
+        found,
       },
       other => other,
     },
@@ -618,6 +655,7 @@ fn malformed(name: &str, children: &[Node], message: String) -> Executed {
       message,
       path: None,
       marks: None,
+      found: Vec::new(),
     }),
   }
 }
@@ -791,6 +829,7 @@ fn run_contains(children: &[Node], ctx: &mut Ctx) -> Executed {
       message: "not every entry found a distinct matching element".to_string(),
       path: None,
       marks: None,
+      found: Vec::new(),
     }
   } else {
     NodeResult::Value(RuntimeValue::Bool(true))
@@ -894,6 +933,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
       message: plain_text(&value_of(&children[0])),
       path: None,
       marks: None,
+      found: Vec::new(),
     },
     "flow:apply" | "flow:tee" => {
       // Neither has a worked example anywhere in the specs; this is a documented placeholder
@@ -1066,6 +1106,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
               message: format!("Unexpected member(s): {}", extra.join(", ")),
               path: locus(children),
               marks: None,
+              found: Vec::new(),
             }
           }
         }
@@ -1081,6 +1122,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
         message: "Expected a value but it was absent".to_string(),
         path: locus(children),
         marks: None,
+        found: Vec::new(),
       },
       _ => NodeResult::Value(RuntimeValue::Bool(true)),
     },
@@ -1200,6 +1242,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
           message: "no content component is loaded to detect content type".to_string(),
           path: locus(children),
           marks: None,
+          found: Vec::new(),
         },
         Some(content) => match content.detect(&value, locus(children).as_deref()) {
           // By essence, as a media type is compared: case and parameters aside, and `text/*` names
@@ -1342,11 +1385,13 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
               message: format!("Unexpected child {}", extra[0]),
               path: locus(children),
               marks: None,
+              found: Vec::new(),
             },
             _ => NodeResult::Error {
               message: format!("Unexpected children {}", extra.join(", ")),
               path: locus(children),
               marks: None,
+              found: Vec::new(),
             },
           }
         }
@@ -1480,6 +1525,7 @@ fn dispatch(name: &str, children: &[Executed], content: Option<&dyn ContentDetec
           message: format!("Expected message with content type {expected} but was {actual}"),
           path: locus(children),
           marks: None,
+          found: Vec::new(),
         }
       }
     }
@@ -1860,6 +1906,7 @@ fn failed(pieces: Vec<Marked>, path: Option<String>) -> NodeResult {
     message: marked.text(),
     path,
     marks: Some(Box::new(marked)),
+    found: Vec::new(),
   }
 }
 

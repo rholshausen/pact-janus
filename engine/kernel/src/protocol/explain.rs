@@ -88,9 +88,13 @@ pub enum ExplainError {
     recorded: Vec<String>,
   },
   NotReadable(String),
-  /// A v1–v4 interaction that needs these pact plugins (staged plan S1.8): `verify` refuses it, so
-  /// there is no plan to explain.
-  NeedsPlugins(Vec<String>),
+  /// A v1–v4 interaction that needs these pact plugins and that the scope's bridges cannot verify (ADR
+  /// 0110 decision 5): `verify` refuses it, so there is no plan to explain. Why, and in which words.
+  NeedsPlugins {
+    plugins: Vec<String>,
+    why: &'static str,
+    message: String,
+  },
   /// A component the interaction needs, or one that refuses a slot's shape, that the scope cannot
   /// provide: `verify` would refuse it before anything ran.
   Unavailable(Unavailable),
@@ -124,7 +128,7 @@ pub fn compile(subject: &Subject, scope: &Scope) -> Result<Plan, ExplainError> {
           "'{other}' is not a format this engine reads (expected '{}')",
           contract::FORMAT
         ))),
-        None => legacy(document, index, subject.variant.as_deref()),
+        None => legacy(document, index, subject.variant.as_deref(), scope),
       }
     }
     other => Err(ExplainError::KindUnsupported(other.to_string())),
@@ -329,7 +333,12 @@ pub fn execute(
 
 /// A v1–v4 pact's interaction, through design 3.5's compiler: request and response together, which
 /// is the whole interaction's verdict in one renderable plan.
-fn legacy(document: &Value, index: usize, variant: Option<&str>) -> Result<Plan, ExplainError> {
+fn legacy(
+  document: &Value,
+  index: usize,
+  variant: Option<&str>,
+  scope: &Scope,
+) -> Result<Plan, ExplainError> {
   let pact = legacy_pact::read("explain", document).map_err(|err| match err {
     contract::ContractError::Invalid { problems } => ExplainError::DocumentInvalid(problems),
     other => ExplainError::NotReadable(other.to_string()),
@@ -344,7 +353,26 @@ fn legacy(document: &Value, index: usize, variant: Option<&str>) -> Result<Plan,
     });
   }
   let interactions = legacy_pact::interactions(pact.as_ref());
-  let interaction = match interactions.get(index) {
+  // ADR 0110 decision 5: one that needs a plugin is explained as the run verifies it, through the
+  // scope's bridges, or refused as the run refuses it.
+  let bridged = match interactions.get(index) {
+    Some(legacy_pact::PactInteraction::NeedsPlugins(needs)) => {
+      let contributions = scope.contributions();
+      let bridges = crate::legacy::plugins::Bridges::read(contributions.capabilities());
+      match crate::legacy::plugins::bridged(needs, &bridges, &legacy_pact::pact_plugins(pact.as_ref())) {
+        Ok(interaction) => Some(interaction),
+        Err(refused) => {
+          return Err(ExplainError::NeedsPlugins {
+            plugins: needs.plugins.clone(),
+            why: refused.why(),
+            message: refused.message(),
+          });
+        }
+      }
+    }
+    _ => None,
+  };
+  let interaction = match bridged.as_ref().or(interactions.get(index)) {
     Some(legacy_pact::PactInteraction::Http(interaction)) => interaction,
     // A message's plan is the produced message's (staged plan S1.7): there is no request to show,
     // since what asks the provider for it is a hook, not a part of the interaction.
@@ -352,7 +380,11 @@ fn legacy(document: &Value, index: usize, variant: Option<&str>) -> Result<Plan,
       return legacy_pact::message_plan(message).map_err(|err| ExplainError::NotReadable(err.to_string()));
     }
     Some(legacy_pact::PactInteraction::NeedsPlugins(needs)) => {
-      return Err(ExplainError::NeedsPlugins(needs.plugins.clone()));
+      return Err(ExplainError::NeedsPlugins {
+        plugins: needs.plugins.clone(),
+        why: "kind",
+        message: crate::legacy::plugins::Refused::Kind.message(),
+      });
     }
     None => {
       return Err(ExplainError::NoSuchInteraction {
@@ -363,7 +395,31 @@ fn legacy(document: &Value, index: usize, variant: Option<&str>) -> Result<Plan,
   };
   let request = legacy_pact::legacy_request(&interaction.request)
     .map_err(|err| ExplainError::NotReadable(err.to_string()))?;
-  let response = legacy_pact::legacy_response(&interaction.response)
+  let response = legacy_pact::interaction_response(interaction)
     .map_err(|err| ExplainError::NotReadable(err.to_string()))?;
   Ok(compile_interaction(&interaction.description, &request, &response))
+}
+
+/// The bridges an explain declares for the pact plugins its subject names, when its options say how to
+/// start one (ADR 0110 decision 6), as a run declares them.
+pub fn bridge_declarations(subject: &Subject, declared: &[Value], options: Option<&Value>) -> Vec<Value> {
+  let Some(bridge) = options.and_then(|options| options.get("plugin-bridge")) else {
+    return Vec::new();
+  };
+  let Some(document) = subject
+    .contract
+    .as_ref()
+    .filter(|document| document.get("$format").is_none())
+  else {
+    return Vec::new();
+  };
+  let Ok(pact) = legacy_pact::read("explain", document) else {
+    return Vec::new();
+  };
+  let plugins = legacy_pact::pact_plugins(pact.as_ref());
+  let names: Vec<&str> = declared
+    .iter()
+    .filter_map(|declaration| declaration.get("name").and_then(Value::as_str))
+    .collect();
+  crate::legacy::plugins::declarations([plugins.as_slice()], &names, bridge)
 }

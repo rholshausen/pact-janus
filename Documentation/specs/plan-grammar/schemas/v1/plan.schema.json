@@ -116,6 +116,21 @@
         "path": {
           "type": "string",
           "description": "For status 'error': the path that located the offending value."
+        },
+        "mismatches": {
+          "type": "array",
+          "description": "For status 'error': each thing the node found wrong with the value under test, when it found several it can locate on its own, as a pact plugin's content matcher does (spec.md §2.3, ADR 0110). A run reports each as a mismatch of its own, at the node's path; 'message' still names them all.",
+          "items": {
+            "type": "object",
+            "required": ["message"],
+            "properties": {
+              "message": { "type": "string" },
+              "at": {
+                "type": "string",
+                "description": "Where the node locates it inside the value under test, in its own words: not a path in the grammar's sense."
+              }
+            }
+          }
         }
       }
     }

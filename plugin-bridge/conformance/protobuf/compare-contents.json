@@ -194,8 +194,8 @@
               "message": "$.square: Expected field 'square' to be missing, but received a value for it",
               "mismatches": [
                 {
-                  "path": "$.square",
-                  "message": "Expected field 'square' to be missing, but received a value for it"
+                  "message": "Expected field 'square' to be missing, but received a value for it",
+                  "at": "$.square"
                 }
               ]
             }

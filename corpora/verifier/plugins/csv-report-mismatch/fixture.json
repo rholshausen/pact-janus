@@ -1,0 +1,48 @@
+{
+  "description": "A CSV report whose second and third columns break the pact's number and date rules: the plugin finds both, and each is a mismatch of its own",
+  "source": "staged plan S5.2d; ADR 0110 decisions 1 and 2; pact-plugins examples/csv/csv-consumer-rust",
+  "pacts": [
+    "CsvClient-CsvServer.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/reports/report001.csv"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": [
+              "text/csv;charset=utf-8"
+            ]
+          },
+          "body": {
+            "text": "Bob,many,26/11/2026\n"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/reports/report001.csv",
+          "headers": {
+            "content-type": [
+              "text/csv"
+            ]
+          },
+          "body": {
+            "text": "Name,100,2000-01-01\n"
+          }
+        },
+        "response": {
+          "status": 201
+        }
+      }
+    ]
+  },
+  "expected": "fail"
+}

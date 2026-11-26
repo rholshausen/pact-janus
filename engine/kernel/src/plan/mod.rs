@@ -20,7 +20,7 @@ pub use compile::{
   variant_space,
 };
 pub use interpret::{
-  ActionApplier, Executed, ExecutedKind, Mismatch, NodeResult, Status, execute, execute_with,
+  ActionApplier, Executed, ExecutedKind, Found, Mismatch, NodeResult, Status, execute, execute_with,
   execute_with_content, outcome,
 };
 pub use model::{

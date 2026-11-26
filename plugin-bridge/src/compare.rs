@@ -289,9 +289,9 @@ pub fn octets(value: &Value, what: &str) -> Result<Vec<u8>, ComponentError> {
 }
 
 /// The mismatches as a plan result document (plan-grammar spec §2.3). None is `ok`. Mismatches are one
-/// `error`, whose message names each, prefixed by the path the plugin gave it, and whose `mismatches`
-/// keep each one whole, in path order. How the engine reports several located mismatches from one node
-/// is S5.2d's to decide; until then the message carries them all.
+/// `error`, whose message names each, prefixed by where the plugin located it, and whose `mismatches`
+/// keep each one whole, in the order of the plugin's keys, located `at` where the plugin said. The engine
+/// reports each as a mismatch of its own (ADR 0110).
 pub fn result(mismatches: &[Mismatch]) -> Value {
   if mismatches.is_empty() {
     return json!({ "status": "ok" });
@@ -310,10 +310,11 @@ pub fn result(mismatches: &[Mismatch]) -> Value {
   let described: Vec<Value> = mismatches
     .iter()
     .map(|mismatch| {
+      // Located `at`, in the plugin's words: a result's `path` is an absolute path (ADR 0110 decision 2).
       let mut described = Map::new();
-      described.insert("path".to_string(), json!(mismatch.path));
       described.insert("message".to_string(), json!(mismatch.message));
       for (key, value) in [
+        ("at", &mismatch.path),
         ("expected", &mismatch.expected),
         ("actual", &mismatch.actual),
         ("diff", &mismatch.diff),
@@ -609,9 +610,9 @@ mod tests {
         "status": "error",
         "message": "$.a: a differs; and so does the type; $.b: b differs",
         "mismatches": [
-          { "path": "$.a", "message": "a differs", "expected": "1", "type": "body" },
-          { "path": "", "message": "and so does the type", "expected": "1", "type": "body" },
-          { "path": "$.b", "message": "b differs", "expected": "1", "type": "body" }
+          { "message": "a differs", "at": "$.a", "expected": "1", "type": "body" },
+          { "message": "and so does the type", "expected": "1", "type": "body" },
+          { "message": "b differs", "at": "$.b", "expected": "1", "type": "body" }
         ]
       })
     );

@@ -1,10 +1,10 @@
 Verifying 3 interactions in 1 document [pact/4.0] against plugin-provider
 
   FAILED  request for a report
-          component-unavailable: this interaction needs the pact plugin 'csv', and this engine cannot load pact plugins
+          component-unavailable: this interaction needs the pact plugin 'csv', and no bridge for it was declared: a run declares janus-plugin-bridge for each plugin a pact names when it is told where the bridge is (janus verify looks where JANUS_PLUGIN_BRIDGE names it, then beside the janus executable)
   FAILED  calculate rectangle area request
-          component-unavailable: this interaction needs the pact plugin 'protobuf', and this engine cannot load pact plugins
+          component-unavailable: this interaction needs the pact plugin 'protobuf', and no bridge for it was declared: a run declares janus-plugin-bridge for each plugin a pact names when it is told where the bridge is (janus verify looks where JANUS_PLUGIN_BRIDGE names it, then beside the janus executable)
   FAILED  an area response for a circle
-          component-unavailable: this interaction needs the pact plugin 'avro', and this engine cannot load pact plugins
+          component-unavailable: this interaction needs the pact plugin 'avro', and no bridge for it was declared: a run declares janus-plugin-bridge for each plugin a pact names when it is told where the bridge is (janus verify looks where JANUS_PLUGIN_BRIDGE names it, then beside the janus executable)
 
 FAILED: 0 verified, 3 failed (3 interactions)

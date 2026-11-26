@@ -61,6 +61,12 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   if args.output == Output::Text {
     options["report"] = json!({ "error-chain": engine::full_chain() });
   }
+  // ADR 0110 decision 6: where janus-plugin-bridge is, so the engine can declare one for each pact
+  // plugin a pact names. Without it, an interaction that needs a plugin is refused, saying where the
+  // bridge was looked for.
+  if let Some(bridge) = crate::plugin_bridge::option() {
+    options["plugin-bridge"] = bridge;
+  }
   if args.publish {
     // `requires_all` guarantees the version; the branch and tags are the provider version's.
     let mut publish = json!({ "provider-version": args.provider_version });

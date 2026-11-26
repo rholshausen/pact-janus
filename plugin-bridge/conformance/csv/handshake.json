@@ -23,6 +23,9 @@
             "actions": [
               {
                 "name": "pact-plugin-csv:compare-contents"
+              },
+              {
+                "name": "pact-plugin-csv:generate-content"
               }
             ]
           },
@@ -41,7 +44,8 @@
                   "content-types": [
                     "text/csv",
                     "application/csv"
-                  ]
+                  ],
+                  "action": "pact-plugin-csv:generate-content"
                 },
                 {
                   "type": "content-matcher",

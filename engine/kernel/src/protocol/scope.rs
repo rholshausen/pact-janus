@@ -93,6 +93,17 @@ impl Scope {
       .and_then(|component| component.transport.clone())
   }
 
+  /// Load `more` declarations through this scope's loaders, for a run that learned it needs them after
+  /// the scope was resolved: a pact plugin's bridge, for a pact fetched from a broker (ADR 0110 decision
+  /// 6). What they contribute is the caller's to add to the run's contributions.
+  pub fn load(&self, more: &[Value]) -> Result<Vec<Resolved>, Unavailable> {
+    let loaded = component::resolve(more, &self.loaders, &self.in_tree)?;
+    for component in &loaded {
+      tracing::info!(name = %component.name, version = %component.version, interfaces = ?component.interfaces, "component loaded");
+    }
+    Ok(loaded)
+  }
+
   /// The declared components this scope loaded, as a contract's `metadata.components` and a run's
   /// summary record them (spec §10.3, ADR 0097): in name order, and none of the embedding's own.
   pub fn recorded(&self) -> Vec<RecordedComponent> {

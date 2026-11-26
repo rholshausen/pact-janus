@@ -1,1 +1,1 @@
-janus explain: component-unavailable: this interaction needs the pact plugin 'protobuf', and this engine cannot load pact plugins
+janus explain: component-unavailable: this interaction needs the pact plugin 'protobuf', and no bridge for it was declared: a run declares janus-plugin-bridge for each plugin a pact names when it is told where the bridge is (janus verify looks where JANUS_PLUGIN_BRIDGE names it, then beside the janus executable)

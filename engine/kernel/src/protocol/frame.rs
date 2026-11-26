@@ -394,6 +394,18 @@ impl EngineError {
     }
   }
 
+  /// [`EngineError::pact_plugins_unavailable`] for a run that could have bridged the plugins (ADR 0110
+  /// decision 5): `why` says what stopped it (`no-bridge`, `transport`, `rules`, `kind`), and `message`
+  /// says it in the legacy layer's words.
+  pub fn pact_plugin_refused(plugins: &[String], why: &str, message: String) -> Self {
+    let mut error = EngineError::pact_plugins_unavailable(plugins);
+    error.message = message;
+    if let Some(details) = error.details.as_deref_mut() {
+      details["why"] = serde_json::json!(why);
+    }
+    error
+  }
+
   /// `component-unavailable` naming `hook/produce-message` (staged plan S1.7): a message interaction
   /// whose message no `produce-message` hook produced, so the provider was never asked for it.
   /// `reason` is `message-not-produced` and `part` names the part the plan scores.

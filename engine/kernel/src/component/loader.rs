@@ -233,6 +233,9 @@ pub struct Resolved {
   pub comparabilities: BTreeMap<String, Comparability>,
   /// Where its bytes came from, as a contract and a verification summary record it (ADR 0097).
   pub source: RecordedSource,
+  /// Its handshake's `capabilities`, as it gave them (spec §3.2): an open vocabulary the kernel reads
+  /// none of. The legacy layer reads a pact plugin bridge's `pact-plugin` from them (ADR 0110 decision 4).
+  pub capabilities: Value,
 }
 
 impl Resolved {
@@ -499,6 +502,7 @@ fn check_handshake(declaration: &ComponentDeclaration, loaded: Loaded) -> Result
     actions,
     substitutions,
     comparabilities,
+    capabilities: hello.get("capabilities").cloned().unwrap_or_else(|| json!({})),
     source: RecordedSource {
       kind: declaration.source.kind.clone(),
       reference: fetched.as_ref().and_then(|f| f.reference.clone()),

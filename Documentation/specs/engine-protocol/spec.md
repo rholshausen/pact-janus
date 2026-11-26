@@ -797,10 +797,21 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   with `component-unavailable`, `details.component` `hook/state-setup`, `details.reason`
   `state-unhandled` and `details.state` (lifecycle-hooks spec §3.2, ADR 0058).
   A v1–v4 interaction that needs a pact-plugins plugin (its `pluginConfiguration` names one, or it
-  uses a matcher only a plugin the pact names provides) is refused by name before anything runs for
-  it: its result is `failed` with `component-unavailable`, `details.component` naming the first
-  plugin as `pact-plugin/<name>`, `details.plugins` every one, and `details.reason` `pact-plugin`
-  (ADR 0045). The rest of the pact verifies, and the summary counts the refusal as a failure.
+  uses a matcher only a plugin the pact names provides) is verified through the plugin's bridge,
+  `janus-plugin-bridge` (component-interfaces spec §9.3.1), when the run has one that can verify all of
+  it: each body a bridged content matcher claims is compared by it, and a request body with generators is
+  filled by its content generator ([ADR
+  0110](../../decisions/0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md)).
+  **`options.plugin-bridge`** says how to start a bridge: a component declaration but its name. Given
+  it, the engine declares `pact-plugin-<name>` for each plugin a pact's metadata names, unless
+  `target.components` declares that name already; a pact fetched from a broker or by URL is declared for
+  when it arrives, before any of its interactions runs. Otherwise it is refused by name before anything
+  runs for it: its result is `failed` with `component-unavailable`, `details.component` naming the first
+  plugin as `pact-plugin/<name>`, `details.plugins` every one, `details.reason` `pact-plugin`, and
+  `details.why` what stopped it: `no-bridge`, `transport` (a plugin's transport, staged plan S5.2e),
+  `rules` (a plugin's matching rule, S5.2g) or `kind` (ADR 0045, ADR 0110). The rest of the pact
+  verifies, and the summary counts the refusal as a failure. A mismatch a plugin found carries `at`,
+  where the plugin locates it inside the body, in its own words.
 - **A `broker` source** names the broker (§8.7's descriptor), the provider, its
   `consumer-version-selectors` (passed to the broker as written), the provider version's
   `provider-branch` and `provider-tags`, and whether to `include-pending` and
@@ -868,7 +879,9 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   each mismatch, and the executed text form. That is how a host matches captured values offline. A
   run's own executed plans arrive on its event stream (§9). A `variant` the interaction does not
   record is `variant-not-found`, with the `recorded` ids in its details, as a run refuses it (ADR
-  0041); a v1–v4 interaction records only `base`.
+  0041); a v1–v4 interaction records only `base`. `options.plugin-bridge` declares a bridge for each
+  pact plugin a v1–v4 subject names, as it does for `verify`, so a plugin interaction is explained as a
+  run verifies it, its plugin bodies compiled to their bridges' actions (ADR 0110).
 
 ### 8.4 Upgrade — `upgrade/*`
 

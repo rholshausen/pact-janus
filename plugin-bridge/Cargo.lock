@@ -1937,6 +1937,7 @@ dependencies = [
  "pact-plugin-driver",
  "pact_models",
  "pretty_assertions",
+ "prost-types",
  "regex",
  "rstest",
  "serde_json",

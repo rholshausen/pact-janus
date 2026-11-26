@@ -1243,6 +1243,15 @@ impl Conversion {
         )
       }
       (_, LegacyBody::Empty) => ConvertedBody::of(json!({ "shape": "forbidden" }), BodyKindShaped::Empty),
+      // Upgrade reads no body as a plugin's: an interaction that needs one is dropped (ADR 0045 decision
+      // 4). Were one here, it would be the body it was recorded as.
+      (_, LegacyBody::Plugin(plugin)) => {
+        let ctx = BodyCtx::root(at);
+        ConvertedBody::of(
+          self.body_shape(category.as_ref(), &plugin.expected.to_json(), &ctx),
+          BodyKindShaped::Json,
+        )
+      }
     };
     converted.checked_type = checked_type.filter(|_| has_content);
     if converted.declared.is_some()
@@ -1924,6 +1933,10 @@ impl Conversion {
     at: &Where,
   ) -> Value {
     match body {
+      // As in `body`: no part is read as a plugin's, and one would be the body it was recorded as.
+      LegacyBody::Plugin(plugin) => {
+        self.part_body(&LegacyBody::Document(plugin.expected.clone()), rules, closed, at)
+      }
       LegacyBody::Document(RuntimeValue::Bytes(bytes)) => {
         let list = best_rule(rules, &["$".to_string()], false).map(|(list, _)| list);
         self.bytes_shape(list, bytes, at)

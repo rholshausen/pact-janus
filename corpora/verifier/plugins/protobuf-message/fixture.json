@@ -1,0 +1,64 @@
+{
+  "description": "Protobuf messages compared by the protobuf plugin, through janus-plugin-bridge: each message's contents are the plugin's to compare, read by the message type their content type names and the descriptors the pact records",
+  "source": "staged plan S5.2d (stage 5's 'a protobuf plugin runs through the bridge'); ADR 0110; pact-plugins examples/protobuf/protobuf-consumer-jvm, its pact as written; the pinned protobuf plugin",
+  "pacts": [
+    "protobuf-consumer-protobuf-provider.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "Configure Interaction Response"
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/protobuf;message=.io.pact.plugin.InteractionResponse"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL3Byb3RvYnVmO21lc3NhZ2U9LmlvLnBhY3QucGx1Z2luLkludGVyYWN0aW9uUmVzcG9uc2UifQ=="
+            ]
+          },
+          "body": {
+            "base64": "ChoKEGFwcGxpY2F0aW9uL2pzb24SBAoCe30YARIXCgokLnRlc3Qub25lEgkKBwoFcmVnZXgaMgoKJC50ZXN0Lm9uZRIkCghEYXRlVGltZRIYChYKBmZvcm1hdBIMGgpZWVlZLU1NLUREGjIKCiQudGVzdC50d28SJAoIRGF0ZVRpbWUSGAoWCgZmb3JtYXQSDBoKWVlZWS1NTS1ERA=="
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "init plugin message"
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/protobuf;message=.io.pact.plugin.InitPluginRequest"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL3Byb3RvYnVmO21lc3NhZ2U9LmlvLnBhY3QucGx1Z2luLkluaXRQbHVnaW5SZXF1ZXN0In0="
+            ]
+          },
+          "body": {
+            "base64": "Cg9wYWN0LWp2bS1kcml2ZXISBTAuMC4w"
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

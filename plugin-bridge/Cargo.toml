@@ -24,6 +24,7 @@ bytes = "1"
 # Lua plugins, interface versions 1 and 2 and installing from the index behave as they do there.
 pact-plugin-driver = "1.2.7"
 pact_models = { version = "~1.3.14", default-features = false }
+prost-types = "0.14"
 regex = "1"
 serde_json = { version = "1", features = ["preserve_order"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }

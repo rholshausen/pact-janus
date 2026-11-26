@@ -26,8 +26,9 @@ components:
 ```
 
 - At `component/hello` it loads the plugin and answers with its catalogue translated: it implements
-  `matcher`, contributes `pact-plugin-<plugin>:compare-contents` when the plugin has a content matcher,
-  and describes every catalogue entry under the `pact-plugin` capability.
+  `matcher`, contributes `pact-plugin-<plugin>:compare-contents` when the plugin has a content matcher and
+  `pact-plugin-<plugin>:generate-content` when it has a content generator, and describes every catalogue
+  entry under the `pact-plugin` capability.
 - `matcher/apply` of `compare-contents` compares a whole body through the plugin's content matcher, with
   what a pact says about the body as its one argument (spec §9.3.1).
 - What the plugin answers is read as the driver reads it for today's verifier, its failures included. A
@@ -39,9 +40,14 @@ A subprocess component starts with an empty environment plus what it is granted,
 directory (`PACT_PLUGIN_DIR`, or `HOME`/`USERPROFILE` for `~/.pact/plugins`), `PACT_DO_NOT_TRACK` to stop
 the driver sending usage metrics, and `RUST_LOG` to see its logs on standard error.
 
-Not yet: no engine declares a bridge for a pact, or compiles a pact's body to `compare-contents` (staged
-plan S5.2d); plugin transports, content generators and matchers are described in the handshake and not
-served (S5.2e–S5.2g); and the bridge is not released (S5.2h).
+`janus verify` and `janus explain` use it for a v1–v4 pact that names a plugin (staged plan S5.2d, ADR
+0110): set `JANUS_PLUGIN_BRIDGE` to it, or put it beside `janus`, and the engine declares one for each
+plugin the pact names. A body the plugin's content matcher claims is compared by `compare-contents`, and
+a request body with generators is filled by `generate-content`, the action a content generator is
+reached through.
+
+Not yet: plugin transports and matchers are described in the handshake and not served (S5.2e, S5.2g);
+and the bridge is not released (S5.2h).
 
 ## Building and testing
 

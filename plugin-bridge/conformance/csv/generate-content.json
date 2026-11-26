@@ -1,0 +1,80 @@
+{
+  "name": "pact-plugin-csv/generate-content",
+  "component": "pact-plugin-csv",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-csv:generate-content",
+        "values": [
+          {
+            "content": "Name,100,2000-01-01\n",
+            "encoded": "text"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "content-type": "text/csv;charset=utf-8",
+              "generators": {
+                "column:3": {
+                  "type": "DateTime",
+                  "format": "yyyy-MM-dd"
+                }
+              },
+              "plugin-configuration": {
+                "interaction": {
+                  "request": {
+                    "csvHeaders": false
+                  }
+                },
+                "pact": {}
+              }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "value",
+              "value": {
+                "of": "bytes",
+                "encoded": "base64"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-csv:generate-content",
+        "values": [
+          {
+            "content": ""
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "content-type": "application/json"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "unsupported-content-type",
+          "category": "document",
+          "details": {
+            "content-type": "application/json"
+          }
+        }
+      }
+    }
+  ]
+}

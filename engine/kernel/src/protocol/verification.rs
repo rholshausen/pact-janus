@@ -62,6 +62,7 @@ use crate::legacy::compile::{self as legacy_compile, compile_response as compile
 use crate::legacy::pact::{
   self as legacy_pact, MessageInteraction, PactInteraction, PluginInteraction, RequestTemplate,
 };
+use crate::legacy::plugins::{self as legacy_plugins, Bridges, Refused};
 use crate::plan::{self, ActionApplier, Assignment, Status, execute_with, outcome};
 use crate::shape::fresh;
 use crate::variant::params;
@@ -515,6 +516,9 @@ pub(crate) struct LegacyPact {
   provider: String,
   specification: String,
   interactions: Vec<PactInteraction>,
+  /// The plugins its metadata names (`metadata.plugins`): what a plugin interaction's bridge is
+  /// declared with and handed (ADR 0110).
+  pub(crate) plugins: Vec<legacy_pact::PactPlugin>,
 }
 
 impl Source {
@@ -636,9 +640,33 @@ impl Source {
   fn prepare(&self, index: usize, contributions: &Contributions, redaction: &Redaction) -> Prepared {
     match self {
       Source::Janus(contract) => prepare_janus(contract, index, &self.format(), contributions, redaction),
-      Source::Legacy(pact) => prepare_legacy(pact, index, &self.format(), redaction),
+      Source::Legacy(pact) => prepare_legacy(pact, index, &self.format(), contributions, redaction),
     }
   }
+}
+
+/// The bridges a run declares for the pact plugins its v1–v4 pacts name, when its options say how to
+/// start one (`options.plugin-bridge`, ADR 0110 decision 6), beside the `declared` components, which win.
+pub(crate) fn bridge_declarations(
+  sources: &[Source],
+  declared: &[Value],
+  options: Option<&Value>,
+) -> Vec<Value> {
+  let Some(bridge) = options.and_then(|options| options.get("plugin-bridge")) else {
+    return Vec::new();
+  };
+  let names: Vec<&str> = declared
+    .iter()
+    .filter_map(|declaration| declaration.get("name").and_then(Value::as_str))
+    .collect();
+  legacy_plugins::declarations(
+    sources.iter().filter_map(|source| match source {
+      Source::Legacy(pact) => Some(pact.plugins.as_slice()),
+      Source::Janus(_) => None,
+    }),
+    &names,
+    bridge,
+  )
 }
 
 /// Read the inline documents, identifying each before parsing it (contract-file spec §2.3, ADR
@@ -735,6 +763,7 @@ fn read_legacy(index: usize, doc: &Value) -> Result<LegacyPact, VerifyError> {
     provider: pact.provider().name,
     specification: pact.specification_version().version_str(),
     interactions: legacy_pact::interactions(pact.as_ref()),
+    plugins: legacy_pact::pact_plugins(pact.as_ref()),
   })
 }
 
@@ -801,6 +830,11 @@ pub(crate) struct BrokerFetch {
   /// The run's scope, which every fetched document's requirements are checked against before
   /// anything is verified, as an inline document's are before `verify` answers.
   pub scope: Scope,
+  /// The components the run declared: a fetched pact's plugin bridge is declared beside them, and
+  /// one they name already is theirs (ADR 0110 decision 6).
+  pub declared: Vec<Value>,
+  /// The run's options, whose `plugin-bridge` says how to start a bridge.
+  pub options: Option<Value>,
 }
 
 /// What a fetched run asks of the broker client.
@@ -872,18 +906,29 @@ pub(crate) fn start(
     Box::new(move || {
       let stream = Arc::clone(&thread_stream);
       guarded(&stream, crashed, move || {
+        let mut components = components;
         let (sources, broker) = match sources {
           Sources::Read(sources) => (sources, None),
           Sources::Broker(fetch) => match fetch_sources(&fetch, &filter, &thread_stream) {
-            Ok((sources, fetched, brokers)) => (
-              sources,
-              Some(BrokerRun {
-                client: fetch.client,
-                brokers,
-                publish,
-                fetched,
-              }),
-            ),
+            Ok((sources, fetched, brokers, bridges)) => {
+              // ADR 0110 decision 6: the fetched pacts' plugin bridges, loaded before anything runs.
+              if !bridges.is_empty() {
+                components.contributions = Arc::new(components.contributions.with_declared(&bridges));
+                components
+                  .recorded
+                  .extend(bridges.iter().map(crate::component::Resolved::recorded));
+                RecordedComponent::normalise(&mut components.recorded);
+              }
+              (
+                sources,
+                Some(BrokerRun {
+                  client: fetch.client,
+                  brokers,
+                  publish,
+                  fetched,
+                }),
+              )
+            }
             Err(summary) => {
               stop_targets(&targets);
               thread_stream.finish("verification/finished", summary);
@@ -914,15 +959,20 @@ pub(crate) fn start(
   }
 }
 
+/// What a fetch produced: the documents, what the broker said of each, the broker each is published to,
+/// and the plugin bridges loaded for them (ADR 0110 decision 6).
+type Fetched = (
+  Vec<Source>,
+  Vec<FetchedPact>,
+  Vec<BrokerDescriptor>,
+  Vec<crate::component::Resolved>,
+);
+
 /// Fetch a broker source's pacts and read them (spec §8.3), reporting what was fetched as a
 /// `verification/fetched` event. A run that cannot get past this ends here: the summary it ends
 /// with is the `Err`.
 #[allow(clippy::type_complexity)]
-fn fetch_sources(
-  fetch: &BrokerFetch,
-  filter: &Filter,
-  stream: &Stream,
-) -> Result<(Vec<Source>, Vec<FetchedPact>, Vec<BrokerDescriptor>), Value> {
+fn fetch_sources(fetch: &BrokerFetch, filter: &Filter, stream: &Stream) -> Result<Fetched, Value> {
   let failed = |error: EngineError| {
     let mut summary = crashed_summary(&[], filter);
     summary["error"] = serde_json::to_value(error).unwrap_or(Value::Null);
@@ -986,7 +1036,18 @@ fn fetch_sources(
   // ADR 0041: a filter naming an id none of them records ends the run here, before anything runs
   // or is published, as one that fetched nothing does.
   filter.check(&sources).map_err(failed)?;
-  Ok((sources, fetched, brokers))
+  // ADR 0110 decision 6: a bridge for each pact plugin they name, loaded now, as an inline pact's is
+  // before `verify` answers; one that cannot be loaded ends the run as it would have ended that call.
+  let more = bridge_declarations(&sources, &fetch.declared, fetch.options.as_ref());
+  let bridges = if more.is_empty() {
+    Vec::new()
+  } else {
+    fetch
+      .scope
+      .load(&more)
+      .map_err(|unavailable| failed(EngineError::component_unresolved(&unavailable)))?
+  };
+  Ok((sources, fetched, brokers, bridges))
 }
 
 fn stop_targets(targets: &[Target]) {
@@ -1915,14 +1976,41 @@ fn produced_resolver(
 /// itself would assert nothing (the same rule the shape path follows, [`drive`]). That has a
 /// pleasant consequence: a request body in a content type design 3.5 cannot compile still replays,
 /// byte for byte, instead of failing an interaction whose response is perfectly checkable.
-fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str, redaction: &Redaction) -> Prepared {
-  let interaction = match &pact.interactions[index] {
-    PactInteraction::Http(http) => http,
-    PactInteraction::Message(message) => {
-      return prepare_legacy_message(pact, message, index, format, redaction);
+fn prepare_legacy(
+  pact: &LegacyPact,
+  index: usize,
+  format: &str,
+  contributions: &Contributions,
+  redaction: &Redaction,
+) -> Prepared {
+  match &pact.interactions[index] {
+    PactInteraction::Http(http) => prepare_legacy_http(pact, http, index, format, redaction),
+    PactInteraction::Message(message) => prepare_legacy_message(pact, message, index, format, redaction),
+    // ADR 0110 decision 5: verified through the plugins' bridges when they can verify all of it.
+    PactInteraction::NeedsPlugins(needs) => {
+      let bridges = Bridges::read(contributions.capabilities());
+      match legacy_plugins::bridged(needs, &bridges, &pact.plugins) {
+        Ok(PactInteraction::Http(http)) => prepare_legacy_http(pact, &http, index, format, redaction),
+        Ok(PactInteraction::Message(message)) => {
+          prepare_legacy_message(pact, &message, index, format, redaction)
+        }
+        Ok(PactInteraction::NeedsPlugins(_)) => {
+          refuse_plugin_interaction(pact, needs, index, format, &Refused::Kind)
+        }
+        Err(refused) => refuse_plugin_interaction(pact, needs, index, format, &refused),
+      }
     }
-    PactInteraction::NeedsPlugins(needs) => return refuse_plugin_interaction(pact, needs, index, format),
-  };
+  }
+}
+
+/// A v1–v4 HTTP interaction's one variant ([`prepare_legacy`]).
+fn prepare_legacy_http(
+  pact: &LegacyPact,
+  interaction: &legacy_pact::LegacyInteraction,
+  index: usize,
+  format: &str,
+  redaction: &Redaction,
+) -> Prepared {
   let states = legacy_states(&interaction.provider_states);
   let reference = legacy_reference(
     pact,
@@ -1936,7 +2024,7 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str, redaction: &Red
   // nothing to read a transport kind out of: the interaction has one.
   let transport = DEFAULT_TRANSPORT_KIND.to_string();
 
-  let response = match legacy_pact::legacy_response(&interaction.response) {
+  let response = match legacy_pact::interaction_response(interaction) {
     Ok(response) => response,
     Err(err) => {
       return Prepared {
@@ -1973,7 +2061,8 @@ fn prepare_legacy(pact: &LegacyPact, index: usize, format: &str, redaction: &Red
       content_shapes: BTreeMap::new(),
       states,
       request,
-      generate_from: RequestTemplate::of(&interaction.request).map(Box::new),
+      generate_from: RequestTemplate::of(&interaction.request)
+        .map(|template| Box::new(template.with_plugin(interaction.request_generator.clone()))),
       fresh: BTreeMap::new(),
       legacy: true,
       warnings: Vec::new(),
@@ -2051,7 +2140,7 @@ fn prepare_legacy_message(
     .clone()
     .unwrap_or_else(|| MESSAGE_TRANSPORT_KIND.to_string());
 
-  let expected = match legacy_pact::legacy_message(message.expected.as_ref(), message.responses) {
+  let expected = match legacy_pact::interaction_message(message) {
     Ok(expected) => expected,
     Err(err) => {
       let part = if message.synchronous {
@@ -2124,6 +2213,7 @@ fn refuse_plugin_interaction(
   needs: &PluginInteraction,
   index: usize,
   format: &str,
+  refused: &Refused,
 ) -> Prepared {
   let mut reference = json!({
     "contract": { "consumer": pact.consumer, "provider": pact.provider },
@@ -2135,8 +2225,12 @@ fn refuse_plugin_interaction(
   if let Some(id) = &needs.id {
     reference["id"] = json!(id);
   }
-  let error =
-    serde_json::to_value(EngineError::pact_plugins_unavailable(&needs.plugins)).unwrap_or(Value::Null);
+  let error = serde_json::to_value(EngineError::pact_plugin_refused(
+    &needs.plugins,
+    refused.why(),
+    refused.message(),
+  ))
+  .unwrap_or(Value::Null);
   Prepared {
     reference,
     transport: DEFAULT_TRANSPORT_KIND.to_string(),
@@ -2582,7 +2676,7 @@ fn generated_request(
   ctx: &RunContext<'_>,
 ) -> Parts {
   let provider_state = provider_state(exchange, scratch);
-  let (generated, failures) = request.generate(&provider_state, &PactGenerators);
+  let (generated, failures) = request.generate(&provider_state, &PactGenerators, Some(ctx.actions));
   let failures = failures
     .into_iter()
     .map(|failure| fresh::Failure {

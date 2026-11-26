@@ -261,9 +261,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
+          workspaces: |
+            . -> target
+            plugin-bridge -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build prerequisites
         run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      # S5.2d (ADR 0110): the plugins/ fixtures verify CSV and protobuf pacts through pact plugins.
+      # Today's verifier loads the pinned plugins from PACT_PLUGIN_DIR, and janus verify through
+      # janus-plugin-bridge, which JANUS_PLUGIN_BRIDGE names. Neither installs from the plugin index.
+      - name: Pinned pact plugins (cache)
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pact-plugins
+          key: pact-plugins-${{ runner.os }}-${{ hashFiles('plugin-bridge/pact-plugins.json') }}
+      - name: Pinned pact plugins, and the bridge
+        run: |
+          echo "PACT_PLUGIN_DIR=$(.github/scripts/pact-plugins.sh "$RUNNER_TEMP/pact-plugins")" >> "$GITHUB_ENV"
+          (cd plugin-bridge && cargo build --locked)
+          echo "JANUS_PLUGIN_BRIDGE=$PWD/plugin-bridge/target/debug/janus-plugin-bridge" >> "$GITHUB_ENV"
+          echo "PACT_DO_NOT_TRACK=true" >> "$GITHUB_ENV"
       - name: Today's verifier, at the pinned version
         run: echo "PACT_VERIFIER_CLI=$(.github/scripts/pact-verifier.sh "$RUNNER_TEMP/pact-verifier")" >> "$GITHUB_ENV"
       - name: The Pact Broker, at the pinned version

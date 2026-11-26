@@ -1,6 +1,7 @@
 # 0106 — Bridge pact-plugins through a child process that speaks the subprocess binding
 
-- **Status**: accepted
+- **Status**: accepted; decision 5's declaring is the engine's, as the host says how to start the bridge
+  ([ADR 0110](0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md) decision 6)
 - **Date**: 2026-11-23
 - **Plan tasks**: S5.2, split here into S5.2a–S5.2h; S5.5, whose loader moves into S5.2b; S5.12
   (a native protobuf content component, and S4.2's protobuf half)

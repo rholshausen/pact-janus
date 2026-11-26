@@ -23,6 +23,9 @@
             "actions": [
               {
                 "name": "pact-plugin-protobuf:compare-contents"
+              },
+              {
+                "name": "pact-plugin-protobuf:generate-content"
               }
             ]
           },
@@ -41,7 +44,8 @@
                   "content-types": [
                     "application/protobuf",
                     "application/grpc"
-                  ]
+                  ],
+                  "action": "pact-plugin-protobuf:generate-content"
                 },
                 {
                   "type": "content-matcher",

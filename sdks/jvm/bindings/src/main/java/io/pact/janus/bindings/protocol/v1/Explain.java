@@ -65,8 +65,15 @@ public class Explain {
     @JsonProperty("encoded")
     @JsonPropertyDescription("The representation of each value in 'values', by path: 'base64' for the base64 of an octet sequence, 'json' (the default) for the value as it stands.")
     private Map<String, String> encoded;
+    /**
+     * ExplainOptions
+     * <p>
+     * Open, additive explain options: 'plan' asks for the structured plan document, and 'plugin-bridge' how to start janus-plugin-bridge for a v1–v4 subject's pact plugins.
+     * 
+     */
     @JsonProperty("options")
-    private Map<String, Object> options;
+    @JsonPropertyDescription("Open, additive explain options: 'plan' asks for the structured plan document, and 'plugin-bridge' how to start janus-plugin-bridge for a v1\u2013v4 subject's pact plugins.")
+    private ExplainOptions options;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -148,13 +155,25 @@ public class Explain {
         this.encoded = encoded;
     }
 
+    /**
+     * ExplainOptions
+     * <p>
+     * Open, additive explain options: 'plan' asks for the structured plan document, and 'plugin-bridge' how to start janus-plugin-bridge for a v1–v4 subject's pact plugins.
+     * 
+     */
     @JsonProperty("options")
-    public Map<String, Object> getOptions() {
+    public ExplainOptions getOptions() {
         return options;
     }
 
+    /**
+     * ExplainOptions
+     * <p>
+     * Open, additive explain options: 'plan' asks for the structured plan document, and 'plugin-bridge' how to start janus-plugin-bridge for a v1–v4 subject's pact plugins.
+     * 
+     */
     @JsonProperty("options")
-    public void setOptions(Map<String, Object> options) {
+    public void setOptions(ExplainOptions options) {
         this.options = options;
     }
 

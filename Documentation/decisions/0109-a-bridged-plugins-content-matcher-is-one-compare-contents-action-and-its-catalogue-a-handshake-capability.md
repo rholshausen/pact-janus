@@ -75,7 +75,8 @@ whole slot's octets. It left four things to the item that built the bridge:
 6. **What the plugin answers is one result; a plugin that does not answer is the bridge's failure.**
    No mismatch is `ok`. Mismatches are one `error`, whose `message` names each, prefixed by the path the
    plugin gave it and joined with `; `, in path order, and whose `mismatches` member keeps each one whole:
-   its `path`, `message`, and the `expected`, `actual`, `diff` and `type` the plugin gave. Everything the
+   its `message`, where the plugin located it (`at`, as ADR 0110 names it; this decision first called it
+   `path`), and the `expected`, `actual`, `diff` and `type` the plugin gave. Everything the
    plugin answered is read as `match_contents` reads it for today's verifier: a content-type mismatch, the
    plugin's own error string, and a call the plugin answered with a failure of its own (a gRPC status such
    as the CSV plugin's `Aborted` for a body it cannot read, or a Lua plugin's script error) are
@@ -84,9 +85,8 @@ whole slot's octets. It left four things to the item that built the bridge:
    which blames the provider for a dead plugin, and every later comparison fails the same way. The bridge
    answers it as `unavailable`, with `plugin` and `version` in its details and the cause as its `chain`,
    and then exits, so the engine's next call starts a new bridge and a new plugin: out of process the
-   process is what is recreated (ADR 0108 decision 3). Until S5.2d decides how the engine reports several
-   located mismatches, the engine reads a result's status and message, and ignores a member it does not
-   know.
+   process is what is recreated (ADR 0108 decision 3). The engine reports each of a result's mismatches
+   as a mismatch of its own (ADR 0110).
 7. **The bridge refuses in the specification's words:** `unknown-action` for an action it did not
    contribute, `unsupported-content-type` for a content type none of the plugin's content matchers
    claims, `invalid-config` for an argument it cannot read, each a `document` error (spec §11.1).

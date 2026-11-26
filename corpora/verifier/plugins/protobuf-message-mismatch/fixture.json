@@ -1,0 +1,64 @@
+{
+  "description": "A protobuf message whose implementation is empty and whose version is not a semantic version, against the pact's notEmpty and semver rules",
+  "source": "staged plan S5.2d; ADR 0110; pact-plugins examples/protobuf/protobuf-consumer-jvm",
+  "pacts": [
+    "protobuf-consumer-protobuf-provider.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "Configure Interaction Response"
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/protobuf;message=.io.pact.plugin.InteractionResponse"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL3Byb3RvYnVmO21lc3NhZ2U9LmlvLnBhY3QucGx1Z2luLkludGVyYWN0aW9uUmVzcG9uc2UifQ=="
+            ]
+          },
+          "body": {
+            "base64": "ChoKEGFwcGxpY2F0aW9uL2pzb24SBAoCe30YARIXCgokLnRlc3Qub25lEgkKBwoFcmVnZXgaMgoKJC50ZXN0Lm9uZRIkCghEYXRlVGltZRIYChYKBmZvcm1hdBIMGgpZWVlZLU1NLUREGjIKCiQudGVzdC50d28SJAoIRGF0ZVRpbWUSGAoWCgZmb3JtYXQSDBoKWVlZWS1NTS1ERA=="
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/",
+          "body": {
+            "json": {
+              "description": "init plugin message"
+            }
+          }
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "Content-Type": [
+              "application/protobuf;message=.io.pact.plugin.InitPluginRequest"
+            ],
+            "Pact-Message-Metadata": [
+              "eyJjb250ZW50VHlwZSI6ImFwcGxpY2F0aW9uL3Byb3RvYnVmO21lc3NhZ2U9LmlvLnBhY3QucGx1Z2luLkluaXRQbHVnaW5SZXF1ZXN0In0="
+            ]
+          },
+          "body": {
+            "base64": "CgASDW5vdC1hLXZlcnNpb24="
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail"
+}

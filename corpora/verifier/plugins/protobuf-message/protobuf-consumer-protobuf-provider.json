@@ -1,0 +1,215 @@
+{
+  "consumer": {
+    "name": "protobuf-consumer"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "io.pact.example.protobuf.provider.PactConsumerTest.consumeConfigureInteractionResponseMessage(AsynchronousMessage)"
+      },
+      "contents": {
+        "content": "ChoKEGFwcGxpY2F0aW9uL2pzb24SBAoCe30YARIXCgokLnRlc3Qub25lEgkKBwoFcmVnZXgaMgoKJC50ZXN0Lm9uZRIkCghEYXRlVGltZRIYChYKBmZvcm1hdBIMGgpZWVlZLU1NLUREGjIKCiQudGVzdC50d28SJAoIRGF0ZVRpbWUSGAoWCgZmb3JtYXQSDBoKWVlZWS1NTS1ERA==",
+        "contentType": "application/protobuf; message=.io.pact.plugin.InteractionResponse",
+        "contentTypeHint": "BINARY",
+        "encoded": "base64"
+      },
+      "description": "Configure Interaction Response",
+      "interactionMarkup": {
+        "markup": "```protobuf\nmessage InteractionResponse {\n    message .io.pact.plugin.Body contents = 1;\n    map<message .io.pact.plugin.InteractionResponse.RulesEntry> rules = 2;\n    map<message .io.pact.plugin.InteractionResponse.GeneratorsEntry> generators = 3;\n}\n```\n",
+        "markupType": "COMMON_MARK"
+      },
+      "key": "989e38d0",
+      "matchingRules": {
+        "body": {
+          "$.contents.content": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "contentType",
+                "value": "application/json"
+              }
+            ]
+          },
+          "$.contents.contentType": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "notEmpty"
+              }
+            ]
+          },
+          "$.contents.contentTypeHint": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "equality"
+              }
+            ]
+          },
+          "$.generators['$.test.one'].type": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "notEmpty"
+              }
+            ]
+          },
+          "$.generators['$.test.one'].values.format": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "equality"
+              }
+            ]
+          },
+          "$.generators['$.test.two'].type": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "notEmpty"
+              }
+            ]
+          },
+          "$.generators['$.test.two'].values.format": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "equality"
+              }
+            ]
+          },
+          "$.rules": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "eachKey",
+                "rules": [
+                  {
+                    "match": "regex",
+                    "regex": "\\$(\\.\\w+)+"
+                  }
+                ],
+                "value": "$.test.one"
+              },
+              {
+                "match": "eachValue",
+                "rules": [
+                  {
+                    "match": "type"
+                  }
+                ],
+                "value": "null"
+              }
+            ]
+          },
+          "$.rules['$.test.one'].rule": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "values"
+              }
+            ]
+          },
+          "$.rules['$.test.one'].rule.*": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "type"
+              }
+            ]
+          },
+          "$.rules['$.test.one'].rule.*.type": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "notEmpty"
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "contentType": "application/protobuf;message=.io.pact.plugin.InteractionResponse"
+      },
+      "pending": false,
+      "pluginConfiguration": {
+        "protobuf": {
+          "descriptorKey": "9d7ae451f4243a5cfc6fa87f322251e1",
+          "message": ".io.pact.plugin.InteractionResponse"
+        }
+      },
+      "type": "Asynchronous/Messages"
+    },
+    {
+      "comments": {
+        "testname": "io.pact.example.protobuf.provider.PactConsumerTest.consumeInitPluginMessage(AsynchronousMessage)"
+      },
+      "contents": {
+        "content": "Cg9wYWN0LWp2bS1kcml2ZXISBTAuMC4w",
+        "contentType": "application/protobuf; message=.io.pact.plugin.InitPluginRequest",
+        "contentTypeHint": "BINARY",
+        "encoded": "base64"
+      },
+      "description": "init plugin message",
+      "interactionMarkup": {
+        "markup": "```protobuf\nmessage InitPluginRequest {\n    string implementation = 1;\n    string version = 2;\n}\n```\n",
+        "markupType": "COMMON_MARK"
+      },
+      "key": "51de4a11",
+      "matchingRules": {
+        "body": {
+          "$.implementation": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "notEmpty"
+              }
+            ]
+          },
+          "$.version": {
+            "combine": "AND",
+            "matchers": [
+              {
+                "match": "semver"
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "contentType": "application/protobuf;message=.io.pact.plugin.InitPluginRequest"
+      },
+      "pending": false,
+      "pluginConfiguration": {
+        "protobuf": {
+          "descriptorKey": "9d7ae451f4243a5cfc6fa87f322251e1",
+          "message": ".io.pact.plugin.InitPluginRequest"
+        }
+      },
+      "type": "Asynchronous/Messages"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.4.2"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+      {
+        "configuration": {
+          "9d7ae451f4243a5cfc6fa87f322251e1": {
+            "protoDescriptors": "CuIFChxnb29nbGUvcHJvdG9idWYvc3RydWN0LnByb3RvEg9nb29nbGUucHJvdG9idWYimAEKBlN0cnVjdBI7CgZmaWVsZHMYASADKAsyIy5nb29nbGUucHJvdG9idWYuU3RydWN0LkZpZWxkc0VudHJ5UgZmaWVsZHMaUQoLRmllbGRzRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSLAoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWVSBXZhbHVlOgI4ASKyAgoFVmFsdWUSOwoKbnVsbF92YWx1ZRgBIAEoDjIaLmdvb2dsZS5wcm90b2J1Zi5OdWxsVmFsdWVIAFIJbnVsbFZhbHVlEiMKDG51bWJlcl92YWx1ZRgCIAEoAUgAUgtudW1iZXJWYWx1ZRIjCgxzdHJpbmdfdmFsdWUYAyABKAlIAFILc3RyaW5nVmFsdWUSHwoKYm9vbF92YWx1ZRgEIAEoCEgAUglib29sVmFsdWUSPAoMc3RydWN0X3ZhbHVlGAUgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdEgAUgtzdHJ1Y3RWYWx1ZRI7CgpsaXN0X3ZhbHVlGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLkxpc3RWYWx1ZUgAUglsaXN0VmFsdWVCBgoEa2luZCI7CglMaXN0VmFsdWUSLgoGdmFsdWVzGAEgAygLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlUgZ2YWx1ZXMqGwoJTnVsbFZhbHVlEg4KCk5VTExfVkFMVUUQAEJ/ChNjb20uZ29vZ2xlLnByb3RvYnVmQgtTdHJ1Y3RQcm90b1ABWi9nb29nbGUuZ29sYW5nLm9yZy9wcm90b2J1Zi90eXBlcy9rbm93bi9zdHJ1Y3RwYvgBAaICA0dQQqoCHkdvb2dsZS5Qcm90b2J1Zi5XZWxsS25vd25UeXBlc2IGcHJvdG8zCoYECh5nb29nbGUvcHJvdG9idWYvd3JhcHBlcnMucHJvdG8SD2dvb2dsZS5wcm90b2J1ZiIjCgtEb3VibGVWYWx1ZRIUCgV2YWx1ZRgBIAEoAVIFdmFsdWUiIgoKRmxvYXRWYWx1ZRIUCgV2YWx1ZRgBIAEoAlIFdmFsdWUiIgoKSW50NjRWYWx1ZRIUCgV2YWx1ZRgBIAEoA1IFdmFsdWUiIwoLVUludDY0VmFsdWUSFAoFdmFsdWUYASABKARSBXZhbHVlIiIKCkludDMyVmFsdWUSFAoFdmFsdWUYASABKAVSBXZhbHVlIiMKC1VJbnQzMlZhbHVlEhQKBXZhbHVlGAEgASgNUgV2YWx1ZSIhCglCb29sVmFsdWUSFAoFdmFsdWUYASABKAhSBXZhbHVlIiMKC1N0cmluZ1ZhbHVlEhQKBXZhbHVlGAEgASgJUgV2YWx1ZSIiCgpCeXRlc1ZhbHVlEhQKBXZhbHVlGAEgASgMUgV2YWx1ZUKDAQoTY29tLmdvb2dsZS5wcm90b2J1ZkINV3JhcHBlcnNQcm90b1ABWjFnb29nbGUuZ29sYW5nLm9yZy9wcm90b2J1Zi90eXBlcy9rbm93bi93cmFwcGVyc3Bi+AEBogIDR1BCqgIeR29vZ2xlLlByb3RvYnVmLldlbGxLbm93blR5cGVzYgZwcm90bzMKvgEKG2dvb2dsZS9wcm90b2J1Zi9lbXB0eS5wcm90bxIPZ29vZ2xlLnByb3RvYnVmIgcKBUVtcHR5Qn0KE2NvbS5nb29nbGUucHJvdG9idWZCCkVtcHR5UHJvdG9QAVouZ29vZ2xlLmdvbGFuZy5vcmcvcHJvdG9idWYvdHlwZXMva25vd24vZW1wdHlwYvgBAaICA0dQQqoCHkdvb2dsZS5Qcm90b2J1Zi5XZWxsS25vd25UeXBlc2IGcHJvdG8zCvg9CgxwbHVnaW4ucHJvdG8SDmlvLnBhY3QucGx1Z2luGhxnb29nbGUvcHJvdG9idWYvc3RydWN0LnByb3RvGh5nb29nbGUvcHJvdG9idWYvd3JhcHBlcnMucHJvdG8aG2dvb2dsZS9wcm90b2J1Zi9lbXB0eS5wcm90byJVChFJbml0UGx1Z2luUmVxdWVzdBImCg5pbXBsZW1lbnRhdGlvbhgBIAEoCVIOaW1wbGVtZW50YXRpb24SGAoHdmVyc2lvbhgCIAEoCVIHdmVyc2lvbiLFAgoOQ2F0YWxvZ3VlRW50cnkSPAoEdHlwZRgBIAEoDjIoLmlvLnBhY3QucGx1Z2luLkNhdGFsb2d1ZUVudHJ5LkVudHJ5VHlwZVIEdHlwZRIQCgNrZXkYAiABKAlSA2tleRJCCgZ2YWx1ZXMYAyADKAsyKi5pby5wYWN0LnBsdWdpbi5DYXRhbG9ndWVFbnRyeS5WYWx1ZXNFbnRyeVIGdmFsdWVzGjkKC1ZhbHVlc0VudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAEiZAoJRW50cnlUeXBlEhMKD0NPTlRFTlRfTUFUQ0hFUhAAEhUKEUNPTlRFTlRfR0VORVJBVE9SEAESDQoJVFJBTlNQT1JUEAISCwoHTUFUQ0hFUhADEg8KC0lOVEVSQUNUSU9OEAQiUgoSSW5pdFBsdWdpblJlc3BvbnNlEjwKCWNhdGFsb2d1ZRgBIAMoCzIeLmlvLnBhY3QucGx1Z2luLkNhdGFsb2d1ZUVudHJ5UgljYXRhbG9ndWUiSQoJQ2F0YWxvZ3VlEjwKCWNhdGFsb2d1ZRgBIAMoCzIeLmlvLnBhY3QucGx1Z2luLkNhdGFsb2d1ZUVudHJ5UgljYXRhbG9ndWUi5QEKBEJvZHkSIAoLY29udGVudFR5cGUYASABKAlSC2NvbnRlbnRUeXBlEjUKB2NvbnRlbnQYAiABKAsyGy5nb29nbGUucHJvdG9idWYuQnl0ZXNWYWx1ZVIHY29udGVudBJOCg9jb250ZW50VHlwZUhpbnQYAyABKA4yJC5pby5wYWN0LnBsdWdpbi5Cb2R5LkNvbnRlbnRUeXBlSGludFIPY29udGVudFR5cGVIaW50IjQKD0NvbnRlbnRUeXBlSGludBILCgdERUZBVUxUEAASCAoEVEVYVBABEgoKBkJJTkFSWRACIqUDChZDb21wYXJlQ29udGVudHNSZXF1ZXN0EjAKCGV4cGVjdGVkGAEgASgLMhQuaW8ucGFjdC5wbHVnaW4uQm9keVIIZXhwZWN0ZWQSLAoGYWN0dWFsGAIgASgLMhQuaW8ucGFjdC5wbHVnaW4uQm9keVIGYWN0dWFsEjIKFWFsbG93X3VuZXhwZWN0ZWRfa2V5cxgDIAEoCFITYWxsb3dVbmV4cGVjdGVkS2V5cxJHCgVydWxlcxgEIAMoCzIxLmlvLnBhY3QucGx1Z2luLkNvbXBhcmVDb250ZW50c1JlcXVlc3QuUnVsZXNFbnRyeVIFcnVsZXMSVQoTcGx1Z2luQ29uZmlndXJhdGlvbhgFIAEoCzIjLmlvLnBhY3QucGx1Z2luLlBsdWdpbkNvbmZpZ3VyYXRpb25SE3BsdWdpbkNvbmZpZ3VyYXRpb24aVwoKUnVsZXNFbnRyeRIQCgNrZXkYASABKAlSA2tleRIzCgV2YWx1ZRgCIAEoCzIdLmlvLnBhY3QucGx1Z2luLk1hdGNoaW5nUnVsZXNSBXZhbHVlOgI4ASJJChNDb250ZW50VHlwZU1pc21hdGNoEhoKCGV4cGVjdGVkGAEgASgJUghleHBlY3RlZBIWCgZhY3R1YWwYAiABKAlSBmFjdHVhbCLnAQoPQ29udGVudE1pc21hdGNoEjcKCGV4cGVjdGVkGAEgASgLMhsuZ29vZ2xlLnByb3RvYnVmLkJ5dGVzVmFsdWVSCGV4cGVjdGVkEjMKBmFjdHVhbBgCIAEoCzIbLmdvb2dsZS5wcm90b2J1Zi5CeXRlc1ZhbHVlUgZhY3R1YWwSGgoIbWlzbWF0Y2gYAyABKAlSCG1pc21hdGNoEhIKBHBhdGgYBCABKAlSBHBhdGgSEgoEZGlmZhgFIAEoCVIEZGlmZhIiCgxtaXNtYXRjaFR5cGUYBiABKAlSDG1pc21hdGNoVHlwZSJUChFDb250ZW50TWlzbWF0Y2hlcxI/CgptaXNtYXRjaGVzGAEgAygLMh8uaW8ucGFjdC5wbHVnaW4uQ29udGVudE1pc21hdGNoUgptaXNtYXRjaGVzIqcCChdDb21wYXJlQ29udGVudHNSZXNwb25zZRIUCgVlcnJvchgBIAEoCVIFZXJyb3ISRwoMdHlwZU1pc21hdGNoGAIgASgLMiMuaW8ucGFjdC5wbHVnaW4uQ29udGVudFR5cGVNaXNtYXRjaFIMdHlwZU1pc21hdGNoEk4KB3Jlc3VsdHMYAyADKAsyNC5pby5wYWN0LnBsdWdpbi5Db21wYXJlQ29udGVudHNSZXNwb25zZS5SZXN1bHRzRW50cnlSB3Jlc3VsdHMaXQoMUmVzdWx0c0VudHJ5EhAKA2tleRgBIAEoCVIDa2V5EjcKBXZhbHVlGAIgASgLMiEuaW8ucGFjdC5wbHVnaW4uQ29udGVudE1pc21hdGNoZXNSBXZhbHVlOgI4ASKAAQobQ29uZmlndXJlSW50ZXJhY3Rpb25SZXF1ZXN0EiAKC2NvbnRlbnRUeXBlGAEgASgJUgtjb250ZW50VHlwZRI/Cg5jb250ZW50c0NvbmZpZxgCIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RSDmNvbnRlbnRzQ29uZmlnIlMKDE1hdGNoaW5nUnVsZRISCgR0eXBlGAEgASgJUgR0eXBlEi8KBnZhbHVlcxgCIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RSBnZhbHVlcyJBCg1NYXRjaGluZ1J1bGVzEjAKBHJ1bGUYASADKAsyHC5pby5wYWN0LnBsdWdpbi5NYXRjaGluZ1J1bGVSBHJ1bGUiUAoJR2VuZXJhdG9yEhIKBHR5cGUYASABKAlSBHR5cGUSLwoGdmFsdWVzGAIgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdFIGdmFsdWVzIrEBChNQbHVnaW5Db25maWd1cmF0aW9uElMKGGludGVyYWN0aW9uQ29uZmlndXJhdGlvbhgBIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RSGGludGVyYWN0aW9uQ29uZmlndXJhdGlvbhJFChFwYWN0Q29uZmlndXJhdGlvbhgCIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RSEXBhY3RDb25maWd1cmF0aW9uIpgJChNJbnRlcmFjdGlvblJlc3BvbnNlEjAKCGNvbnRlbnRzGAEgASgLMhQuaW8ucGFjdC5wbHVnaW4uQm9keVIIY29udGVudHMSRAoFcnVsZXMYAiADKAsyLi5pby5wYWN0LnBsdWdpbi5JbnRlcmFjdGlvblJlc3BvbnNlLlJ1bGVzRW50cnlSBXJ1bGVzElMKCmdlbmVyYXRvcnMYAyADKAsyMy5pby5wYWN0LnBsdWdpbi5JbnRlcmFjdGlvblJlc3BvbnNlLkdlbmVyYXRvcnNFbnRyeVIKZ2VuZXJhdG9ycxJBCg9tZXNzYWdlTWV0YWRhdGEYBCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0Ug9tZXNzYWdlTWV0YWRhdGESVQoTcGx1Z2luQ29uZmlndXJhdGlvbhgFIAEoCzIjLmlvLnBhY3QucGx1Z2luLlBsdWdpbkNvbmZpZ3VyYXRpb25SE3BsdWdpbkNvbmZpZ3VyYXRpb24SLAoRaW50ZXJhY3Rpb25NYXJrdXAYBiABKAlSEWludGVyYWN0aW9uTWFya3VwEmQKFWludGVyYWN0aW9uTWFya3VwVHlwZRgHIAEoDjIuLmlvLnBhY3QucGx1Z2luLkludGVyYWN0aW9uUmVzcG9uc2UuTWFya3VwVHlwZVIVaW50ZXJhY3Rpb25NYXJrdXBUeXBlEhoKCHBhcnROYW1lGAggASgJUghwYXJ0TmFtZRJdCg5tZXRhZGF0YV9ydWxlcxgJIAMoCzI2LmlvLnBhY3QucGx1Z2luLkludGVyYWN0aW9uUmVzcG9uc2UuTWV0YWRhdGFSdWxlc0VudHJ5Ug1tZXRhZGF0YVJ1bGVzEmwKE21ldGFkYXRhX2dlbmVyYXRvcnMYCiADKAsyOy5pby5wYWN0LnBsdWdpbi5JbnRlcmFjdGlvblJlc3BvbnNlLk1ldGFkYXRhR2VuZXJhdG9yc0VudHJ5UhJtZXRhZGF0YUdlbmVyYXRvcnMaVwoKUnVsZXNFbnRyeRIQCgNrZXkYASABKAlSA2tleRIzCgV2YWx1ZRgCIAEoCzIdLmlvLnBhY3QucGx1Z2luLk1hdGNoaW5nUnVsZXNSBXZhbHVlOgI4ARpYCg9HZW5lcmF0b3JzRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSLwoFdmFsdWUYAiABKAsyGS5pby5wYWN0LnBsdWdpbi5HZW5lcmF0b3JSBXZhbHVlOgI4ARpfChJNZXRhZGF0YVJ1bGVzRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSMwoFdmFsdWUYAiABKAsyHS5pby5wYWN0LnBsdWdpbi5NYXRjaGluZ1J1bGVzUgV2YWx1ZToCOAEaYAoXTWV0YWRhdGFHZW5lcmF0b3JzRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSLwoFdmFsdWUYAiABKAsyGS5pby5wYWN0LnBsdWdpbi5HZW5lcmF0b3JSBXZhbHVlOgI4ASInCgpNYXJrdXBUeXBlEg8KC0NPTU1PTl9NQVJLEAASCAoESFRNTBABItIBChxDb25maWd1cmVJbnRlcmFjdGlvblJlc3BvbnNlEhQKBWVycm9yGAEgASgJUgVlcnJvchJFCgtpbnRlcmFjdGlvbhgCIAMoCzIjLmlvLnBhY3QucGx1Z2luLkludGVyYWN0aW9uUmVzcG9uc2VSC2ludGVyYWN0aW9uElUKE3BsdWdpbkNvbmZpZ3VyYXRpb24YAyABKAsyIy5pby5wYWN0LnBsdWdpbi5QbHVnaW5Db25maWd1cmF0aW9uUhNwbHVnaW5Db25maWd1cmF0aW9uIowFChZHZW5lcmF0ZUNvbnRlbnRSZXF1ZXN0EjAKCGNvbnRlbnRzGAEgASgLMhQuaW8ucGFjdC5wbHVnaW4uQm9keVIIY29udGVudHMSVgoKZ2VuZXJhdG9ycxgCIAMoCzI2LmlvLnBhY3QucGx1Z2luLkdlbmVyYXRlQ29udGVudFJlcXVlc3QuR2VuZXJhdG9yc0VudHJ5UgpnZW5lcmF0b3JzElUKE3BsdWdpbkNvbmZpZ3VyYXRpb24YAyABKAsyIy5pby5wYWN0LnBsdWdpbi5QbHVnaW5Db25maWd1cmF0aW9uUhNwbHVnaW5Db25maWd1cmF0aW9uEjkKC3Rlc3RDb250ZXh0GAQgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdFILdGVzdENvbnRleHQSSwoIdGVzdE1vZGUYBSABKA4yLy5pby5wYWN0LnBsdWdpbi5HZW5lcmF0ZUNvbnRlbnRSZXF1ZXN0LlRlc3RNb2RlUgh0ZXN0TW9kZRJRCgpjb250ZW50Rm9yGAYgASgOMjEuaW8ucGFjdC5wbHVnaW4uR2VuZXJhdGVDb250ZW50UmVxdWVzdC5Db250ZW50Rm9yUgpjb250ZW50Rm9yGlgKD0dlbmVyYXRvcnNFbnRyeRIQCgNrZXkYASABKAlSA2tleRIvCgV2YWx1ZRgCIAEoCzIZLmlvLnBhY3QucGx1Z2luLkdlbmVyYXRvclIFdmFsdWU6AjgBIjMKCFRlc3RNb2RlEgsKB1Vua25vd24QABIMCghDb25zdW1lchABEgwKCFByb3ZpZGVyEAIiJwoKQ29udGVudEZvchILCgdSZXF1ZXN0EAASDAoIUmVzcG9uc2UQASJLChdHZW5lcmF0ZUNvbnRlbnRSZXNwb25zZRIwCghjb250ZW50cxgBIAEoCzIULmlvLnBhY3QucGx1Z2luLkJvZHlSCGNvbnRlbnRzIrMBChZTdGFydE1vY2tTZXJ2ZXJSZXF1ZXN0EiQKDWhvc3RJbnRlcmZhY2UYASABKAlSDWhvc3RJbnRlcmZhY2USEgoEcG9ydBgCIAEoDVIEcG9ydBIQCgN0bHMYAyABKAhSA3RscxISCgRwYWN0GAQgASgJUgRwYWN0EjkKC3Rlc3RDb250ZXh0GAUgASgLMhcuZ29vZ2xlLnByb3RvYnVmLlN0cnVjdFILdGVzdENvbnRleHQifAoXU3RhcnRNb2NrU2VydmVyUmVzcG9uc2USFgoFZXJyb3IYASABKAlIAFIFZXJyb3ISPQoHZGV0YWlscxgCIAEoCzIhLmlvLnBhY3QucGx1Z2luLk1vY2tTZXJ2ZXJEZXRhaWxzSABSB2RldGFpbHNCCgoIcmVzcG9uc2UiUwoRTW9ja1NlcnZlckRldGFpbHMSEAoDa2V5GAEgASgJUgNrZXkSEgoEcG9ydBgCIAEoDVIEcG9ydBIYCgdhZGRyZXNzGAMgASgJUgdhZGRyZXNzIjkKGVNodXRkb3duTW9ja1NlcnZlclJlcXVlc3QSHAoJc2VydmVyS2V5GAEgASgJUglzZXJ2ZXJLZXkiMQoRTW9ja1NlcnZlclJlcXVlc3QSHAoJc2VydmVyS2V5GAEgASgJUglzZXJ2ZXJLZXkifQoQTW9ja1NlcnZlclJlc3VsdBISCgRwYXRoGAEgASgJUgRwYXRoEhQKBWVycm9yGAIgASgJUgVlcnJvchI/CgptaXNtYXRjaGVzGAMgAygLMh8uaW8ucGFjdC5wbHVnaW4uQ29udGVudE1pc21hdGNoUgptaXNtYXRjaGVzImgKGlNodXRkb3duTW9ja1NlcnZlclJlc3BvbnNlEg4KAm9rGAEgASgIUgJvaxI6CgdyZXN1bHRzGAIgAygLMiAuaW8ucGFjdC5wbHVnaW4uTW9ja1NlcnZlclJlc3VsdFIHcmVzdWx0cyJfChFNb2NrU2VydmVyUmVzdWx0cxIOCgJvaxgBIAEoCFICb2sSOgoHcmVzdWx0cxgCIAMoCzIgLmlvLnBhY3QucGx1Z2luLk1vY2tTZXJ2ZXJSZXN1bHRSB3Jlc3VsdHMijQEKHlZlcmlmaWNhdGlvblByZXBhcmF0aW9uUmVxdWVzdBISCgRwYWN0GAEgASgJUgRwYWN0EiYKDmludGVyYWN0aW9uS2V5GAIgASgJUg5pbnRlcmFjdGlvbktleRIvCgZjb25maWcYAyABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0UgZjb25maWcifgoNTWV0YWRhdGFWYWx1ZRJACg5ub25CaW5hcnlWYWx1ZRgBIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZUgAUg5ub25CaW5hcnlWYWx1ZRIiCgtiaW5hcnlWYWx1ZRgCIAEoDEgAUgtiaW5hcnlWYWx1ZUIHCgV2YWx1ZSLiAQoPSW50ZXJhY3Rpb25EYXRhEigKBGJvZHkYASABKAsyFC5pby5wYWN0LnBsdWdpbi5Cb2R5UgRib2R5EkkKCG1ldGFkYXRhGAIgAygLMi0uaW8ucGFjdC5wbHVnaW4uSW50ZXJhY3Rpb25EYXRhLk1ldGFkYXRhRW50cnlSCG1ldGFkYXRhGloKDU1ldGFkYXRhRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSMwoFdmFsdWUYAiABKAsyHS5pby5wYWN0LnBsdWdpbi5NZXRhZGF0YVZhbHVlUgV2YWx1ZToCOAEikgEKH1ZlcmlmaWNhdGlvblByZXBhcmF0aW9uUmVzcG9uc2USFgoFZXJyb3IYASABKAlIAFIFZXJyb3ISSwoPaW50ZXJhY3Rpb25EYXRhGAIgASgLMh8uaW8ucGFjdC5wbHVnaW4uSW50ZXJhY3Rpb25EYXRhSABSD2ludGVyYWN0aW9uRGF0YUIKCghyZXNwb25zZSLSAQoYVmVyaWZ5SW50ZXJhY3Rpb25SZXF1ZXN0EkkKD2ludGVyYWN0aW9uRGF0YRgBIAEoCzIfLmlvLnBhY3QucGx1Z2luLkludGVyYWN0aW9uRGF0YVIPaW50ZXJhY3Rpb25EYXRhEi8KBmNvbmZpZxgCIAEoCzIXLmdvb2dsZS5wcm90b2J1Zi5TdHJ1Y3RSBmNvbmZpZxISCgRwYWN0GAMgASgJUgRwYWN0EiYKDmludGVyYWN0aW9uS2V5GAQgASgJUg5pbnRlcmFjdGlvbktleSJ5ChZWZXJpZmljYXRpb25SZXN1bHRJdGVtEhYKBWVycm9yGAEgASgJSABSBWVycm9yEj0KCG1pc21hdGNoGAIgASgLMh8uaW8ucGFjdC5wbHVnaW4uQ29udGVudE1pc21hdGNoSABSCG1pc21hdGNoQggKBnJlc3VsdCLTAQoSVmVyaWZpY2F0aW9uUmVzdWx0EhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3MSQwoMcmVzcG9uc2VEYXRhGAIgASgLMh8uaW8ucGFjdC5wbHVnaW4uSW50ZXJhY3Rpb25EYXRhUgxyZXNwb25zZURhdGESRgoKbWlzbWF0Y2hlcxgDIAMoCzImLmlvLnBhY3QucGx1Z2luLlZlcmlmaWNhdGlvblJlc3VsdEl0ZW1SCm1pc21hdGNoZXMSFgoGb3V0cHV0GAQgAygJUgZvdXRwdXQifQoZVmVyaWZ5SW50ZXJhY3Rpb25SZXNwb25zZRIWCgVlcnJvchgBIAEoCUgAUgVlcnJvchI8CgZyZXN1bHQYAiABKAsyIi5pby5wYWN0LnBsdWdpbi5WZXJpZmljYXRpb25SZXN1bHRIAFIGcmVzdWx0QgoKCHJlc3BvbnNlMoIICgpQYWN0UGx1Z2luElMKCkluaXRQbHVnaW4SIS5pby5wYWN0LnBsdWdpbi5Jbml0UGx1Z2luUmVxdWVzdBoiLmlvLnBhY3QucGx1Z2luLkluaXRQbHVnaW5SZXNwb25zZRJECg9VcGRhdGVDYXRhbG9ndWUSGS5pby5wYWN0LnBsdWdpbi5DYXRhbG9ndWUaFi5nb29nbGUucHJvdG9idWYuRW1wdHkSYgoPQ29tcGFyZUNvbnRlbnRzEiYuaW8ucGFjdC5wbHVnaW4uQ29tcGFyZUNvbnRlbnRzUmVxdWVzdBonLmlvLnBhY3QucGx1Z2luLkNvbXBhcmVDb250ZW50c1Jlc3BvbnNlEnEKFENvbmZpZ3VyZUludGVyYWN0aW9uEisuaW8ucGFjdC5wbHVnaW4uQ29uZmlndXJlSW50ZXJhY3Rpb25SZXF1ZXN0GiwuaW8ucGFjdC5wbHVnaW4uQ29uZmlndXJlSW50ZXJhY3Rpb25SZXNwb25zZRJiCg9HZW5lcmF0ZUNvbnRlbnQSJi5pby5wYWN0LnBsdWdpbi5HZW5lcmF0ZUNvbnRlbnRSZXF1ZXN0GicuaW8ucGFjdC5wbHVnaW4uR2VuZXJhdGVDb250ZW50UmVzcG9uc2USYgoPU3RhcnRNb2NrU2VydmVyEiYuaW8ucGFjdC5wbHVnaW4uU3RhcnRNb2NrU2VydmVyUmVxdWVzdBonLmlvLnBhY3QucGx1Z2luLlN0YXJ0TW9ja1NlcnZlclJlc3BvbnNlEmsKElNodXRkb3duTW9ja1NlcnZlchIpLmlvLnBhY3QucGx1Z2luLlNodXRkb3duTW9ja1NlcnZlclJlcXVlc3QaKi5pby5wYWN0LnBsdWdpbi5TaHV0ZG93bk1vY2tTZXJ2ZXJSZXNwb25zZRJcChRHZXRNb2NrU2VydmVyUmVzdWx0cxIhLmlvLnBhY3QucGx1Z2luLk1vY2tTZXJ2ZXJSZXF1ZXN0GiEuaW8ucGFjdC5wbHVnaW4uTW9ja1NlcnZlclJlc3VsdHMShAEKIVByZXBhcmVJbnRlcmFjdGlvbkZvclZlcmlmaWNhdGlvbhIuLmlvLnBhY3QucGx1Z2luLlZlcmlmaWNhdGlvblByZXBhcmF0aW9uUmVxdWVzdBovLmlvLnBhY3QucGx1Z2luLlZlcmlmaWNhdGlvblByZXBhcmF0aW9uUmVzcG9uc2USaAoRVmVyaWZ5SW50ZXJhY3Rpb24SKC5pby5wYWN0LnBsdWdpbi5WZXJpZnlJbnRlcmFjdGlvblJlcXVlc3QaKS5pby5wYWN0LnBsdWdpbi5WZXJpZnlJbnRlcmFjdGlvblJlc3BvbnNlQhBaDmlvLnBhY3QucGx1Z2luYgZwcm90bzM=",
+            "protoFile": "// Proto file for Pact plugin interface V1\n\nsyntax = \"proto3\";\n\nimport \"google/protobuf/struct.proto\";\nimport \"google/protobuf/wrappers.proto\";\nimport \"google/protobuf/empty.proto\";\n\npackage io.pact.plugin;\noption go_package = \"io.pact.plugin\";\n\n// Request to verify the plugin has loaded OK\nmessage InitPluginRequest {\n  // Implementation calling the plugin\n  string implementation = 1;\n  // Version of the implementation\n  string version = 2;\n}\n\n// Entry to be added to the core catalogue. Each entry describes one of the features the plugin provides.\n// Entries will be stored in the catalogue under the key \"plugin/$name/$type/$key\".\nmessage CatalogueEntry {\n  enum EntryType {\n    // Matcher for contents of messages, requests or response bodies\n    CONTENT_MATCHER = 0;\n    // Generator for contents of messages, requests or response bodies\n    CONTENT_GENERATOR = 1;\n    // Transport for a network protocol\n    TRANSPORT = 2;\n    // Matching rule for content field/values\n    MATCHER = 3;\n    // Type of interaction\n    INTERACTION = 4;\n  }\n  // Entry type\n  EntryType type = 1;\n  // Entry key\n  string key = 2;\n  // Associated data required for the entry. For CONTENT_MATCHER and CONTENT_GENERATOR types, a \"content-types\"\n  // value (separated by semi-colons) is required for all the content types the plugin supports.\n  map<string, string> values = 3;\n}\n\n// Response to init plugin, providing the catalogue entries the plugin provides\nmessage InitPluginResponse {\n  // List of entries the plugin supports\n  repeated CatalogueEntry catalogue = 1;\n}\n\n// Catalogue of Core Pact + Plugin features\nmessage Catalogue {\n  // List of entries from the core catalogue\n  repeated CatalogueEntry catalogue = 1;\n}\n\n// Message representing a request, response or message body\nmessage Body {\n  // The content type of the body in MIME format (i.e. application/json)\n  string contentType = 1;\n  // Bytes of the actual content\n  google.protobuf.BytesValue content = 2;\n  // Enum of content type override. This is a hint on how the content type should be treated.\n  enum ContentTypeHint {\n    // Determine the form of the content using the default rules of the Pact implementation\n    DEFAULT = 0;\n    // Contents must always be treated as a text form\n    TEXT = 1;\n    // Contents must always be treated as a binary form\n    BINARY = 2;\n  }\n  // Content type override to apply (if required). If omitted, the default rules of the Pact implementation\n  // will be used\n  ContentTypeHint contentTypeHint = 3;\n}\n\n// Request to preform a comparison on an actual body given the expected one\nmessage CompareContentsRequest {\n  // Expected body from the Pact interaction\n  Body expected = 1;\n  // Actual received body\n  Body actual = 2;\n  // If unexpected keys or attributes should be allowed. Setting this to false results in additional keys or fields\n  // will cause a mismatch\n  bool allow_unexpected_keys = 3;\n  // Map of expressions to matching rules. The expressions follow the documented Pact matching rule expressions\n  map<string, MatchingRules> rules = 4;\n  // Additional data added to the Pact/Interaction by the plugin\n  PluginConfiguration pluginConfiguration = 5;\n}\n\n// Indicates that there was a mismatch with the content type\nmessage ContentTypeMismatch {\n  // Expected content type (MIME format)\n  string expected = 1;\n  // Actual content type received (MIME format)\n  string actual = 2;\n}\n\n// A mismatch for an particular item of content\nmessage ContentMismatch {\n  // Expected data bytes\n  google.protobuf.BytesValue expected = 1;\n  // Actual data bytes\n  google.protobuf.BytesValue actual = 2;\n  // Description of the mismatch\n  string mismatch = 3;\n  // Path to the item that was matched. This is the value as per the documented Pact matching rule expressions.\n  string path = 4;\n  // Optional diff of the contents\n  string diff = 5;\n  // Part of the interaction that the mismatch is for: body, headers, metadata, etc.\n  string mismatchType = 6;\n}\n\n// List of content mismatches\nmessage ContentMismatches {\n  repeated ContentMismatch mismatches = 1;\n}\n\n// Response to the CompareContentsRequest with the results of the comparison\nmessage CompareContentsResponse {\n  // Error message if an error occurred. If this field is set, the remaining fields will be ignored and the\n  // verification marked as failed\n  string error = 1;\n  // There was a mismatch with the types of content. If this is set, the results may not be set.\n  ContentTypeMismatch typeMismatch = 2;\n  // Results of the match, keyed by matching rule expression\n  map<string, ContentMismatches> results = 3;\n}\n\n// Request to configure/setup an interaction so that it can be verified later\nmessage ConfigureInteractionRequest {\n  // Content type of the interaction (MIME format)\n  string contentType = 1;\n  // This is data specified by the user in the consumer test\n  google.protobuf.Struct contentsConfig = 2;\n}\n\n// Represents a matching rule\nmessage MatchingRule {\n  // Type of the matching rule\n  string type = 1;\n  // Associated data for the matching rule\n  google.protobuf.Struct values = 2;\n}\n\n// List of matching rules\nmessage MatchingRules {\n  repeated MatchingRule rule = 1;\n}\n\n// Example generator\nmessage Generator {\n  // Type of generator\n  string type = 1;\n  // Associated data for the generator\n  google.protobuf.Struct values = 2;\n}\n\n// Plugin configuration added to the pact file by the ConfigureInteraction step\nmessage PluginConfiguration {\n  // Data to be persisted against the interaction\n  google.protobuf.Struct interactionConfiguration = 1;\n  // Data to be persisted in the Pact file metadata (Global data)\n  google.protobuf.Struct pactConfiguration = 2;\n}\n\n// Response to the configure/setup an interaction request\nmessage InteractionResponse {\n  // Contents for the interaction\n  Body contents = 1;\n  // All matching rules to apply\n  map<string, MatchingRules> rules = 2;\n  // Generators to apply\n  map<string, Generator> generators = 3;\n  // For message interactions, any metadata to be applied\n  google.protobuf.Struct messageMetadata = 4;\n  // Plugin specific data to be persisted in the pact file\n  PluginConfiguration pluginConfiguration = 5;\n  // Markdown/HTML formatted text representation of the interaction\n  string interactionMarkup = 6;\n  // Type of markup used\n  enum MarkupType {\n    // CommonMark format\n    COMMON_MARK = 0;\n    // HTML format\n    HTML = 1;\n  }\n  MarkupType interactionMarkupType = 7;\n  // Description of what part this interaction belongs to (in the case of there being more than one, for instance,\n  // request/response messages)\n  string partName = 8;\n  // All matching rules to apply to any message metadata\n  map<string, MatchingRules> metadata_rules = 9;\n  // Generators to apply to any message metadata\n  map<string, Generator> metadata_generators = 10;\n}\n\n// Response to the configure/setup an interaction request\nmessage ConfigureInteractionResponse {\n  // If an error occurred. In this case, the other fields will be ignored/not set\n  string error = 1;\n  // The actual response if no error occurred.\n  repeated InteractionResponse interaction = 2;\n  // Plugin specific data to be persisted in the pact file\n  PluginConfiguration pluginConfiguration = 3;\n}\n\n// Request to generate the contents using any defined generators\nmessage GenerateContentRequest {\n  // Original contents\n  Body contents = 1;\n  // Generators to apply\n  map<string, Generator> generators = 2;\n  // Additional data added to the Pact/Interaction by the plugin\n  PluginConfiguration pluginConfiguration = 3;\n  // Context data provided by the test framework\n  google.protobuf.Struct testContext = 4;\n\n  // The mode of the generation, if running from a consumer test or during provider verification\n  enum TestMode {\n    Unknown = 0;\n    // Running on the consumer side\n    Consumer = 1;\n    // Running on the provider side\n    Provider = 2;\n  }\n  TestMode testMode = 5;\n\n  // Which part the content is for\n  enum ContentFor {\n    Request = 0;\n    Response = 1;\n  }\n  ContentFor contentFor = 6;\n}\n\n// Generated body/message response\nmessage GenerateContentResponse {\n  Body contents = 1;\n}\n\n// Request to start a mock server\nmessage StartMockServerRequest {\n  // Interface to bind to. Will default to the loopback adapter\n  string hostInterface = 1;\n  // Port to bind to. Default (or a value of 0) get the OS to open a random port\n  uint32 port = 2;\n  // If TLS should be used (if supported by the mock server)\n  bool tls = 3;\n  // Pact as JSON to use for the mock server behaviour\n  string pact = 4;\n  // Context data provided by the test framework\n  google.protobuf.Struct testContext = 5;\n}\n\n// Response to the start mock server request\nmessage StartMockServerResponse {\n  oneof response {\n    // If an error occurred\n    string error = 1;\n\n    // Mock server details\n    MockServerDetails details = 2;\n  }\n}\n\n// Details on a running mock server\nmessage MockServerDetails {\n  // Mock server unique ID\n  string key = 1;\n  // Port the mock server is running on\n  uint32 port = 2;\n  // IP address the mock server is bound to. Probably an IP6 address, but may be IP4\n  string address = 3;\n}\n\n// Request to shut down a running mock server\n// TODO: replace this with MockServerRequest in the next major version\nmessage ShutdownMockServerRequest {\n  // The server ID to shutdown\n  string serverKey = 1;\n}\n\n// Request for a running mock server by ID\nmessage MockServerRequest {\n  // The server ID to shutdown\n  string serverKey = 1;\n}\n\n// Result of a request that the mock server received\nmessage MockServerResult {\n  // service + method that was requested\n  string path = 1;\n  // If an error occurred trying to handle the request\n  string error = 2;\n  // Any mismatches that occurred\n  repeated ContentMismatch mismatches = 3;\n}\n\n// Response to the shut down mock server request\n// TODO: replace this with MockServerResults in the next major version\nmessage ShutdownMockServerResponse {\n  // If the mock status is all ok\n  bool ok = 1;\n  // The results of the test run, will contain an entry for each request received by the mock server\n  repeated MockServerResult results = 2;\n}\n\n// Matching results of the mock server.\nmessage MockServerResults {\n  // If the mock status is all ok\n  bool ok = 1;\n  // The results of the test run, will contain an entry for each request received by the mock server\n  repeated MockServerResult results = 2;\n}\n\n// Request to prepare an interaction for verification\nmessage VerificationPreparationRequest {\n  // Pact as JSON to use for the verification\n  string pact = 1;\n  // Interaction key for the interaction from the Pact that is being verified\n  string interactionKey = 2;\n  // Any data supplied by the user to verify the interaction\n  google.protobuf.Struct config = 3;\n}\n\n// Request metadata value. Will either be a JSON-like value, or binary data\nmessage MetadataValue {\n  oneof value {\n    google.protobuf.Value nonBinaryValue = 1;\n    bytes binaryValue = 2;\n  }\n}\n\n// Interaction request data to be sent or received for verification\nmessage InteractionData {\n  // Request/Response body as bytes\n  Body body = 1;\n  // Metadata associated with the request/response\n  map<string, MetadataValue> metadata = 2;\n}\n\n// Response for the prepare an interaction for verification request\nmessage VerificationPreparationResponse {\n  oneof response {\n    // If an error occurred\n    string error = 1;\n\n    // Interaction data required to construct any request\n    InteractionData interactionData = 2;\n  }\n}\n\n// Request data to verify an interaction\nmessage VerifyInteractionRequest {\n  // Interaction data required to construct the request\n  InteractionData interactionData = 1;\n  // Any data supplied by the user to verify the interaction\n  google.protobuf.Struct config = 2;\n  // Pact as JSON to use for the verification\n  string pact = 3;\n  // Interaction key for the interaction from the Pact that is being verified\n  string interactionKey = 4;\n}\n\nmessage VerificationResultItem {\n  oneof result {\n    string error = 1;\n    ContentMismatch mismatch = 2;\n  }\n}\n\n// Result of running the verification\nmessage VerificationResult {\n  // Was the verification successful?\n  bool success = 1;\n  // Interaction data retrieved from the provider (optional)\n  InteractionData responseData = 2;\n  // Any mismatches that occurred\n  repeated VerificationResultItem mismatches = 3;\n  // Output for the verification to display to the user\n  repeated string output = 4;\n}\n\n// Result of running the verification\nmessage VerifyInteractionResponse {\n  oneof response {\n    // If an error occurred trying to run the verification\n    string error = 1;\n\n    VerificationResult result = 2;\n  }\n}\n\nservice PactPlugin {\n  // Check that the plugin loaded OK. Returns the catalogue entries describing what the plugin provides\n  rpc InitPlugin(InitPluginRequest) returns (InitPluginResponse);\n  // Updated catalogue. This will be sent when the core catalogue has been updated (probably by a plugin loading).\n  rpc UpdateCatalogue(Catalogue) returns (google.protobuf.Empty);\n  // Request to perform a comparison of some contents (matching request)\n  rpc CompareContents(CompareContentsRequest) returns (CompareContentsResponse);\n  // Request to configure/setup the interaction for later verification. Data returned will be persisted in the pact file.\n  rpc ConfigureInteraction(ConfigureInteractionRequest) returns (ConfigureInteractionResponse);\n  // Request to generate the content using any defined generators\n  rpc GenerateContent(GenerateContentRequest) returns (GenerateContentResponse);\n\n  // Start a mock server\n  rpc StartMockServer(StartMockServerRequest) returns (StartMockServerResponse);\n  // Shutdown a running mock server\n  // TODO: Replace the message types with MockServerRequest and MockServerResults in the next major version\n  rpc ShutdownMockServer(ShutdownMockServerRequest) returns (ShutdownMockServerResponse);\n  // Get the matching results from a running mock server\n  rpc GetMockServerResults(MockServerRequest) returns (MockServerResults);\n\n  // Prepare an interaction for verification. This should return any data required to construct any request\n  // so that it can be amended before the verification is run\n  rpc PrepareInteractionForVerification(VerificationPreparationRequest) returns (VerificationPreparationResponse);\n  // Execute the verification for the interaction.\n  rpc VerifyInteraction(VerifyInteractionRequest) returns (VerifyInteractionResponse);\n}\n"
+          }
+        },
+        "name": "protobuf",
+        "version": "0.5.1"
+      }
+    ]
+  },
+  "provider": {
+    "name": "protobuf-provider"
+  }
+}

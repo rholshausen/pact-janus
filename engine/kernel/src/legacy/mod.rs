@@ -38,5 +38,6 @@ pub mod builder;
 pub mod compile;
 pub mod multipart;
 pub mod pact;
+pub mod plugins;
 pub mod upgrade;
 pub mod xml;

@@ -53,6 +53,10 @@ pub fn run(args: &ExplainArgs) -> Result<Outcome, Error> {
   };
 
   let mut request = json!({ "interaction": subject, "options": { "plan": args.plan } });
+  // ADR 0110 decision 6: a plugin interaction is explained through its bridge, as a run verifies it.
+  if let Some(bridge) = crate::plugin_bridge::option() {
+    request["options"]["plugin-bridge"] = bridge;
+  }
   if let Some(path) = &args.config {
     request["components"] = io::config_components(path)?;
   }

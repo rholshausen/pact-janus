@@ -1403,6 +1403,7 @@ export interface VerifyOptions {
    * A provider state no state-setup hook admits (lifecycle-hooks spec §3.2, ADR 0058). 'warn': a 'state-unhandled' warning, and the exchange runs without it, as pact-js runs it. 'fail': the variant fails before its exchange, with component-unavailable naming 'hook/state-setup', as pact-jvm fails it. Any other value is read as 'warn'.
    */
   "unhandled-states"?: string;
+  "plugin-bridge"?: PluginBridge;
   [k: string]: unknown;
 }
 
@@ -1567,9 +1568,7 @@ export interface Explain {
   encoded?: {
     [k: string]: string;
   };
-  options?: {
-    [k: string]: unknown;
-  };
+  options?: ExplainOptions;
   [k: string]: unknown;
 }
 
@@ -1598,6 +1597,33 @@ export interface ExplainSubject {
    * For kind 'contract-interaction' on a Janus contract: the recorded variant to pin the plan to. Absent means the unpinned plan.
    */
   variant?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * Open, additive explain options: 'plan' asks for the structured plan document, and 'plugin-bridge' how to start janus-plugin-bridge for a v1–v4 subject's pact plugins.
+ */
+export interface ExplainOptions {
+  "plugin-bridge"?: PluginBridge;
+  [k: string]: unknown;
+}
+
+/**
+ * How to start janus-plugin-bridge (spec.md §8.3, ADR 0110 decision 6): a component declaration but its name, as component-interfaces spec §10.2 has one. Given it, the engine declares 'pact-plugin-<name>' for each pact plugin a v1–v4 pact's metadata names, the plugin's name and version appended to the source's 'args', unless the run's components already declare that name; for a pact fetched from a broker or by URL, when it arrives. A plugin interaction no bridge can verify is refused, as without one.
+ */
+export interface PluginBridge {
+  /**
+   * A 'subprocess' source: the bridge program, and any arguments before the plugin's.
+   */
+  source: {
+    [k: string]: unknown;
+  };
+  grants?: {
+    [k: string]: unknown;
+  };
+  limits?: {
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
 
@@ -1647,6 +1673,10 @@ export interface Mismatch {
    * The nearest action the failure came from.
    */
   action?: string | null;
+  /**
+   * Where the action that found it locates it inside the value at 'path', in its own words, when it found several (plan-grammar spec §2.3, ADR 0110): a pact plugin's location in a body only the plugin decodes. Not a path.
+   */
+  at?: string;
   "message-segments"?: Segments;
   [k: string]: unknown;
 }

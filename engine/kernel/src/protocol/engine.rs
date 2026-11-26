@@ -868,7 +868,15 @@ impl Engine {
     // Component-interfaces spec §2.3: load what the project declared, then collect the union of
     // every interaction's requirements and fail the unsatisfiable ones — before any transport is
     // started and before any exchange runs.
-    let scope = match self.scope(&req.target.components) {
+    // ADR 0110 decision 6: a bridge for each pact plugin the documents name, when the host said how to
+    // start one. A broker's pacts are declared for once they are fetched.
+    let mut declarations = req.target.components.clone();
+    declarations.extend(verification::bridge_declarations(
+      &contracts,
+      &req.target.components,
+      req.options.as_ref(),
+    ));
+    let scope = match self.scope(&declarations) {
       Ok(scope) => scope,
       Err(err) => return ResponseFrame::err(id, err),
     };
@@ -967,6 +975,8 @@ impl Engine {
         fetch,
         require_pacts: req.source.require_pacts,
         scope,
+        declared: declarations,
+        options: req.options.clone(),
       })),
       _ => verification::Sources::Read(contracts),
     };
@@ -1117,8 +1127,15 @@ impl Engine {
       Ok(req) => req,
       Err(err) => return ResponseFrame::err(id, err),
     };
-    // The components a run would load, and the requirements a run would check (ADR 0050).
-    let scope = match self.scope(&req.components) {
+    // The components a run would load, and the requirements a run would check (ADR 0050), with a
+    // bridge for each pact plugin the subject names when the host said how to start one (ADR 0110).
+    let mut declarations = req.components.clone();
+    declarations.extend(explain::bridge_declarations(
+      &req.interaction,
+      &req.components,
+      req.options.as_ref(),
+    ));
+    let scope = match self.scope(&declarations) {
       Ok(scope) => scope,
       Err(err) => return ResponseFrame::err(id, err),
     };
@@ -1633,7 +1650,11 @@ fn explain_error(err: ExplainError) -> EngineError {
       EngineError::variant_not_recorded(std::slice::from_ref(&variant), &recorded)
     }
     ExplainError::NotReadable(message) => EngineError::malformed_frame(message),
-    ExplainError::NeedsPlugins(plugins) => EngineError::pact_plugins_unavailable(&plugins),
+    ExplainError::NeedsPlugins {
+      plugins,
+      why,
+      message,
+    } => EngineError::pact_plugin_refused(&plugins, why, message),
     ExplainError::Unavailable(unavailable) => EngineError::component_unresolved(&unavailable),
     ExplainError::Values(message) => EngineError::malformed_frame(format!("verification/explain: {message}")),
   }

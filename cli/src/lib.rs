@@ -37,6 +37,7 @@ pub mod framing;
 mod highlight;
 mod io;
 pub mod logging;
+mod plugin_bridge;
 mod publish;
 pub mod register;
 mod style;

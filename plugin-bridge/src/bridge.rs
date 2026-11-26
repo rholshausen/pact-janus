@@ -6,7 +6,8 @@
 //!   translated ([`crate::catalogue`]). A plugin that cannot be loaded is `unavailable`, so the engine
 //!   reports the declaration as one that did not load.
 //! - `matcher/apply` of `<component>:compare-contents` compares a body through the plugin's content
-//!   matcher ([`crate::compare`]). A plugin the call cannot reach is `unavailable`, and the bridge leaves
+//!   matcher ([`crate::compare`]), and of `<component>:generate-content` fills one through its content
+//!   generator ([`crate::generate`]). A plugin the call cannot reach is `unavailable`, and the bridge leaves
 //!   once it has answered, so the engine's next call starts a new bridge and a new plugin (ADR 0108
 //!   decision 3: out of process, the process is what is recreated).
 //! - `component/shutdown` is answered and changes nothing: the plugin lives as long as the bridge's
@@ -15,6 +16,7 @@
 use crate::catalogue::{self, Entry, Plugin};
 use crate::compare::{self, Arguments};
 use crate::error::ComponentError;
+use crate::generate;
 use pact_plugin_driver::call_chain;
 use pact_plugin_driver::catalogue_manager::{self, CatalogueEntry, CatalogueEntryProviderType};
 use pact_plugin_driver::plugin_manager;
@@ -192,19 +194,33 @@ impl Bridge {
   }
 
   fn apply(&self, loaded: &Loaded, body: &Value) -> Result<Value, ComponentError> {
+    let plugin = &loaded.plugin;
     let action = body.get("action").and_then(Value::as_str).unwrap_or_default();
-    let matchers: Vec<&CatalogueEntry> = loaded
+    // Which catalogue entries the action is served by: a content matcher's or a content generator's.
+    let (kind, served) = if action == plugin.compare_contents() {
+      ("content-matcher", "content matcher")
+    } else if action == plugin.generate_content() {
+      ("content-generator", "content generator")
+    } else {
+      ("", "")
+    };
+    let entries: Vec<Entry> = loaded
       .entries
       .iter()
-      .filter(|entry| entry.entry_type.to_string() == "content-matcher")
+      .filter(|entry| !kind.is_empty() && entry.entry_type.to_string() == kind)
+      .map(|entry| Entry {
+        kind: entry.entry_type.to_string(),
+        key: entry.key.clone(),
+        values: entry.values.clone().into_iter().collect(),
+      })
       .collect();
-    if matchers.is_empty() || action != loaded.plugin.compare_contents() {
+    if entries.is_empty() {
       return Err(
         ComponentError::document(
           "unknown-action",
           format!(
             "the bridge for the pact plugin '{}' contributes no action '{action}'",
-            loaded.plugin.name
+            plugin.name
           ),
         )
         .with("action", action),
@@ -214,32 +230,31 @@ impl Bridge {
       .get("values")
       .and_then(Value::as_array)
       .ok_or_else(|| ComponentError::invalid_config("matcher/apply has no 'values'"))?;
-    let arguments = Arguments::read(body.get("config"))?;
-    let entry = matchers
+    let config = body.get("config");
+    let content_type = if kind == "content-matcher" {
+      Arguments::read(config)?.content_type
+    } else {
+      generate::Arguments::read(config)?.content_type
+    };
+    let entry = entries
       .iter()
       .find(|entry| {
-        let entry = Entry {
-          kind: entry.entry_type.to_string(),
-          key: entry.key.clone(),
-          values: entry.values.clone().into_iter().collect(),
-        };
         entry
           .content_types()
           .iter()
-          .any(|pattern| catalogue::claims(pattern, &arguments.content_type))
+          .any(|pattern| catalogue::claims(pattern, &content_type))
       })
       .ok_or_else(|| {
         ComponentError::document(
           "unsupported-content-type",
           format!(
-            "the pact plugin '{}' has no content matcher for '{}'",
-            loaded.plugin.name, arguments.content_type
+            "the pact plugin '{}' has no {served} for '{content_type}'",
+            plugin.name
           ),
         )
-        .with("content-type", arguments.content_type.as_str())
+        .with("content-type", content_type.as_str())
       })?;
-    tracing::debug!(entry = %entry.key, content_type = %arguments.content_type, "comparing contents");
-    let plugin = &loaded.plugin;
+    tracing::debug!(entry = %entry.key, %content_type, %action, "applying");
     let dependency = PluginDependency {
       name: plugin.name.clone(),
       version: Some(plugin.version.clone()),
@@ -253,16 +268,29 @@ impl Bridge {
     };
     let mut results = Vec::with_capacity(values.len());
     for value in values {
-      let request = arguments.request(&arguments.actual(value)?);
-      let answer = self.runtime.block_on(instance.compare_contents_with_chain(
-        request,
-        &call_chain::new_call_chain_id(),
-        call_chain::default_deadline_ms(),
-      ));
-      match answer {
-        Err(err) if compare::unreachable(&err) => return Err(self.lost(plugin, err)),
-        answer => results.push(compare::result(&compare::mismatches(answer))),
-      }
+      let result = if kind == "content-matcher" {
+        let arguments = Arguments::read(config)?;
+        let request = arguments.request(&arguments.actual(value)?);
+        match self.runtime.block_on(instance.compare_contents_with_chain(
+          request,
+          &call_chain::new_call_chain_id(),
+          call_chain::default_deadline_ms(),
+        )) {
+          Err(err) if compare::unreachable(&err) => return Err(self.lost(plugin, err)),
+          answer => compare::result(&compare::mismatches(answer)),
+        }
+      } else {
+        let request = generate::Arguments::read(config)?.request(value)?;
+        match self.runtime.block_on(instance.generate_content_with_chain(
+          request,
+          &call_chain::new_call_chain_id(),
+          call_chain::default_deadline_ms(),
+        )) {
+          Err(err) if compare::unreachable(&err) => return Err(self.lost(plugin, err)),
+          answer => generate::result(answer),
+        }
+      };
+      results.push(result);
     }
     Ok(json!({ "results": results }))
   }

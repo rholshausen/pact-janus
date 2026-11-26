@@ -1,0 +1,48 @@
+{
+  "description": "A CSV report compared by pact-plugins' CSV plugin, through janus-plugin-bridge: the response body is the plugin's to compare, and the request body is filled by the plugin's content generator",
+  "source": "staged plan S5.2d; ADR 0110; pact-plugins examples/csv/csv-consumer-rust, its pact as written; the pinned CSV plugin (plugin-bridge/pact-plugins.json)",
+  "pacts": [
+    "CsvClient-CsvServer.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/reports/report001.csv"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": [
+              "text/csv;charset=utf-8"
+            ]
+          },
+          "body": {
+            "text": "Name,100,2000-01-01\n"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "POST",
+          "path": "/reports/report001.csv",
+          "headers": {
+            "content-type": [
+              "text/csv"
+            ]
+          },
+          "body": {
+            "text": "Name,100,2000-01-01\n"
+          }
+        },
+        "response": {
+          "status": 201
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

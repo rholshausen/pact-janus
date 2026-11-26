@@ -123,6 +123,12 @@ impl Reporter {
     for mismatch in payload["mismatches"].as_array().into_iter().flatten() {
       text.text_plain(format!("\n{DETAIL}"));
       text.text_as(Kind::Path, mismatch["path"].as_str().unwrap_or(""));
+      // A place inside the value the node that found it locates it at (ADR 0110).
+      if let Some(at) = mismatch["at"].as_str() {
+        text.text_plain(" (");
+        text.text_as(Kind::Path, at);
+        text.text_plain(")");
+      }
       text.text_plain(": ");
       text.append(marked(mismatch, "message"));
     }
@@ -617,6 +623,24 @@ mod tests {
        \x20         given a product exists\n\
        \x20         $.response.status: Expected 200 to equal 404\n\
        \x20         auth at before-request: failed"
+    );
+  }
+
+  #[test]
+  fn a_mismatch_a_component_located_says_where_inside_the_value() {
+    let result = json!({
+      "interaction": { "description": "request for a report", "format": "pact/4.0" },
+      "variant": "base", "status": "failed",
+      "mismatches": [
+        { "path": "$.response.body", "at": "row: 1, column: 1", "message": "Expected 'many' to match a number" },
+        { "path": "$.response.body", "message": "Expected 3 columns" }
+      ],
+    });
+    assert_eq!(
+      text(&mut reporter(), "verification/interaction-result", result),
+      "  FAILED  request for a report\n\
+       \x20         $.response.body (row: 1, column: 1): Expected 'many' to match a number\n\
+       \x20         $.response.body: Expected 3 columns"
     );
   }
 

@@ -29,6 +29,7 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
     "path",
     "message",
     "action",
+    "at",
     "message-segments"
 })
 public class Mismatch {
@@ -54,6 +55,13 @@ public class Mismatch {
     @JsonProperty("action")
     @JsonPropertyDescription("The nearest action the failure came from.")
     private String action;
+    /**
+     * Where the action that found it locates it inside the value at 'path', in its own words, when it found several (plan-grammar spec §2.3, ADR 0110): a pact plugin's location in a body only the plugin decodes. Not a path.
+     * 
+     */
+    @JsonProperty("at")
+    @JsonPropertyDescription("Where the action that found it locates it inside the value at 'path', in its own words, when it found several (plan-grammar spec \u00a72.3, ADR 0110): a pact plugin's location in a body only the plugin decodes. Not a path.")
+    private String at;
     /**
      * Segments
      * <p>
@@ -123,6 +131,24 @@ public class Mismatch {
     }
 
     /**
+     * Where the action that found it locates it inside the value at 'path', in its own words, when it found several (plan-grammar spec §2.3, ADR 0110): a pact plugin's location in a body only the plugin decodes. Not a path.
+     * 
+     */
+    @JsonProperty("at")
+    public String getAt() {
+        return at;
+    }
+
+    /**
+     * Where the action that found it locates it inside the value at 'path', in its own words, when it found several (plan-grammar spec §2.3, ADR 0110): a pact plugin's location in a body only the plugin decodes. Not a path.
+     * 
+     */
+    @JsonProperty("at")
+    public void setAt(String at) {
+        this.at = at;
+    }
+
+    /**
      * Segments
      * <p>
      * A display member's segments, sent as '<member>-segments' beside it ('text-segments', 'message-segments') when the host declared the 'segments' capability: the pieces of the display string, in order. Their texts, joined, are exactly the string; a host that finds otherwise prints the string. Flat: a piece is never inside another.
@@ -170,6 +196,10 @@ public class Mismatch {
         sb.append('=');
         sb.append(((this.action == null)?"<null>":this.action));
         sb.append(',');
+        sb.append("at");
+        sb.append('=');
+        sb.append(((this.at == null)?"<null>":this.at));
+        sb.append(',');
         sb.append("messageSegments");
         sb.append('=');
         sb.append(((this.messageSegments == null)?"<null>":this.messageSegments));
@@ -190,10 +220,11 @@ public class Mismatch {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.path == null)? 0 :this.path.hashCode()));
+        result = ((result* 31)+((this.at == null)? 0 :this.at.hashCode()));
+        result = ((result* 31)+((this.messageSegments == null)? 0 :this.messageSegments.hashCode()));
         result = ((result* 31)+((this.action == null)? 0 :this.action.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         result = ((result* 31)+((this.message == null)? 0 :this.message.hashCode()));
-        result = ((result* 31)+((this.messageSegments == null)? 0 :this.messageSegments.hashCode()));
         return result;
     }
 
@@ -206,7 +237,7 @@ public class Mismatch {
             return false;
         }
         Mismatch rhs = ((Mismatch) other);
-        return ((((((this.path == rhs.path)||((this.path!= null)&&this.path.equals(rhs.path)))&&((this.action == rhs.action)||((this.action!= null)&&this.action.equals(rhs.action))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.message == rhs.message)||((this.message!= null)&&this.message.equals(rhs.message))))&&((this.messageSegments == rhs.messageSegments)||((this.messageSegments!= null)&&this.messageSegments.equals(rhs.messageSegments))));
+        return (((((((this.path == rhs.path)||((this.path!= null)&&this.path.equals(rhs.path)))&&((this.at == rhs.at)||((this.at!= null)&&this.at.equals(rhs.at))))&&((this.messageSegments == rhs.messageSegments)||((this.messageSegments!= null)&&this.messageSegments.equals(rhs.messageSegments))))&&((this.action == rhs.action)||((this.action!= null)&&this.action.equals(rhs.action))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))))&&((this.message == rhs.message)||((this.message!= null)&&this.message.equals(rhs.message))));
     }
 
 }

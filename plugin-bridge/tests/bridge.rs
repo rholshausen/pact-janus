@@ -252,9 +252,9 @@ fn equal_bodies_are_ok_and_different_ones_are_one_mismatch_naming_each_differenc
       "status": "error",
       "message": "$: Expected 2 line(s) but got 3; $[0]: Expected 'x' but got 'a'; $[1]: Expected 'b' but got 'c'",
       "mismatches": [
-        { "path": "$", "message": "Expected 2 line(s) but got 3", "expected": "2", "actual": "3" },
-        { "path": "$[0]", "message": "Expected 'x' but got 'a'", "expected": "x", "actual": "a" },
-        { "path": "$[1]", "message": "Expected 'b' but got 'c'", "expected": "b", "actual": "c" }
+        { "message": "Expected 2 line(s) but got 3", "at": "$", "expected": "2", "actual": "3" },
+        { "message": "Expected 'x' but got 'a'", "at": "$[0]", "expected": "x", "actual": "a" },
+        { "message": "Expected 'b' but got 'c'", "at": "$[1]", "expected": "b", "actual": "c" }
       ]
     })
   );

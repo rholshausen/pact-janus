@@ -99,6 +99,21 @@ pub enum LegacyBody {
   /// A multipart body's parts, in body order ([`crate::legacy::multipart`]). Compiled part by part,
   /// as today's verifier compares them (ADR 0040).
   Multipart(Vec<LegacyPart>),
+  /// A body a pact plugin compares (ADR 0110 decision 3): compiled to its bridge's action over the whole
+  /// slot, in place of the compiler's own walk.
+  Plugin(Box<PluginBody>),
+}
+
+/// A body a pact plugin's content matcher compares, through the action its bridge contributes
+/// (component-interfaces spec §9.3.1).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PluginBody {
+  /// The body as the pact records it: its octets, or its text.
+  pub expected: RuntimeValue,
+  /// `pact-plugin-<name>:compare-contents`.
+  pub action: String,
+  /// The action's one argument: what the pact says about the body (ADR 0109 decision 5).
+  pub argument: Value,
 }
 
 impl LegacyBody {
@@ -110,6 +125,7 @@ impl LegacyBody {
         document.clone()
       }
       LegacyBody::Multipart(parts) => crate::legacy::multipart::document(parts),
+      LegacyBody::Plugin(plugin) => plugin.expected.clone(),
     }
   }
 }
@@ -823,7 +839,7 @@ fn body_type_check(
     Some(LegacyBody::Document(value)) if !matches!(value, RuntimeValue::Null | RuntimeValue::Absent)
   ) || matches!(
     body,
-    Some(LegacyBody::Form(_) | LegacyBody::Xml(_) | LegacyBody::Multipart(_))
+    Some(LegacyBody::Form(_) | LegacyBody::Xml(_) | LegacyBody::Multipart(_) | LegacyBody::Plugin(_))
   );
   let named = headers
     .keys()
@@ -887,6 +903,15 @@ fn compile_body_content(
     LegacyBody::Xml(document) => compile_xml_body(document, category, closed, root_path),
     // Parts by name, each by its own type, as today's `match_mime_multipart` compares them.
     LegacyBody::Multipart(parts) => compile_multipart_body(parts, category, closed, root_path),
+    // The whole body, by the plugin that owns its content type (ADR 0110 decision 3). The pact's rules
+    // travel in the argument: the plugin applies them, not this compiler.
+    LegacyBody::Plugin(plugin) => vec![Node::action(
+      &plugin.action,
+      vec![
+        Node::resolve(root_path.to_string()),
+        Node::value(Literal::from_json(&plugin.argument)),
+      ],
+    )],
     // Structure, or one value at `$`: a string, or octets compared by the rules there or byte for
     // byte, as today's `match_octet_stream` compares them (ADR 0036 decision 3).
     LegacyBody::Document(body) => {

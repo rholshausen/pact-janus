@@ -25,6 +25,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+#[derive(Clone)]
 struct Contributor {
   name: String,
   content: Option<Arc<dyn ContentComponent>>,
@@ -34,6 +35,9 @@ struct Contributor {
   /// What a declared component's handshake says of each operator's comparability (spec §7.5);
   /// `None` for an in-tree matcher, which answers in code.
   comparabilities: Option<BTreeMap<String, crate::component::Comparability>>,
+  /// A declared component's handshake `capabilities`, unread here (ADR 0110 decision 4); `Null` for an
+  /// in-tree matcher.
+  capabilities: Value,
 }
 
 #[derive(Default)]
@@ -52,6 +56,7 @@ impl Contributions {
       actions: component.actions.clone(),
       substitutions: component.substitutions.clone(),
       comparabilities: Some(component.comparabilities.clone()),
+      capabilities: component.capabilities.clone(),
     });
     let in_tree = in_tree.iter().map(|component| Contributor {
       name: component.name.clone(),
@@ -60,10 +65,38 @@ impl Contributions {
       actions: component.actions.clone(),
       substitutions: Vec::new(),
       comparabilities: None,
+      capabilities: Value::Null,
     });
     Contributions {
       contributors: declared.chain(in_tree).collect(),
     }
+  }
+
+  /// These contributions and `more`'s: components a run loaded after its scope was resolved (ADR 0110
+  /// decision 6). Matchers only, since nothing decodes a run's slots that its scope did not.
+  pub fn with_declared(&self, more: &[Resolved]) -> Contributions {
+    let added = more.iter().map(|component| Contributor {
+      name: component.name.clone(),
+      content: None,
+      matcher: component.matcher.clone(),
+      actions: component.actions.clone(),
+      substitutions: Vec::new(),
+      comparabilities: Some(component.comparabilities.clone()),
+      capabilities: component.capabilities.clone(),
+    });
+    Contributions {
+      contributors: added.chain(self.contributors.iter().cloned()).collect(),
+    }
+  }
+
+  /// Each declared component's name and handshake capabilities, which the legacy layer reads a pact plugin
+  /// bridge's from (ADR 0110 decision 4).
+  pub fn capabilities(&self) -> impl Iterator<Item = (&str, &Value)> {
+    self
+      .contributors
+      .iter()
+      .filter(|c| !c.capabilities.is_null())
+      .map(|c| (c.name.as_str(), &c.capabilities))
   }
 
   /// The declared component that decodes `media_type`: the first that handles it, as the scope's
@@ -293,6 +326,7 @@ impl ActionApplier for Contributions {
         ),
         path: None,
         marks: None,
+        found: Vec::new(),
       });
     };
     // One application. Its first argument is the value under test, wrapped as a `MatchValue` —
@@ -326,6 +360,7 @@ impl ActionApplier for Contributions {
           message: format!("'{}' answered '{action}' with no result", contributor.name),
           path: None,
           marks: None,
+          found: Vec::new(),
         },
       },
       // Spec §11.3 says this is `component-failed` at the engine boundary. A plan node has nowhere
@@ -338,18 +373,55 @@ impl ActionApplier for Contributions {
         ),
         path: None,
         marks: None,
+        found: Vec::new(),
       },
     })
   }
+}
+
+/// A result's `value`, a plan value (plan-grammar spec §2.2): its natural JSON, or octets when it is tagged
+/// `base64`, as a pact plugin's generated body is (ADR 0110 decision 7).
+fn value_of(value: &Value) -> RuntimeValue {
+  let inner = value.get("value").unwrap_or(&Value::Null);
+  match value.get("encoded").and_then(Value::as_str) {
+    Some("base64") => inner
+      .as_str()
+      .and_then(|text| {
+        use base64::Engine as _;
+        base64::engine::general_purpose::STANDARD.decode(text).ok()
+      })
+      .map(RuntimeValue::Bytes)
+      .unwrap_or(RuntimeValue::Absent),
+    _ => RuntimeValue::from_json(inner),
+  }
+}
+
+/// An error result's `mismatches` (plan-grammar spec §2.3, ADR 0110): each a `message`, located by an
+/// optional `at` in the component's own words. An entry with no message is not one.
+fn found(result: &Value) -> Vec<plan::Found> {
+  result
+    .get("mismatches")
+    .and_then(Value::as_array)
+    .into_iter()
+    .flatten()
+    .filter_map(|entry| {
+      Some(plan::Found {
+        message: entry.get("message")?.as_str()?.to_string(),
+        at: entry
+          .get("at")
+          .and_then(Value::as_str)
+          .filter(|at| !at.is_empty())
+          .map(str::to_string),
+      })
+    })
+    .collect()
 }
 
 /// A plan result document (plan-grammar spec §2.3): `ok`, `value` with a plan value, or `error`.
 fn read_result(result: &Value) -> NodeResult {
   match result.get("status").and_then(Value::as_str) {
     Some("ok") => NodeResult::Ok,
-    Some("value") => NodeResult::Value(RuntimeValue::from_json(
-      result.pointer("/value/value").unwrap_or(&Value::Null),
-    )),
+    Some("value") => NodeResult::Value(value_of(result.get("value").unwrap_or(&Value::Null))),
     Some("error") => NodeResult::Error {
       message: result
         .get("message")
@@ -358,11 +430,103 @@ fn read_result(result: &Value) -> NodeResult {
         .to_string(),
       path: result.get("path").and_then(Value::as_str).map(str::to_string),
       marks: None,
+      found: found(result),
     },
     _ => NodeResult::Error {
       message: format!("not a plan result document: {result}"),
       path: None,
       marks: None,
+      found: Vec::new(),
     },
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::component::{ApplyResult, ComponentError};
+  use crate::plan::{Executed, ExecutedKind, outcome};
+  use pretty_assertions::assert_eq;
+
+  /// A matcher that finds two things wrong with every value, as a pact plugin's content matcher does.
+  struct TwoWrong;
+
+  impl MatcherComponent for TwoWrong {
+    fn apply(&self, req: Apply) -> Result<ApplyResult, ComponentError> {
+      Ok(ApplyResult {
+        results: req
+          .values
+          .iter()
+          .map(|_| {
+            json!({
+              "status": "error",
+              "message": "row 1: not a number; row 2: not a date",
+              "mismatches": [
+                { "at": "row 1", "message": "not a number" },
+                { "message": "not a date" },
+                { "at": "row 3" }
+              ]
+            })
+          })
+          .collect(),
+      })
+    }
+  }
+
+  #[test]
+  fn each_mismatch_a_component_found_is_a_mismatch_of_its_own_at_the_nodes_path() {
+    let contributions = Contributions::from_resolved(
+      &[],
+      &[InTreeMatcher {
+        name: "plugin".to_string(),
+        actions: vec!["plugin:compare".to_string()],
+        matcher: Arc::new(TwoWrong),
+      }],
+    );
+    let result = contributions
+      .apply(
+        "plugin:compare",
+        &[RuntimeValue::String("x".to_string())],
+        Some("$.response.body"),
+      )
+      .expect("the action is contributed");
+    let executed = Executed {
+      kind: ExecutedKind::Action {
+        name: "plugin:compare".to_string(),
+        children: Vec::new(),
+      },
+      result: Some(match result {
+        NodeResult::Error {
+          message,
+          marks,
+          found,
+          ..
+        } => NodeResult::Error {
+          message,
+          path: Some("$.response.body".to_string()),
+          marks,
+          found,
+        },
+        other => other,
+      }),
+    };
+    let (_, mismatches) = outcome(&executed);
+    let reported: Vec<(Option<&str>, &str, Option<&str>)> = mismatches
+      .iter()
+      .map(|m| (m.path.as_deref(), m.message.as_str(), m.at.as_deref()))
+      .collect();
+    // The entry with no message is not a mismatch; the node's own message names the rest.
+    assert_eq!(
+      reported,
+      vec![
+        (Some("$.response.body"), "not a number", Some("row 1")),
+        (Some("$.response.body"), "not a date", None),
+      ]
+    );
+    assert!(
+      mismatches
+        .iter()
+        .all(|m| m.action.as_deref() == Some("plugin:compare"))
+    );
   }
 }

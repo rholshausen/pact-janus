@@ -924,7 +924,12 @@ of length 1. The native binding pays neither cost, which is exactly the asymmetr
 
 Each result is a **plan result document** in design 2.4's result form (`ok`, `value`, `error`) — the
 same shape a kernel action produces, so a mismatch from a component is a mismatch, not a special case,
-and reaches the user through the same executed plan (spike 1.4 §2).
+and reaches the user through the same executed plan (spike 1.4 §2). An action that finds several things
+wrong with one value, each it can locate inside it, says so with the `error`'s `mismatches`: each a
+`message`, located `at` in the component's own words (plan-grammar spec §2.3). The engine reports each
+as a mismatch of its own, at the node's path
+([ADR 0110](../../decisions/0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md)).
+A `value` of octets is tagged `base64`, as a plan value is.
 
 ### 7.3 Generating
 
@@ -1288,8 +1293,9 @@ actual body's octets. Its one argument says what a pact says about the body:
 }
 ```
 
-The answer is one result. Mismatches are one `error`, whose message names each, prefixed by the path the
-plugin gave it, in path order, and whose `mismatches` keep each whole. Whatever the plugin answered is
+The answer is one result. Mismatches are one `error`, whose message names each, prefixed by where the
+plugin located it, and whose `mismatches` keep each whole, located `at` in the plugin's words; the engine
+reports each as a mismatch of its own (§7.2, ADR 0110). Whatever the plugin answered is
 read as the driver reads it for today's verifier, so a content-type mismatch, the plugin's own error
 string and a failure the plugin answered the call with are mismatches:
 
@@ -1298,14 +1304,28 @@ string and a failure the plugin answered the call with are mismatches:
   "results": [ {
     "status": "error",
     "message": "row:    1, column: 1: Expected 'many' to match a number",
-    "mismatches": [ { "path": "row:    1, column: 1", "message": "Expected 'many' to match a number",
+    "mismatches": [ { "message": "Expected 'many' to match a number", "at": "row:    1, column: 1",
                       "expected": "100", "actual": "many" } ]
   } ]
 }
 ```
 
+A content generator is the action `<component>:generate-content`, which fills a whole body as the
+plugin's `GenerateContent` does: the value under test is the body as the pact records it, and the one
+argument names its `content-type`, its `generators` in the v4 pact form, the plugin's
+`plugin-configuration` (`interaction`, the interaction's whole configuration for the plugin, and `pact`)
+and the `test-context` the generators read. Its result is the generated body, a `value` of octets, or an
+`error` when the plugin could not generate one.
+
+A run uses a bridge for a v1–v4 interaction that needs its plugin (ADR 0110). The legacy compiler
+compiles a body the verifier compares, whose type a `content-matcher` entry claims, to that entry's
+`action`, with the argument above built from the pact, and a request body with generators, whose type a
+`content-generator` entry claims, is filled by that entry's `action` before it is sent. A run whose
+host says how to start the bridge (engine-protocol spec §8.3's `options.plugin-bridge`) declares one
+for each plugin a pact names.
+
 An action the bridge did not contribute is `unknown-action`, a content type none of the plugin's content
-matchers claims is `unsupported-content-type`, an argument it cannot read is `invalid-config`, and a
+matchers or generators claims is `unsupported-content-type`, an argument it cannot read is `invalid-config`, and a
 plugin that cannot be loaded is `unavailable` at the handshake, with the driver's causes as its `chain`.
 The plugin lives as long as the bridge's standard input. A plugin the call cannot reach (no connection,
 or gRPC's `Unavailable`, `Cancelled` or `DeadlineExceeded`) is not a mismatch, since nothing about the

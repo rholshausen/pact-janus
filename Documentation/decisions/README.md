@@ -122,10 +122,11 @@ superseding ADR instead.
 | [0103](0103-a-content-component-asks-for-embedded-content-in-its-answer-and-the-registry-decodes-it.md) | A content component asks for embedded content in its answer, and the registry decodes it | accepted |
 | [0104](0104-the-component-interface-is-generally-available-for-content-and-matcher-components-over-wasm.md) | The component interface is generally available for content and matcher components over WASM | accepted |
 | [0105](0105-run-each-components-conformance-cases-through-every-binding-it-is-reached-by.md) | Run each component's conformance cases through every binding it is reached by | accepted |
-| [0106](0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md) | Bridge pact-plugins through a child process that speaks the subprocess binding | accepted |
+| [0106](0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md) | Bridge pact-plugins through a child process that speaks the subprocess binding | accepted (who declares a bridge, decision 5, refined by 0110) |
 | [0107](0107-apply-the-rules-below-an-eachvalue-matcher-as-the-verifier-pinned-at-1-5-0-does.md) | Apply the rules below an `eachValue` matcher, as the verifier pinned at 1.5.0 does | accepted |
 | [0108](0108-a-subprocess-component-is-a-program-and-its-arguments-and-its-process-is-the-unit-of-recreation.md) | A subprocess component is a program and its arguments, and its process is the unit of recreation | accepted |
 | [0109](0109-a-bridged-plugins-content-matcher-is-one-compare-contents-action-and-its-catalogue-a-handshake-capability.md) | A bridged plugin's content matcher is one compare-contents action, and its catalogue a handshake capability | accepted |
+| [0110](0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md) | A v1–v4 plugin body compiles to its bridge's compare-contents, and one node reports each mismatch it found | accepted |
 
 ## Decision backlog
 

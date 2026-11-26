@@ -396,6 +396,10 @@ pub(crate) fn mismatch_json(mismatch: &Mismatch, segments: bool) -> Value {
     "message": mismatch.message,
     "action": mismatch.action,
   });
+  // Where the node that found it locates it, when it found several (ADR 0110).
+  if let Some(at) = &mismatch.at {
+    json["at"] = serde_json::json!(at);
+  }
   // The values it quotes, marked, for a host that asked (spec §2.7, ADR 0054). A message that quotes
   // none is one plain segment.
   if segments {

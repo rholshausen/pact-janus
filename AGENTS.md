@@ -348,8 +348,18 @@ Three sources are the source of truth and take precedence over this file when th
 > the handshake, contributes `<component>:compare-contents` for a content matcher, a whole body compared
 > as the driver compares it for today's verifier, and describes the plugin's catalogue under the
 > handshake's `pact-plugin` capability (spec §9.3.1). A plugin it cannot reach is `unavailable`, not a
-> mismatch, and the bridge exits so the engine starts a new one. Its conformance cases pass against the CSV and protobuf plugins, pinned by
-> digest in `plugin-bridge/pact-plugins.json`, and a Lua fixture plugin; no engine declares one yet (S5.2d).
+> mismatch, and the bridge exits so the engine starts a new one. Its conformance cases pass against the
+> CSV and protobuf plugins, pinned by digest in `plugin-bridge/pact-plugins.json`, and a Lua fixture plugin.
+> S5.2d (ADR 0110): a v1–v4 interaction that needs a plugin is verified through its bridge. Given
+> `options.plugin-bridge` (which `janus verify` and `janus explain` set from `JANUS_PLUGIN_BRIDGE`, else a
+> bridge beside `janus`), the engine declares `pact-plugin-<name>` for each plugin a pact names, a broker's
+> pact's when it arrives; the legacy compiler (`engine/kernel/src/legacy/plugins.rs`, reading the
+> `pact-plugin` capability a loaded component keeps) compiles a body a plugin claims to its
+> `compare-contents`, and a request body with generators is filled by its `generate-content`. One node can
+> report several mismatches: an `error` result's `mismatches`, each `at` a place in the component's words,
+> reported as mismatches of their own (`Mismatch.at`). A plugin transport or rule is refused by name
+> (S5.2e, S5.2g). `corpora/verifier/plugins/` holds the CSV and protobuf fixtures, agreeing with today's
+> verifier.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -424,6 +434,7 @@ plugin-bridge/   janus-plugin-bridge (S5.2c, ADR 0106, ADR 0109): one of today's
                  Cargo workspace and lockfile, excluded from ours, so pact-plugin-driver's gRPC, protobuf
                  and Lua never enter a Janus binary; conformance/ holds its cases per plugin, tests/fixtures
                  a Lua plugin its tests load, pact-plugins.json the plugin releases CI runs it against
+                 (and the verifier-diff job's plugins/ fixtures, through JANUS_PLUGIN_BRIDGE)
 spikes/          The prototype's time-boxed experiments: each one's FINDINGS.md, at the path the
                  ADRs cite, and no code (S0.12 deleted it; `b8d5010` is the last commit with it)
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
