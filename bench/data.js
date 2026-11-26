@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795663157568,
+  "lastUpdate": 1795663159747,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -69186,6 +69186,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 119.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "315a78ae044972432ba9fb40954f85f01eb68f0c",
+          "message": "feat: S5.2d, a v1–v4 pact's plugin content is verified through janus-plugin-bridge, and one node reports each mismatch it found (ADR 0110)\n\n- Plan grammar §2.3: an error result may carry `mismatches`, each a message and an optional `at`, the\n  node's own words for where inside the value under test. A run reports each as a mismatch of its\n  own at the node's path; the engine protocol's Mismatch gains `at`, and the report writes\n  `<path> (<at>): <message>`. The bridge's entries are located `at`, not `path` (ADR 0109 amended).\n- engine/kernel/src/legacy/plugins.rs reads the run's bridges from their handshakes' `pact-plugin`\n  capability, which a loaded component now keeps (Resolved::capabilities) and nothing outside the\n  legacy layer reads. A plugin interaction keeps its HTTP or message interaction and is verified when\n  its bridges can verify all of it: a response body or message contents a content matcher claims\n  compiles to <component>:compare-contents (LegacyBody::Plugin), its slot declared as octets.\n  Otherwise it is refused by name, details.why saying no-bridge, transport (S5.2e), rules (S5.2g) or\n  kind.\n- options.plugin-bridge on verification/verify and verification/explain says how to start the bridge;\n  the engine declares pact-plugin-<name> for each plugin a pact's metadata names, at its highest named\n  version, unless the run declares that name. A broker's or URL's pact is declared for when it\n  arrives, its bridge loaded through the scope's loaders before anything runs. janus verify and janus\n  explain set it from JANUS_PLUGIN_BRIDGE, else a janus-plugin-bridge beside janus.\n- A request body with generators, whose type a content generator claims, is filled through the\n  bridge's new <component>:generate-content before it is sent, as today's verifier fills it. A\n  component's `value` tagged base64 is read as octets.\n- corpora/verifier/plugins/: pact-plugins' CSV example (HTTP) and protobuf JVM example (messages),\n  each passing and failing, all 12 verdicts agreeing with pact_verifier_cli 1.5.0. CI's verifier-diff\n  job installs the pinned plugins and builds the bridge. SDK bindings regenerated (ExplainOptions,\n  PluginBridge, Mismatch.at); S5.2h now covers SDK verifiers setting the option.\n\nThe bridge's GenerateContent request and the answer reading follow pact-plugin-driver 1.2.7's\ncontent.rs (ContentGenerator::generate_content), and the configuration a plugin is handed follows\npact_matching's plugin_support.rs, both in pact-foundation's repositories.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-26T14:11:10+11:00",
+          "tree_id": "1ce6ac1ee015edda0ed6f0a26e114a27b368d6b4",
+          "url": "https://github.com/rholshausen/pact-janus/commit/315a78ae044972432ba9fb40954f85f01eb68f0c"
+        },
+        "date": 1795663159188,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 51128,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 48296,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 73.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 54.2,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 182.9,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 135.5,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
