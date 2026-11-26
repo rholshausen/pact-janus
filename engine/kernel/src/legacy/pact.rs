@@ -133,6 +133,10 @@ pub struct PluginInteraction {
   pub configuration: BTreeMap<String, Value>,
   /// The transport a v4 interaction names, which may be a plugin's (gRPC).
   pub transport: Option<String>,
+  /// When it names a transport: the v4 pact holding this interaction alone, with the pact's metadata, and
+  /// the interaction's key there, which a plugin's transport builds and verifies the exchange from (ADR
+  /// 0111 decision 2).
+  pub transport_pact: Option<Box<(Value, String)>>,
   /// Whether one of its rules is a plugin's: a matcher-only plugin's (staged plan S5.2g).
   pub plugin_rules: bool,
 }
@@ -268,10 +272,29 @@ pub fn interactions(pact: &dyn Pact) -> Vec<PactInteraction> {
           })
           .unwrap_or_default(),
         transport: v4.as_ref().and_then(|v4| v4.transport()),
+        transport_pact: v4
+          .as_ref()
+          .filter(|v4| v4.transport().is_some())
+          .and_then(|v4| alone_in(pact, v4.as_ref()))
+          .map(Box::new),
         plugin_rules: has_plugin_rules(interaction.as_ref()),
       }))
     })
     .collect()
+}
+
+/// `pact` holding `interaction` alone, keyed, as a v4 pact document, and its key: what pact-plugin-driver
+/// hands a plugin's transport, which looks the interaction up by its key in the pact it is given.
+fn alone_in(
+  pact: &dyn Pact,
+  interaction: &(dyn pact_models::v4::interaction::V4Interaction + Send + Sync + RefUnwindSafe),
+) -> Option<(Value, String)> {
+  let mut v4 = pact.as_v4_pact().ok()?;
+  let keyed = interaction.with_unique_key();
+  let key = keyed.unique_key();
+  v4.interactions = vec![keyed];
+  let document = v4.to_json(pact_models::PactSpecification::V4).ok()?;
+  Some((document, key))
 }
 
 /// An interaction as it is verified when it needs no plugin, or once its plugin bodies are its bridges'.

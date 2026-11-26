@@ -889,11 +889,19 @@ impl Engine {
     // Every target transport is started before the run begins, so an unreachable or
     // misconfigured provider fails the *call* rather than arriving as a run that verified nothing.
     let mut targets = Vec::with_capacity(req.target.transports.len());
+    // An optional binding no component provides yet is held, and the run starts it if one it loads does
+    // (ADR 0111 decision 4).
+    let mut held = Vec::new();
     for binding in &req.target.transports {
       let Some(component) = scope
         .transport(&binding.transport)
         .or_else(|| self.transports.get(&binding.transport).cloned())
       else {
+        if binding.optional {
+          held.push(binding.clone());
+          continue;
+        }
+        stop_targets(&targets);
         return ResponseFrame::err(
           id,
           EngineError::component_unavailable(&format!("transport/{}", binding.transport)),
@@ -963,6 +971,17 @@ impl Engine {
     };
 
     let stream = self.open_stream();
+    let targets = verification::Targets::new(
+      targets,
+      held,
+      scope.transports(),
+      req
+        .target
+        .transports
+        .first()
+        .and_then(|binding| binding.options.clone()),
+      session.clone(),
+    );
     let components = verification::RunComponents {
       content: scope.content(),
       contributions: scope.contributions(),

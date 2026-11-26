@@ -376,6 +376,77 @@ fn decode(text: &str, plus_is_space: bool) -> String {
   String::from_utf8_lossy(&out).into_owned()
 }
 
+/// pact-plugins' gRPC area calculator, started as a child process (staged plan S5.2e): the program
+/// `JANUS_AREA_CALCULATOR` names, built from `plugin-bridge/examples/area_calculator.rs`. Its standard
+/// input is its lease on life, and it is killed when this is dropped.
+pub struct AreaCalculator {
+  child: std::process::Child,
+  port: u16,
+}
+
+/// The variable naming the area calculator's program.
+pub const AREA_CALCULATOR_VARIABLE: &str = "JANUS_AREA_CALCULATOR";
+
+impl AreaCalculator {
+  pub fn start(answers: crate::fixture::AreaAnswers) -> Result<AreaCalculator, String> {
+    use std::io::BufRead;
+    let program = std::env::var_os(AREA_CALCULATOR_VARIABLE).ok_or_else(|| {
+      format!(
+        "the fixture's provider is the gRPC area calculator, and {AREA_CALCULATOR_VARIABLE} names none: \
+         build it with `cargo build --example area_calculator` in plugin-bridge/"
+      )
+    })?;
+    let mut child = std::process::Command::new(&program)
+      .args(["--answers", answers.arg()])
+      .stdin(std::process::Stdio::piped())
+      .stdout(std::process::Stdio::piped())
+      .stderr(std::process::Stdio::inherit())
+      .spawn()
+      .map_err(|err| {
+        format!(
+          "could not start the area calculator ({}): {err}",
+          program.to_string_lossy()
+        )
+      })?;
+    let mut line = String::new();
+    let read = child
+      .stdout
+      .take()
+      .map(|stdout| std::io::BufReader::new(stdout).read_line(&mut line));
+    let port = line
+      .trim()
+      .strip_prefix("listening on ")
+      .and_then(|port| port.parse().ok());
+    match (read, port) {
+      (Some(Ok(_)), Some(port)) => Ok(AreaCalculator { child, port }),
+      _ => {
+        let _ = child.kill();
+        let _ = child.wait();
+        Err(format!(
+          "the area calculator did not say where it listens (it said '{}')",
+          line.trim()
+        ))
+      }
+    }
+  }
+
+  pub fn port(&self) -> u16 {
+    self.port
+  }
+
+  pub fn base_url(&self) -> String {
+    format!("http://127.0.0.1:{}", self.port)
+  }
+}
+
+impl Drop for AreaCalculator {
+  fn drop(&mut self) {
+    drop(self.child.stdin.take());
+    let _ = self.child.kill();
+    let _ = self.child.wait();
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

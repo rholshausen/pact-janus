@@ -115,7 +115,11 @@
         },
         "action": {
           "type": "string",
-          "description": "The contributed action an entry the bridge serves is reached through. Absent for an entry it describes and does not serve."
+          "description": "The contributed action an entry the bridge serves is reached through: a content matcher's compare-contents, a content generator's generate-content, a transport's verdict. Absent for an entry it describes and does not serve."
+        },
+        "kind": {
+          "type": "string",
+          "description": "For a transport the bridge drives, the transport kind it contributes for it (spec.md §9.3.1, ADR 0111). Absent for one it describes and does not drive."
         },
         "values": {
           "type": "object",

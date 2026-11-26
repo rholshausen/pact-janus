@@ -127,6 +127,7 @@ superseding ADR instead.
 | [0108](0108-a-subprocess-component-is-a-program-and-its-arguments-and-its-process-is-the-unit-of-recreation.md) | A subprocess component is a program and its arguments, and its process is the unit of recreation | accepted |
 | [0109](0109-a-bridged-plugins-content-matcher-is-one-compare-contents-action-and-its-catalogue-a-handshake-capability.md) | A bridged plugin's content matcher is one compare-contents action, and its catalogue a handshake capability | accepted |
 | [0110](0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md) | A v1–v4 plugin body compiles to its bridge's compare-contents, and one node reports each mismatch it found | accepted |
+| [0111](0111-a-plugin-transports-exchange-is-one-send-and-its-verdict-a-reply-the-bridges-action-reads.md) | A plugin transport's exchange is one send, and its verdict a reply the bridge's action reads | accepted |
 
 ## Decision backlog
 

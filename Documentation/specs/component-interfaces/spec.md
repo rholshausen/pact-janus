@@ -1233,10 +1233,12 @@ version as its arguments, and granted what the plugin driver reads from its envi
 ```
 
 The bridge loads the plugin at the handshake and answers with its catalogue translated. Its version is
-the loaded plugin's. It implements `matcher`, and contributes only what it answers: one action,
-`<component>:compare-contents`, when the plugin registers a content matcher. Every catalogue entry is
-described under the **`pact-plugin` capability**, which is how the engine learns which bodies a plugin
-compares, from the plugin:
+the loaded plugin's. It implements `matcher`, and `transport` when the plugin registers a transport, and
+contributes only what it answers: the action `<component>:compare-contents` when the plugin registers a
+content matcher, `<component>:generate-content` for a content generator, and for each transport a kind of
+the entry's key, driven, with `<component>:verdict` (below). Every catalogue entry is described under the
+**`pact-plugin` capability**, which is how the engine learns which bodies a plugin compares, from the
+plugin:
 
 ```json component-hello-result
 {
@@ -1261,9 +1263,9 @@ compares, from the plugin:
 ```
 
 A catalogue entry's `type` is the driver's name for it (`content-matcher`, `content-generator`,
-`transport`, `matcher`, `interaction`, `generator`), its `values` are the plugin's own, and `action`
-names what an entry is reached through when the bridge serves it; the others are described and not
-contributed, until the bridge answers for them (staged plan S5.2e–S5.2g). Each of `content-types` is a
+`transport`, `matcher`, `interaction`, `generator`), its `values` are the plugin's own, `action` names what
+an entry is reached through when the bridge serves it, and a transport it drives names its `kind`; the
+others are described and not contributed, until the bridge answers for them (staged plan S5.2f, S5.2g). Each of `content-types` is a
 **pattern**, claimed as pact-plugin-driver claims it: a regular expression, anchored at both ends, over a
 media type's type and subtype with any suffix, parameters stripped (`text/csv` claims
 `text/csv;charset=utf-8`).
@@ -1317,12 +1319,41 @@ argument names its `content-type`, its `generators` in the v4 pact form, the plu
 and the `test-context` the generators read. Its result is the generated body, a `value` of octets, or an
 `error` when the plugin could not generate one.
 
+A plugin's **transport** is a transport kind the bridge drives
+([ADR 0111](../../decisions/0111-a-plugin-transports-exchange-is-one-send-and-its-verdict-a-reply-the-bridges-action-reads.md)),
+contributed as the entry's key (`grpc`) with `roles: ["drive"]` and exchange parts `request` and
+`response`; its catalogue entry names the `kind` and the `action`, `<component>:verdict`. The plugin, not
+the engine, sends the request and compares the reply, as it does for today's verifier, so one `send` is the
+whole exchange. A drive instance's options say where the provider is: `host` and `port`, else `base-url`'s
+host and port, and `headers`, which are added to the request's metadata. The `request` part has three
+plain JSON slots: `pact`, the v4 pact holding the one interaction, with the pact's metadata; `key`, its key
+there; and `provider-state`, the exchange's provider-state values. The bridge asks the plugin to prepare the
+request and then to verify the interaction, each with the context today's verifier builds (`host`, `port`,
+`providerState`), and replies with one slot, the `response` part's `verdict`:
+
+```json sketch
+{ "reply": { "response": { "verdict": { "content": {
+    "ok": false,
+    "mismatches": [ { "message": "Expected message 'AreaResponse' but was missing or empty", "at": "$" } ],
+    "errors": [],
+    "output": [ "Given a Calculator/calculateMulti request ... [FAILED]" ] } } } } }
+```
+
+`<component>:verdict`'s value under test is that slot: `ok` is `ok`, and otherwise the result is one
+`error` whose `mismatches` are each of the plugin's mismatches, located `at` its path, and each of its
+errors, unlocated. A plugin that answers either call with an error is the send's `transport-failed`, with
+the plugin's message; one the bridge cannot reach is `unavailable`, as for any call. The bridge serves no
+plugin transport's mock: a `serve` instance is `operation-unsupported` (staged plan S5.2f).
+
 A run uses a bridge for a v1–v4 interaction that needs its plugin (ADR 0110). The legacy compiler
 compiles a body the verifier compares, whose type a `content-matcher` entry claims, to that entry's
 `action`, with the argument above built from the pact, and a request body with generators, whose type a
-`content-generator` entry claims, is filled by that entry's `action` before it is sent. A run whose
-host says how to start the bridge (engine-protocol spec §8.3's `options.plugin-bridge`) declares one
-for each plugin a pact names.
+`content-generator` entry claims, is filled by that entry's `action` before it is sent. An interaction
+carried over a transport a `transport` entry's key names is driven through that entry's `kind`, its plan
+the entry's `action` on `$.response.verdict` and nothing else (ADR 0111); with no binding of the kind, the
+instance is started with the run's first binding's options, the provider's. A run whose host says how to
+start the bridge (engine-protocol spec §8.3's `options.plugin-bridge`) declares one for each plugin a pact
+names.
 
 An action the bridge did not contribute is `unknown-action`, a content type none of the plugin's content
 matchers or generators claims is `unsupported-content-type`, an argument it cannot read is `invalid-config`, and a

@@ -360,7 +360,15 @@ fn legacy(
       let contributions = scope.contributions();
       let bridges = crate::legacy::plugins::Bridges::read(contributions.capabilities());
       match crate::legacy::plugins::bridged(needs, &bridges, &legacy_pact::pact_plugins(pact.as_ref())) {
-        Ok(interaction) => Some(interaction),
+        Ok(crate::legacy::plugins::Bridged::Interaction(interaction)) => Some(interaction),
+        // ADR 0111 decision 3: the plugin's verdict, read by its bridge's action, and nothing else.
+        Ok(crate::legacy::plugins::Bridged::Transport(transport)) => {
+          return Ok(crate::legacy::compile::compile_plugin_verdict(
+            &transport.action,
+            crate::legacy::plugins::TRANSPORT_RESPONSE,
+            crate::legacy::plugins::TRANSPORT_VERDICT,
+          ));
+        }
         Err(refused) => {
           return Err(ExplainError::NeedsPlugins {
             plugins: needs.plugins.clone(),

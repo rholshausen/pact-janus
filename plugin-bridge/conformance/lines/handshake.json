@@ -17,12 +17,28 @@
             "version": "0.1.0"
           },
           "interfaces": [
-            "matcher"
+            "matcher",
+            "transport"
           ],
           "contributes": {
             "actions": [
               {
                 "name": "pact-plugin-lines:compare-contents"
+              },
+              {
+                "name": "pact-plugin-lines:verdict"
+              }
+            ],
+            "transports": [
+              {
+                "kind": "lines",
+                "roles": [
+                  "drive"
+                ],
+                "exchange-parts": {
+                  "initiating": "request",
+                  "answering": "response"
+                }
               }
             ]
           },
@@ -46,7 +62,9 @@
                 },
                 {
                   "type": "transport",
-                  "key": "lines"
+                  "key": "lines",
+                  "kind": "lines",
+                  "action": "pact-plugin-lines:verdict"
                 }
               ]
             }

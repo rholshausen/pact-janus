@@ -27,10 +27,16 @@ components:
 
 - At `component/hello` it loads the plugin and answers with its catalogue translated: it implements
   `matcher`, contributes `pact-plugin-<plugin>:compare-contents` when the plugin has a content matcher and
-  `pact-plugin-<plugin>:generate-content` when it has a content generator, and describes every catalogue
-  entry under the `pact-plugin` capability.
+  `pact-plugin-<plugin>:generate-content` when it has a content generator, and, when the plugin has a
+  transport, implements `transport` and contributes it as a kind of the entry's key (`grpc`), driven,
+  with `pact-plugin-<plugin>:verdict`. It describes every catalogue entry under the `pact-plugin`
+  capability.
 - `matcher/apply` of `compare-contents` compares a whole body through the plugin's content matcher, with
   what a pact says about the body as its one argument (spec §9.3.1).
+- `transport/send` on a drive instance of a plugin transport is the whole exchange (ADR 0111): the plugin
+  prepares the request from the pact it is sent, calls the provider and compares its answer, and the reply
+  is the plugin's verdict, which `matcher/apply` of `verdict` reads. A `serve` instance, a plugin
+  transport's mock, is not served yet (S5.2f).
 - What the plugin answers is read as the driver reads it for today's verifier, its failures included. A
   plugin the call cannot reach is the bridge's failure, not a mismatch: the call is answered
   `unavailable`, and the bridge exits, so the engine starts a new one.
@@ -44,18 +50,26 @@ the driver sending usage metrics, and `RUST_LOG` to see its logs on standard err
 0110): set `JANUS_PLUGIN_BRIDGE` to it, or put it beside `janus`, and the engine declares one for each
 plugin the pact names. A body the plugin's content matcher claims is compared by `compare-contents`, and
 a request body with generators is filled by `generate-content`, the action a content generator is
-reached through.
+reached through. An interaction carried over the plugin's transport is driven through the bridge's kind
+(S5.2e), reached at the `--transports` entry of its name, else the provider's host and port.
 
-Not yet: plugin transports and matchers are described in the handshake and not served (S5.2e, S5.2g);
-and the bridge is not released (S5.2h).
+Not yet: plugin matchers are described in the handshake and not served (S5.2g), a plugin transport's mock
+is not served (S5.2f), and the bridge is not released (S5.2h).
 
 ## Building and testing
 
 ```bash
 cargo build
 cargo test        # against tests/fixtures/plugins/lines-0.1.0, a Lua plugin: nothing is downloaded
-JANUS_PACT_PLUGINS=/tmp/plugins cargo test   # and the test that kills a plugin process (Unix), on the pinned CSV plugin
+JANUS_PACT_PLUGINS=/tmp/plugins cargo test   # and the tests on the pinned plugins: one kills the CSV plugin (Unix),
+                                             # one drives the protobuf plugin's gRPC transport
 ```
+
+[`examples/area_calculator.rs`](examples/area_calculator.rs) is the gRPC provider from pact-plugins'
+`examples/gRPC/area_calculator`, its messages and service written as prost and tonic generate them, so it
+needs no `protoc`: `cargo build --example area_calculator`, then `area_calculator [--port <port>] [--answers
+areas|nothing|error]`. The gRPC test runs it, and S1.1's harness verifies the example's pact against it
+(`corpora/verifier/plugins/grpc-area-calculator*`, with `JANUS_AREA_CALCULATOR` naming it).
 
 `conformance/` holds the bridge's conformance cases (component-interfaces spec §9.4), one directory per
 plugin, and `conformance/plugins.janus.yaml` declares a bridge for each. The plugins they are written

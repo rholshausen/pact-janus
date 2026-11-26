@@ -3003,8 +3003,8 @@ The component model, opened to the ecosystem.
       component to clippy and its own tests, as it does `janus-csv`.
 - **S5.2 A bridge for today's pact-plugins** — **L**, at least the protobuf/gRPC one, so no existing
   user loses a plugin. This closes S1.8's refusal. Split 2026-11-23 into eight by
-  [ADR 0106](decisions/0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md):
-  the bridge is `janus-plugin-bridge`, a child process in a workspace of its own, built on
+  [ADR 0106](decisions/0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md)
+  (a ninth, S5.2i, came from ADR 0111): the bridge is `janus-plugin-bridge`, a child process in a workspace of its own, built on
   `pact-plugin-driver`, so gRPC, protobuf and the driver stay out of every Janus binary. It speaks the
   subprocess binding to the engine, one process and one component (`pact-plugin-<name>`) per plugin.
   S4.2's protobuf half is not the bridge's, because a plugin cannot decode: it is S5.12.
@@ -3118,6 +3118,33 @@ The component model, opened to the ecosystem.
     deciding how a verdict the plugin reached becomes a verification result without the engine comparing
     the same parts again.
     *Exit:* an S1.1 fixture for pact-plugins' gRPC area calculator, agreeing with today's verifier.
+    *Done 2026-11-26* ([ADR 0111](decisions/0111-a-plugin-transports-exchange-is-one-send-and-its-verdict-a-reply-the-bridges-action-reads.md)):
+    - A plugin's transport is a kind the bridge contributes, in the drive role, with exchange parts `request`
+      and `response`; its catalogue entry under `pact-plugin` names the `kind` and the action
+      `<component>:verdict`. One `transport/send` is the whole exchange: its `request` part carries `pact`
+      (the v4 pact holding the one interaction, with the pact's metadata), `key` and `provider-state`, and
+      the bridge asks the plugin to prepare the request and then to verify the interaction, with the context
+      today's verifier builds and a drive instance's `headers` in the request's metadata. The reply's one
+      slot, `verdict`, is the plugin's answer. A plugin that answers either call with an error is the send's
+      `transport-failed`; one the bridge cannot reach is `unavailable`, and the bridge exits.
+    - The legacy compiler compiles an interaction carried over a bridged plugin transport to one node, the
+      bridge's `verdict` action on `$.response.verdict`, and nothing else: the plugin compared the
+      exchange, and nothing is compared twice. Each of the plugin's mismatches is reported with its path as
+      `at` (ADR 0110), and `janus explain` shows the same plan.
+    - A `target.transports` binding may be `optional`: held when no component provides its kind, started the
+      first time an interaction of its kind is verified if a component loaded by then does (a broker's
+      pact's bridge), and no error if none ever does. A plugin transport with no binding of its own is
+      started with the run's first binding's options, as today's verifier reaches it at the provider's host
+      and port; the bridge reads `host` and `port`, else `base-url`'s. `janus verify` binds each
+      `--transports` entry but `http`, and a `--transport` other than `http` or `https`, optionally.
+    - `plugin-bridge/examples/area_calculator.rs` is pact-plugins' area calculator, its messages and service
+      written as prost and tonic generate them, so it needs no `protoc`. `corpora/verifier/plugins/` holds
+      the Go consumer's pact verified against it answering areas, nothing, and a gRPC `INTERNAL` status: all
+      six verdicts agree with `pact_verifier_cli` 1.5.0, and CI's `verifier-diff` job builds it
+      (`JANUS_AREA_CALCULATOR`). The bridge's tests drive the pinned protobuf plugin against it on Linux,
+      macOS and Windows, and `engine/kernel/tests/plugin_transport.rs` drives a stub bridge.
+    - Not done, on purpose: a request filter cannot rewrite the request a plugin builds, and no report
+      prints a plugin's output lines (S5.2i); a plugin transport's mock is S5.2f's.
   - **S5.2f The consumer side** — **L**. The facades' plugin DSLs (pact-js's `usingPlugin` and
     `withPluginContents`, pact-jvm's), reaching `ConfigureInteraction` through `add-pact-interaction`; a
     mock that serves plugin content and starts a plugin's own (`StartMockServer`); and a form in a Janus
@@ -3135,6 +3162,14 @@ The component model, opened to the ecosystem.
     engine's release (ADR 0030's names) or a release of their own (as ADR 0060 made the SDKs').
     *Exit:* a provider with no Rust toolchain installs the bridge from a release and verifies a protobuf
     pact.
+  - **S5.2i A plugin transport's request filter and output** — **S**. Today's verifier hands the request a
+    plugin transport prepared to `--request-filter` (`call_non_http`) before the plugin sends it, and prints
+    the plugin's output lines under the interaction. ADR 0111 decision 5 leaves both out: a `before-request`
+    hook sees the pact and the interaction's key, and the output stays in the verdict. Decide whether a
+    hook may see and change the prepared request and metadata (a second bridge call between prepare and
+    verify), and have the report print a verdict's output.
+    *Exit:* a provider test whose request filter adds gRPC metadata passes through the bridge as it does
+    under today's verifier, and `janus verify`'s report prints the plugin's output lines.
 - **S5.3 Content components that are not JSON** — **M**: `encode` seeing the shape (finding 12), and
   decode errors and degradations reaching the user as their own finding kind, not as "expected a
   value" (findings 13, 14). Member order moved to S1.20.
@@ -3538,7 +3573,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user (done: ADR 0101) | findings 12–14 |
 | S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099); generally available, with a guide (done: S5.1d, ADR 0104) | findings 15–17 |
-| S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 (the subprocess loader done: S5.2b, ADR 0108; the bridge and its handshake done: S5.2c, ADR 0109; a v1–v4 pact's plugin content verified: S5.2d, ADR 0110) | S1.8 |
+| S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 (the subprocess loader done: S5.2b, ADR 0108; the bridge and its handshake done: S5.2c, ADR 0109; a v1–v4 pact's plugin content verified: S5.2d, ADR 0110; plugin transports verified: S5.2e, ADR 0111, whose request filters and output are S5.2i) | S1.8 |
 | S5.5 | Out-of-process containment and command form (moved to S5.2b by ADR 0106; done: ADR 0108); the subprocess binding has no author guide and is not generally available | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components (done: ADR 0103) | ADR 0040 decision 3 |
 | S5.8 | A component's substitutions do not reach content embedded in a slot | ADR 0103 |

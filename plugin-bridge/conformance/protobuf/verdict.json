@@ -1,0 +1,94 @@
+{
+  "name": "pact-plugin-protobuf/verdict",
+  "component": "pact-plugin-protobuf",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-protobuf:verdict",
+        "values": [
+          {
+            "content": {
+              "ok": true,
+              "mismatches": [],
+              "errors": [],
+              "output": [
+                "will return an output .area_calculator.AreaResponse message [OK]"
+              ]
+            },
+            "path": "$.response.verdict"
+          },
+          {
+            "content": {
+              "ok": false,
+              "mismatches": [
+                {
+                  "message": "Expected message 'AreaResponse' but was missing or empty",
+                  "at": "$"
+                }
+              ],
+              "errors": [
+                "the provider closed the stream"
+              ],
+              "output": []
+            },
+            "path": "$.response.verdict"
+          },
+          {
+            "content": {
+              "ok": false
+            },
+            "path": "$.response.verdict"
+          }
+        ]
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            },
+            {
+              "status": "error",
+              "message": "$: Expected message 'AreaResponse' but was missing or empty; the provider closed the stream",
+              "mismatches": [
+                {
+                  "message": "Expected message 'AreaResponse' but was missing or empty",
+                  "at": "$"
+                },
+                {
+                  "message": "the provider closed the stream"
+                }
+              ]
+            },
+            {
+              "status": "error",
+              "mismatches": [
+                {
+                  "message": "the plugin failed the interaction and said nothing about why"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-protobuf:verdict",
+        "values": [
+          {
+            "content": "not a verdict"
+          }
+        ]
+      },
+      "expect": {
+        "error": {
+          "code": "invalid-config"
+        }
+      }
+    }
+  ]
+}

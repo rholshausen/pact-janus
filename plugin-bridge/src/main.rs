@@ -21,6 +21,7 @@ mod compare;
 mod error;
 mod frames;
 mod generate;
+mod transport;
 
 use bridge::{Bridge, Wanted};
 use std::io::{self, BufReader};

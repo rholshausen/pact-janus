@@ -1,8 +1,10 @@
 //! A plugin's catalogue, translated into a Janus handshake (ADR 0106 decision 4, ADR 0109).
 //!
 //! The bridge is a component named `pact-plugin-<name>`, at the plugin's own version, implementing the
-//! matcher interface. What it contributes is only what it can be called for: a content matcher becomes
-//! the action `<component>:compare-contents`. Every catalogue entry, bridged or not, is described under
+//! matcher interface, and the transport interface when the plugin has a transport. What it contributes is
+//! only what it can be called for: a content matcher becomes the action `<component>:compare-contents`, a
+//! content generator `<component>:generate-content`, and a transport a kind the bridge drives, whose
+//! verdict `<component>:verdict` reads (ADR 0111). Every catalogue entry, bridged or not, is described under
 //! the handshake's `pact-plugin` capability, with the content types a content matcher claims, so the
 //! engine learns which bodies the plugin compares from the plugin, and nothing about the plugin itself.
 
@@ -34,6 +36,11 @@ impl Plugin {
   /// The action a content generator is reached through (ADR 0110 decision 7).
   pub fn generate_content(&self) -> String {
     format!("{}:generate-content", self.component())
+  }
+
+  /// The action a transport's verdict is read through (ADR 0111 decision 3).
+  pub fn verdict(&self) -> String {
+    format!("{}:verdict", self.component())
   }
 }
 
@@ -93,12 +100,30 @@ pub fn claims(pattern: &str, media_type: &str) -> bool {
   regex::Regex::new(&format!("^(?:{pattern})$")).is_ok_and(|regex| regex.is_match(&base))
 }
 
+/// Whether a transport entry's key makes a transport kind the bridge can contribute: a kind is an open
+/// vocabulary of names (spec §5.1), and the bridge contributes one only when it reads as one.
+pub fn usable_kind(key: &str) -> bool {
+  !key.is_empty()
+    && key
+      .chars()
+      .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '+' || c == '.')
+}
+
 /// The handshake a bridge answers `component/hello` with, for `plugin` and its catalogue.
 pub fn handshake(plugin: &Plugin, entries: &[Entry]) -> Value {
   let compare_contents = plugin.compare_contents();
   let generate_content = plugin.generate_content();
+  let verdict = plugin.verdict();
   let matches_contents = entries.iter().any(|entry| entry.kind == "content-matcher");
   let generates_contents = entries.iter().any(|entry| entry.kind == "content-generator");
+  // A plugin transport is a kind the bridge drives (ADR 0111 decision 1), its exchange one send.
+  let mut kinds: Vec<&str> = entries
+    .iter()
+    .filter(|entry| entry.kind == "transport" && usable_kind(&entry.key))
+    .map(|entry| entry.key.as_str())
+    .collect();
+  kinds.sort_unstable();
+  kinds.dedup();
   let mut sorted: Vec<&Entry> = entries.iter().collect();
   sorted.sort_by(|a, b| (&a.kind, &a.key).cmp(&(&b.kind, &b.key)));
   let catalogue: Vec<Value> = sorted
@@ -116,6 +141,10 @@ pub fn handshake(plugin: &Plugin, entries: &[Entry]) -> Value {
       if entry.kind == "content-generator" {
         described.insert("action".to_string(), json!(generate_content));
       }
+      if entry.kind == "transport" && usable_kind(&entry.key) {
+        described.insert("kind".to_string(), json!(entry.key));
+        described.insert("action".to_string(), json!(verdict));
+      }
       described.insert("values".to_string(), json!(entry.values));
       Value::Object(described)
     })
@@ -123,16 +152,35 @@ pub fn handshake(plugin: &Plugin, entries: &[Entry]) -> Value {
   let actions: Vec<Value> = [
     (matches_contents, compare_contents),
     (generates_contents, generate_content),
+    (!kinds.is_empty(), verdict),
   ]
   .into_iter()
   .filter(|(served, _)| *served)
   .map(|(_, action)| json!({ "name": action }))
   .collect();
+  let mut interfaces = vec!["matcher"];
+  let mut contributes = json!({ "actions": actions });
+  if !kinds.is_empty() {
+    interfaces.push("transport");
+    contributes["transports"] = kinds
+      .iter()
+      .map(|kind| {
+        json!({
+          "kind": kind,
+          "roles": ["drive"],
+          "exchange-parts": {
+            "initiating": crate::transport::INITIATING,
+            "answering": crate::transport::ANSWERING
+          }
+        })
+      })
+      .collect();
+  }
   json!({
     "component-protocol-version": PROTOCOL_VERSION,
     "component": { "name": plugin.component(), "version": plugin.version },
-    "interfaces": ["matcher"],
-    "contributes": { "actions": actions },
+    "interfaces": interfaces,
+    "contributes": contributes,
     "capabilities": {
       CAPABILITY: {
         "name": plugin.name,
@@ -192,13 +240,21 @@ mod tests {
       hello["component"],
       json!({ "name": "pact-plugin-protobuf", "version": "0.8.1" })
     );
-    assert_eq!(hello["interfaces"], json!(["matcher"]));
+    assert_eq!(hello["interfaces"], json!(["matcher", "transport"]));
     assert_eq!(
       hello["contributes"],
-      json!({ "actions": [
-        { "name": "pact-plugin-protobuf:compare-contents" },
-        { "name": "pact-plugin-protobuf:generate-content" }
-      ] })
+      json!({
+        "actions": [
+          { "name": "pact-plugin-protobuf:compare-contents" },
+          { "name": "pact-plugin-protobuf:generate-content" },
+          { "name": "pact-plugin-protobuf:verdict" }
+        ],
+        "transports": [{
+          "kind": "grpc",
+          "roles": ["drive"],
+          "exchange-parts": { "initiating": "request", "answering": "response" }
+        }]
+      })
     );
     let described = &hello["capabilities"]["pact-plugin"];
     assert_eq!(described["name"], "protobuf");
@@ -220,15 +276,33 @@ mod tests {
           "action": "pact-plugin-protobuf:compare-contents",
           "values": { "content-types": "application/protobuf;application/grpc" }
         },
-        { "type": "transport", "key": "grpc", "values": {} }
+        {
+          "type": "transport",
+          "key": "grpc",
+          "kind": "grpc",
+          "action": "pact-plugin-protobuf:verdict",
+          "values": {}
+        }
       ])
     );
   }
 
   #[test]
-  fn a_plugin_with_no_content_matcher_contributes_no_action() {
-    let hello = handshake(&protobuf(), &[entry("transport", "grpc", &[])]);
+  fn a_plugin_with_nothing_the_bridge_serves_contributes_nothing() {
+    let hello = handshake(&protobuf(), &[entry("matcher", "credit-card", &[])]);
+    assert_eq!(hello["interfaces"], json!(["matcher"]));
     assert_eq!(hello["contributes"], json!({ "actions": [] }));
+  }
+
+  #[test]
+  fn a_transport_whose_key_is_no_kind_is_described_and_not_contributed() {
+    let hello = handshake(&protobuf(), &[entry("transport", "My Transport", &[])]);
+    assert_eq!(hello["interfaces"], json!(["matcher"]));
+    assert_eq!(hello["contributes"], json!({ "actions": [] }));
+    assert_eq!(
+      hello["capabilities"]["pact-plugin"]["catalogue"][0],
+      json!({ "type": "transport", "key": "My Transport", "values": {} })
+    );
   }
 
   #[rstest]

@@ -121,7 +121,12 @@ interaction of a pact it did not fetch is `absent` there too.
   messages, each passing and failing. Both verifiers load the plugins
   `plugin-bridge/pact-plugins.json` pins from `PACT_PLUGIN_DIR` (`.github/scripts/pact-plugins.sh`
   installs them), and `janus verify` reaches them through `janus-plugin-bridge`, which
-  `JANUS_PLUGIN_BRIDGE` names, as CI's job sets them.
+  `JANUS_PLUGIN_BRIDGE` names, as CI's job sets them. And the gRPC area calculator's (S5.2e, ADR 0111),
+  the pact pact-plugins' Go consumer wrote, carried over the protobuf plugin's `grpc` transport: a
+  provider of kind `area-calculator`, `{ "kind": "area-calculator", "answers": "areas" | "nothing" |
+  "error" }`, is `plugin-bridge/examples/area_calculator.rs`, which `JANUS_AREA_CALCULATOR` names, answering
+  each shape's area, an answer with none, or a gRPC `INTERNAL` status. Both verifiers reach it at the
+  provider's port, with no `--transports` entry, as pact-plugins' examples verify it.
 - `bodies/`: bodies that are not JSON, and how a reply's content type is read (S1.6, ADR 0036): a
   reply with no `Content-Type`, one labelled with a type the pact's does not agree with, a regex on
   a text body and an `application/octet-stream` body; and XML (S1.22, ADR 0039): the rules pact-jvm's

@@ -280,6 +280,37 @@ pub enum ProviderSpec {
   /// The sample provider (`samples/order-service`), started in this process with auth off. Its
   /// provider-state endpoint is the state callback.
   OrderService,
+  /// pact-plugins' gRPC area calculator (`plugin-bridge/examples/area_calculator.rs`, staged plan
+  /// S5.2e): the program `JANUS_AREA_CALCULATOR` names, answering as `answers` says. It has no
+  /// provider-state callback.
+  AreaCalculator {
+    #[serde(default)]
+    answers: AreaAnswers,
+  },
+}
+
+/// What the area calculator answers with.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AreaAnswers {
+  /// Each shape's area.
+  #[default]
+  Areas,
+  /// An answer with no areas.
+  Nothing,
+  /// A gRPC `INTERNAL` status.
+  Error,
+}
+
+impl AreaAnswers {
+  /// The program's `--answers` for it.
+  pub fn arg(self) -> &'static str {
+    match self {
+      AreaAnswers::Areas => "areas",
+      AreaAnswers::Nothing => "nothing",
+      AreaAnswers::Error => "error",
+    }
+  }
 }
 
 /// Whether the verifiers are given a provider-state callback, and how it answers.

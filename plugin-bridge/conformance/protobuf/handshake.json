@@ -17,7 +17,8 @@
             "version": "0.8.1"
           },
           "interfaces": [
-            "matcher"
+            "matcher",
+            "transport"
           ],
           "contributes": {
             "actions": [
@@ -26,6 +27,21 @@
               },
               {
                 "name": "pact-plugin-protobuf:generate-content"
+              },
+              {
+                "name": "pact-plugin-protobuf:verdict"
+              }
+            ],
+            "transports": [
+              {
+                "kind": "grpc",
+                "roles": [
+                  "drive"
+                ],
+                "exchange-parts": {
+                  "initiating": "request",
+                  "answering": "response"
+                }
               }
             ]
           },
@@ -58,7 +74,9 @@
                 },
                 {
                   "type": "transport",
-                  "key": "grpc"
+                  "key": "grpc",
+                  "kind": "grpc",
+                  "action": "pact-plugin-protobuf:verdict"
                 }
               ]
             }

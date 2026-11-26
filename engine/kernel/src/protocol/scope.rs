@@ -93,6 +93,21 @@ impl Scope {
       .and_then(|component| component.transport.clone())
   }
 
+  /// Every transport the scope's declared components provide, by kind, in declaration order.
+  pub fn transports(&self) -> Vec<(String, Arc<dyn TransportComponent>)> {
+    self
+      .resolved
+      .iter()
+      .filter_map(|component| Some((component, component.transport.clone()?)))
+      .flat_map(|(component, transport)| {
+        component
+          .transport_kinds
+          .iter()
+          .map(move |kind| (kind.clone(), Arc::clone(&transport)))
+      })
+      .collect()
+  }
+
   /// Load `more` declarations through this scope's loaders, for a run that learned it needs them after
   /// the scope was resolved: a pact plugin's bridge, for a pact fetched from a broker (ADR 0110 decision
   /// 6). What they contribute is the caller's to add to the run's contributions.

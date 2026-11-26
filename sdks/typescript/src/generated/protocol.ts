@@ -1545,6 +1545,10 @@ export interface TransportBinding {
   options?: {
     [k: string]: unknown;
   };
+  /**
+   * When no loaded component provides its kind, hold it rather than fail the call, and start it the first time an interaction of its kind is verified if a component loaded by then provides it, such as a fetched pact's plugin bridge (spec.md §8.3, ADR 0111). Never started, it is no error.
+   */
+  optional?: boolean;
   [k: string]: unknown;
 }
 

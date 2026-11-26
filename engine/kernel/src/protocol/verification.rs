@@ -62,7 +62,7 @@ use crate::legacy::compile::{self as legacy_compile, compile_response as compile
 use crate::legacy::pact::{
   self as legacy_pact, MessageInteraction, PactInteraction, PluginInteraction, RequestTemplate,
 };
-use crate::legacy::plugins::{self as legacy_plugins, Bridges, Refused};
+use crate::legacy::plugins::{self as legacy_plugins, Bridged, Bridges, PluginTransport, Refused};
 use crate::plan::{self, ActionApplier, Assignment, Status, execute_with, outcome};
 use crate::shape::fresh;
 use crate::variant::params;
@@ -471,11 +471,17 @@ pub struct VerificationTarget {
   pub components: Vec<Value>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct TransportBinding {
   pub transport: String,
   #[serde(default)]
   pub options: Option<Value>,
+  /// Held rather than refused when no component in the run's scope provides its kind, and started the
+  /// first time an interaction of its kind is verified, if a component loaded by then does: a pact
+  /// plugin's transport, whose bridge a broker's pact declares only once it is fetched (ADR 0111
+  /// decision 4). Never started, it is no error.
+  #[serde(default)]
+  pub optional: bool,
 }
 
 /// Why a `verify` call could not start. Everything after the run has started is an *event*, not an
@@ -788,6 +794,7 @@ fn legacy_hint(doc: &Value) -> Option<String> {
 // ---------------------------------------------------------------------------------------------
 
 /// One transport the target bound, in the drive role, ready to send.
+#[derive(Clone)]
 pub(crate) struct Target {
   pub kind: String,
   pub component: Arc<dyn TransportComponent>,
@@ -795,6 +802,119 @@ pub(crate) struct Target {
   /// What `transport/start` answered: the descriptor a hook sees as `endpoint`
   /// (lifecycle-hooks spec §3.3) — never assumed to be a URL, just passed along.
   pub endpoint: Value,
+}
+
+/// What a run may drive (ADR 0111 decision 4): the instances started before it, and what it may start
+/// during it, the first time an interaction needs one. That is an optional binding no component provided
+/// when the run started, once one does; or a pact plugin's transport with no binding of its own, started
+/// with the run's first binding's options, the provider's, as today's verifier reaches it. Every instance
+/// is stopped when the run ends.
+#[derive(Clone)]
+pub(crate) struct Targets {
+  started: Vec<Target>,
+  /// Optional bindings whose kind no component provided when the run started.
+  held: Vec<TransportBinding>,
+  /// The transports the run's components provide, by kind, which a held binding or a plugin transport is
+  /// started from: the scope's, and a fetched pact's bridges'.
+  providers: Vec<(String, Arc<dyn TransportComponent>)>,
+  /// The run's first binding's options.
+  provider_options: Option<Value>,
+  /// What a started instance's id begins with, unique to the run.
+  prefix: String,
+  next: usize,
+}
+
+impl Targets {
+  pub(crate) fn new(
+    started: Vec<Target>,
+    held: Vec<TransportBinding>,
+    providers: Vec<(String, Arc<dyn TransportComponent>)>,
+    provider_options: Option<Value>,
+    prefix: String,
+  ) -> Targets {
+    Targets {
+      started,
+      held,
+      providers,
+      provider_options,
+      prefix,
+      next: 0,
+    }
+  }
+
+  /// The instance of `kind` started already, if there is one.
+  fn find(&self, kind: &str) -> Option<Target> {
+    self.started.iter().find(|target| target.kind == kind).cloned()
+  }
+
+  /// The instance an interaction of `kind` is driven through, started now when it may be: from the held
+  /// binding of its kind, or, `at_provider`, with the provider's options. `Ok(None)` when there is none to
+  /// start; `Err` is the failed start, as a result's `error`.
+  fn target(&mut self, kind: &str, at_provider: bool) -> Result<Option<Target>, Value> {
+    if let Some(target) = self.find(kind) {
+      return Ok(Some(target));
+    }
+    let Some(component) = self
+      .providers
+      .iter()
+      .find(|(provided, _)| provided == kind)
+      .map(|(_, component)| Arc::clone(component))
+    else {
+      return Ok(None);
+    };
+    let options = match self.held.iter().position(|binding| binding.transport == kind) {
+      Some(held) => self.held.remove(held).options,
+      None if at_provider => self.provider_options.clone(),
+      None => return Ok(None),
+    };
+    self.next += 1;
+    let instance = format!("{}-t{}", self.prefix, self.next);
+    let started = component.start(crate::component::Start {
+      instance: instance.clone(),
+      kind: kind.to_string(),
+      role: "drive".to_string(),
+      options,
+    });
+    match started {
+      Ok(started) => {
+        tracing::debug!(kind, instance, "transport started for the run");
+        let target = Target {
+          kind: kind.to_string(),
+          component,
+          instance,
+          endpoint: started.endpoint,
+        };
+        self.started.push(target.clone());
+        Ok(Some(target))
+      }
+      Err(error) => Err(
+        serde_json::to_value(EngineError::component_failed(
+          &format!("transport/{kind}"),
+          &error,
+        ))
+        .unwrap_or(Value::Null),
+      ),
+    }
+  }
+
+  /// The transports `loaded` provide, which the run may now start: a fetched pact's bridges.
+  pub(crate) fn provide(&mut self, loaded: &[crate::component::Resolved]) {
+    for component in loaded {
+      if let Some(transport) = &component.transport {
+        for kind in &component.transport_kinds {
+          self.providers.push((kind.clone(), Arc::clone(transport)));
+        }
+      }
+    }
+  }
+
+  fn kinds(&self) -> Vec<String> {
+    self.started.iter().map(|target| target.kind.clone()).collect()
+  }
+
+  fn stop(&self) {
+    stop_targets(&self.started);
+  }
 }
 
 /// A verification session's live state (spec §7.1: the session is the only resource). It holds
@@ -874,7 +994,7 @@ struct BrokerRun {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn start(
   sources: Sources,
-  targets: Vec<Target>,
+  targets: Targets,
   components: RunComponents,
   hooks: Option<HookRunner>,
   options: Option<Value>,
@@ -892,21 +1012,14 @@ pub(crate) fn start(
     Sources::Broker(_) => crashed_summary(&[], &filter),
   };
   // What to stop if the run never starts: its closure owns the targets.
-  let started: Vec<Target> = targets
-    .iter()
-    .map(|target| Target {
-      kind: target.kind.clone(),
-      component: Arc::clone(&target.component),
-      instance: target.instance.clone(),
-      endpoint: Value::Null,
-    })
-    .collect();
+  let started = targets.clone();
   let spawned = background.spawn(
     "janus verification",
     Box::new(move || {
       let stream = Arc::clone(&thread_stream);
       guarded(&stream, crashed, move || {
         let mut components = components;
+        let mut targets = targets;
         let (sources, broker) = match sources {
           Sources::Read(sources) => (sources, None),
           Sources::Broker(fetch) => match fetch_sources(&fetch, &filter, &thread_stream) {
@@ -914,6 +1027,8 @@ pub(crate) fn start(
               // ADR 0110 decision 6: the fetched pacts' plugin bridges, loaded before anything runs.
               if !bridges.is_empty() {
                 components.contributions = Arc::new(components.contributions.with_declared(&bridges));
+                // A bridge's plugin transport, which the run starts when an interaction needs it (ADR 0111).
+                targets.provide(&bridges);
                 components
                   .recorded
                   .extend(bridges.iter().map(crate::component::Resolved::recorded));
@@ -930,7 +1045,7 @@ pub(crate) fn start(
               )
             }
             Err(summary) => {
-              stop_targets(&targets);
+              targets.stop();
               thread_stream.finish("verification/finished", summary);
               return;
             }
@@ -953,7 +1068,7 @@ pub(crate) fn start(
   match spawned {
     Ok(task) => Ok(Run { stream, task }),
     Err(err) => {
-      stop_targets(&started);
+      started.stop();
       Err(err)
     }
   }
@@ -1095,7 +1210,7 @@ fn crashed_summary(sources: &[Source], filter: &Filter) -> Value {
 fn run(
   sources: Vec<Source>,
   broker: Option<BrokerRun>,
-  targets: Vec<Target>,
+  mut targets: Targets,
   components: RunComponents,
   hooks: Option<HookRunner>,
   filter: Filter,
@@ -1125,7 +1240,7 @@ fn run(
       // Positionally parallel to `providers`: which format each source document was written in
       // (plan task 5.4). A run over a mix of the two says so in its first event.
       "formats": sources.iter().map(Source::format).collect::<Vec<_>>(),
-      "transports": targets.iter().map(|t| t.kind.clone()).collect::<Vec<_>>(),
+      "transports": targets.kinds(),
       "filtered": narrowed.contains(&true),
       "hooks": hooks.is_some(),
     }),
@@ -1172,7 +1287,7 @@ fn run(
         let flow = verify_prepared(
           source.prepare(index, &contributions, &redaction),
           &mut RunContext {
-            targets: &targets,
+            targets: &mut targets,
             content: content.as_deref(),
             actions: contributions.as_ref(),
             filter: &filter,
@@ -1270,7 +1385,7 @@ fn run(
   // session allocated is released when it ends, and the host learns it ended from that event. A
   // host that saw `finished` while a client instance was still open would be right to call it a
   // leak.
-  stop_targets(&targets);
+  targets.stop();
 
   stream.finish(
     "verification/finished",
@@ -1630,7 +1745,7 @@ fn summary(report: &Report<'_>) -> Value {
 /// Everything one run carries through every interaction and every variant: what it may drive,
 /// what decodes a slot, what it was asked to replay, where it reports, and its hooks.
 struct RunContext<'a> {
-  targets: &'a [Target],
+  targets: &'a mut Targets,
   content: Option<&'a dyn ContentComponent>,
   /// Runs the component actions a plan names: a component operator's, a content component's
   /// substitution (ADR 0100), an embedding's own matcher's (ADR 0057).
@@ -1685,6 +1800,10 @@ struct Prepared {
   reference: Value,
   /// Which transport kind drives it.
   transport: String,
+  /// With no binding of its own kind, it is driven through an instance started with the run's first
+  /// binding's options, the provider's: a pact plugin's transport, which today's verifier reaches at the
+  /// provider's host and port (ADR 0111 decision 4).
+  at_provider: bool,
   replays: Vec<Replay>,
 }
 
@@ -1749,6 +1868,10 @@ struct Ready {
   /// address a header as one value per name (`legacy_pact::header_captures`), shapes address the
   /// slot the transport actually produced.
   resolve: fn(&Parts, &ContentTypes, Option<&dyn ContentComponent>) -> Decoded,
+  /// A part and slot of the request the exchange's provider-state values are written into once its states
+  /// are set up, every state's `params` and then what the `state-setup` hooks returned: a pact plugin's
+  /// transport builds the request from them (ADR 0111 decision 2). `None` writes none.
+  state_values: Option<(String, String)>,
   /// The interaction's declared content types (contract-file spec §5.5): the request's declared
   /// slots are encoded through them before sending, the reply's decoded under them. Empty for a
   /// v1–v4 pact, which has no declarations.
@@ -1798,6 +1921,7 @@ fn prepare_janus(
     Ok(spec) => spec,
     Err(problems) => {
       return Prepared {
+        at_provider: false,
         reference,
         transport,
         replays: interaction
@@ -1857,6 +1981,7 @@ fn prepare_janus(
         hooked["pact-message"] = produced_request(interaction, &transport, states.as_deref(), &request);
       }
       Replay::Ready(Box::new(Ready {
+        state_values: None,
         variant: variant.id.clone(),
         answer: if emissive {
           Answer::Produced {
@@ -1897,6 +2022,7 @@ fn prepare_janus(
     .collect();
 
   Prepared {
+    at_provider: false,
     reference,
     transport,
     replays,
@@ -1990,12 +2116,17 @@ fn prepare_legacy(
     PactInteraction::NeedsPlugins(needs) => {
       let bridges = Bridges::read(contributions.capabilities());
       match legacy_plugins::bridged(needs, &bridges, &pact.plugins) {
-        Ok(PactInteraction::Http(http)) => prepare_legacy_http(pact, &http, index, format, redaction),
-        Ok(PactInteraction::Message(message)) => {
+        Ok(Bridged::Interaction(PactInteraction::Http(http))) => {
+          prepare_legacy_http(pact, &http, index, format, redaction)
+        }
+        Ok(Bridged::Interaction(PactInteraction::Message(message))) => {
           prepare_legacy_message(pact, &message, index, format, redaction)
         }
-        Ok(PactInteraction::NeedsPlugins(_)) => {
+        Ok(Bridged::Interaction(PactInteraction::NeedsPlugins(_))) => {
           refuse_plugin_interaction(pact, needs, index, format, &Refused::Kind)
+        }
+        Ok(Bridged::Transport(transport)) => {
+          prepare_plugin_transport(pact, needs, &transport, index, format, redaction)
         }
         Err(refused) => refuse_plugin_interaction(pact, needs, index, format, &refused),
       }
@@ -2028,6 +2159,7 @@ fn prepare_legacy_http(
     Ok(response) => response,
     Err(err) => {
       return Prepared {
+        at_provider: false,
         reference,
         transport,
         replays: vec![Replay::Broken {
@@ -2046,9 +2178,11 @@ fn prepare_legacy_http(
   secrets.collect_parts(&redacted, &request);
   secrets.collect_parts(&redacted, &legacy_pact::response_parts(&interaction.response));
   Prepared {
+    at_provider: false,
     reference,
     transport,
     replays: vec![Replay::Ready(Box::new(Ready {
+      state_values: None,
       variant: LEGACY_VARIANT.to_string(),
       answer: Answer::Driven,
       origin: json!(crate::variant::Origin::Base),
@@ -2149,6 +2283,7 @@ fn prepare_legacy_message(
         "contents"
       };
       return Prepared {
+        at_provider: false,
         reference,
         transport,
         replays: vec![Replay::Broken {
@@ -2168,9 +2303,11 @@ fn prepare_legacy_message(
     pact_message["transport"] = json!(named);
   }
   Prepared {
+    at_provider: false,
     reference,
     transport: transport.clone(),
     replays: vec![Replay::Ready(Box::new(Ready {
+      state_values: None,
       variant: LEGACY_VARIANT.to_string(),
       answer: Answer::Produced {
         part: legacy_pact::MESSAGE_PART.to_string(),
@@ -2196,6 +2333,67 @@ fn prepare_legacy_message(
         "states": states_json,
         "transport": { "kind": transport },
         "pact-message": pact_message,
+      }),
+    }))],
+  }
+}
+
+/// A v1–v4 interaction carried over a pact plugin's transport (ADR 0111): one variant, driven through
+/// the transport kind its bridge contributes in one send, whose reply is the plugin's verdict, read by the
+/// bridge's `verdict` action and nothing else. With no binding of the kind, it is reached at the provider,
+/// as today's verifier reaches it.
+fn prepare_plugin_transport(
+  pact: &LegacyPact,
+  needs: &PluginInteraction,
+  transport: &PluginTransport,
+  index: usize,
+  format: &str,
+  redaction: &Redaction,
+) -> Prepared {
+  let states = legacy_states(&needs.provider_states);
+  let reference = legacy_reference(
+    pact,
+    index,
+    &needs.description,
+    &states,
+    format,
+    needs.id.as_ref(),
+  );
+  let states_json = serde_json::to_value(&states).unwrap_or(Value::Null);
+  Prepared {
+    reference,
+    transport: transport.kind.clone(),
+    at_provider: true,
+    replays: vec![Replay::Ready(Box::new(Ready {
+      variant: LEGACY_VARIANT.to_string(),
+      answer: Answer::Driven,
+      origin: json!(crate::variant::Origin::Base),
+      assignment: json!([]),
+      states,
+      request: transport.request(),
+      generate_from: None,
+      fresh: BTreeMap::new(),
+      state_values: Some((
+        legacy_plugins::TRANSPORT_REQUEST.to_string(),
+        legacy_plugins::TRANSPORT_PROVIDER_STATE.to_string(),
+      )),
+      legacy: true,
+      plan: legacy_compile::compile_plugin_verdict(
+        &transport.action,
+        legacy_plugins::TRANSPORT_RESPONSE,
+        legacy_plugins::TRANSPORT_VERDICT,
+      ),
+      resolve: decoded_parts,
+      content_types: ContentTypes::new(),
+      content_shapes: BTreeMap::new(),
+      warnings: Vec::new(),
+      redacted: redaction.reported(Some(&transport.kind)),
+      secrets: Secrets::default(),
+      recorded_redacted: Vec::new(),
+      interaction: json!({
+        "description": needs.description,
+        "states": states_json,
+        "transport": { "kind": transport.kind },
       }),
     }))],
   }
@@ -2232,6 +2430,7 @@ fn refuse_plugin_interaction(
   ))
   .unwrap_or(Value::Null);
   Prepared {
+    at_provider: false,
     reference,
     transport: DEFAULT_TRANSPORT_KIND.to_string(),
     replays: vec![Replay::Broken {
@@ -2289,8 +2488,21 @@ fn unsupported_body(err: &legacy_pact::Unsupported, index: usize, part: &str) ->
 
 /// Replay one interaction's variants: the one loop both source kinds run through.
 fn verify_prepared(prepared: Prepared, ctx: &mut RunContext<'_>, tally: &mut Tally) -> Flow {
-  let targets = ctx.targets;
-  let target = targets.iter().find(|target| target.kind == prepared.transport);
+  // A transport the run has not started is started for the first replay that drives one (ADR 0111
+  // decision 4); a produced message's hooks are told the endpoint of one started already.
+  let driven = prepared
+    .replays
+    .iter()
+    .any(|replay| matches!(replay, Replay::Ready(ready) if matches!(ready.answer, Answer::Driven)));
+  let (target, unstarted) = if driven {
+    match ctx.targets.target(&prepared.transport, prepared.at_provider) {
+      Ok(target) => (target, None),
+      Err(error) => (None, Some(error)),
+    }
+  } else {
+    (ctx.targets.find(&prepared.transport), None)
+  };
+  let target = target.as_ref();
   let reference = prepared.reference;
 
   for replay in prepared.replays {
@@ -2317,9 +2529,11 @@ fn verify_prepared(prepared: Prepared, ctx: &mut RunContext<'_>, tally: &mut Tal
     // silent skip — a verifier that cannot speak an interaction's transport has not verified it. A
     // produced message needs no transport: a hook produces it.
     if target.is_none() && matches!(ready.answer, Answer::Driven) {
-      let error = json!({
-        "code": "component-unavailable",
-        "component": format!("transport/{}", prepared.transport),
+      let error = unstarted.clone().unwrap_or_else(|| {
+        json!({
+          "code": "component-unavailable",
+          "component": format!("transport/{}", prepared.transport),
+        })
       });
       report_failure(ctx, tally, &reference, &ready.variant, error);
       continue;
@@ -2569,11 +2783,21 @@ fn drive_exchange(
   scratch: &mut ExchangeScratch,
 ) -> Result<Driven, Stopped> {
   let names = target.component.exchange_parts();
-  let request = match &exchange.ready.generate_from {
+  let mut request = match &exchange.ready.generate_from {
     None if !exchange.ready.fresh.is_empty() => fresh_request(exchange, scratch, ctx),
     None => exchange.ready.request.clone(),
     Some(request) => generated_request(exchange, request, scratch, ctx),
   };
+  if let Some((part, slot)) = &exchange.ready.state_values {
+    request.entry(part.clone()).or_default().insert(
+      slot.clone(),
+      crate::component::SlotValue {
+        content: Value::Object(provider_state(exchange, scratch)),
+        encoded: None,
+        content_type: None,
+      },
+    );
+  }
   let Some(mut request) = sent_parts(&request, &names) else {
     return Err(Stopped::Failed(json!({
       "interaction": exchange.reference, "variant": exchange.ready.variant, "status": "failed",

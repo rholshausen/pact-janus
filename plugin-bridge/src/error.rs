@@ -39,6 +39,15 @@ impl ComponentError {
     ComponentError::new("unavailable", "component", message)
   }
 
+  pub fn internal(message: impl Into<String>) -> ComponentError {
+    ComponentError::new("internal", "internal", message)
+  }
+
+  /// `transport-failed`: the plugin answered a transport's exchange with a failure (ADR 0111 decision 2).
+  pub fn transport_failed(message: impl Into<String>) -> ComponentError {
+    ComponentError::new("transport-failed", "component", message)
+  }
+
   pub fn invalid_config(message: impl Into<String>) -> ComponentError {
     ComponentError::document("invalid-config", message)
   }

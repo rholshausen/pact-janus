@@ -83,12 +83,7 @@ pub fn run(args: &VerifyArgs) -> Result<Outcome, Error> {
   }
 
   let provider = provider_options(args)?;
-  let mut target = json!({
-    "transports": [{
-      "transport": transport_kind(args),
-      "options": provider,
-    }]
-  });
+  let mut target = json!({ "transports": transport_bindings(args, &provider)? });
   let mut hooks = hooks.unwrap_or_else(|| json!({ "version": 1 }));
   // One file, two members, two owners (lifecycle-hooks spec §6.1): the components are design
   // 2.6's and ride beside the hooks, not inside them.
@@ -304,6 +299,33 @@ fn transport_kind(args: &VerifyArgs) -> &str {
     "https" => "http",
     kind => kind,
   }
+}
+
+/// The target's transport bindings: the provider's, of `--transport`'s kind, and one for each
+/// `--transports` entry but `http`, at the provider's host and the entry's port, with the `--header`s.
+/// Any but HTTP is optional (ADR 0111 decision 4): a pact plugin's transport (`grpc`) exists only once a
+/// pact names its plugin, and today's verifier takes a `--transports` entry for one no pact uses.
+fn transport_bindings(args: &VerifyArgs, provider: &Value) -> Result<Value, Error> {
+  let kind = transport_kind(args);
+  let mut first = json!({ "transport": kind, "options": provider });
+  if kind != "http" {
+    first["optional"] = json!(true);
+  }
+  let mut bindings = vec![first];
+  for entry in args.transports.iter().filter(|entry| entry.name != "http") {
+    if bindings
+      .iter()
+      .any(|binding| binding["transport"] == entry.name.as_str())
+    {
+      continue;
+    }
+    let mut options = json!({ "base-url": transport_url(args, entry)? });
+    if let Some(headers) = provider.get("headers") {
+      options["headers"] = headers.clone();
+    }
+    bindings.push(json!({ "transport": entry.name, "options": options, "optional": true }));
+  }
+  Ok(Value::Array(bindings))
 }
 
 /// A `--transports` entry's URL, as today's verifier makes one (`ProviderTransport::base_url`):
@@ -663,6 +685,37 @@ mod todays_options {
     let mut line = line.to_vec();
     line.extend(["--provider-url", "http://localhost:8080"]);
     assert!(matches!(source(&verify_args(&line)), Err(Error::Usage(_))));
+  }
+
+  #[test]
+  fn transports_entries_but_http_are_optional_bindings_at_the_providers_host() {
+    let args = verify_args(&[
+      "pact.json",
+      "--provider-url",
+      "http://orders.local:8080",
+      "--transports",
+      "http:8081 grpc:8222",
+      "--header",
+      "x-trace=1",
+    ]);
+    let provider = provider_options(&args).unwrap();
+    let bindings = transport_bindings(&args, &provider).unwrap();
+    assert_eq!(
+      bindings,
+      json!([
+        { "transport": "http",
+          "options": { "base-url": "http://orders.local:8081", "headers": { "x-trace": "1" } } },
+        { "transport": "grpc", "optional": true,
+          "options": { "base-url": "http://orders.local:8222", "headers": { "x-trace": "1" } } }
+      ])
+    );
+    // Today's `--transport grpc --port`: the provider's binding is the plugin transport's, optionally.
+    let args = verify_args(&["pact.json", "--transport", "grpc", "-p", "37757"]);
+    let provider = provider_options(&args).unwrap();
+    assert_eq!(
+      transport_bindings(&args, &provider).unwrap(),
+      json!([{ "transport": "grpc", "optional": true, "options": { "base-url": "http://localhost:37757" } }])
+    );
   }
 
   #[test]

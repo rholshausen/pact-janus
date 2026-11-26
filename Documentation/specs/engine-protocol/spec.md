@@ -777,6 +777,12 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   before `verify` answers, so options its transport cannot act on fail the call with
   `component-failed`, never the run's first request (the HTTP transport's options:
   component-interfaces spec [§5.6](../component-interfaces/spec.md#56-the-built-in-http-transports-options)).
+  A binding whose kind no loaded component provides fails the call with `component-unavailable`,
+  unless it is **`optional`**: then it is held, and started the first time an interaction of its kind
+  is verified, if a component loaded by then provides the kind (a fetched pact's plugin bridge), and is
+  no error if none ever does ([ADR
+  0111](../../decisions/0111-a-plugin-transports-exchange-is-one-send-and-its-verdict-a-reply-the-bridges-action-reads.md)
+  decision 4). Every instance a run started is stopped when it ends.
   `target.components` declares the project's
   components exactly as `consumer-session/create`'s `config.components` does; they are loaded, and
   the union of every contract's `requires` checked against them and the in-tree components (design
@@ -801,15 +807,19 @@ Schema: [`schemas/v1/verification.schema.json`](schemas/v1/verification.schema.j
   `janus-plugin-bridge` (component-interfaces spec §9.3.1), when the run has one that can verify all of
   it: each body a bridged content matcher claims is compared by it, and a request body with generators is
   filled by its content generator ([ADR
-  0110](../../decisions/0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md)).
+  0110](../../decisions/0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md));
+  one carried over a plugin's transport is driven through the kind its bridge contributes, and the
+  plugin's verdict is its result (ADR 0111). With no binding of that kind, its instance is started with
+  the first binding's options, the provider's, as today's verifier reaches a plugin transport at the
+  provider's host and port.
   **`options.plugin-bridge`** says how to start a bridge: a component declaration but its name. Given
   it, the engine declares `pact-plugin-<name>` for each plugin a pact's metadata names, unless
   `target.components` declares that name already; a pact fetched from a broker or by URL is declared for
   when it arrives, before any of its interactions runs. Otherwise it is refused by name before anything
   runs for it: its result is `failed` with `component-unavailable`, `details.component` naming the first
   plugin as `pact-plugin/<name>`, `details.plugins` every one, `details.reason` `pact-plugin`, and
-  `details.why` what stopped it: `no-bridge`, `transport` (a plugin's transport, staged plan S5.2e),
-  `rules` (a plugin's matching rule, S5.2g) or `kind` (ADR 0045, ADR 0110). The rest of the pact
+  `details.why` what stopped it: `no-bridge`, `transport` (a plugin's transport its bridge does not
+  drive), `rules` (a plugin's matching rule, S5.2g) or `kind` (ADR 0045, ADR 0110). The rest of the pact
   verifies, and the summary counts the refusal as a failure. A mismatch a plugin found carries `at`,
   where the plugin locates it inside the body, in its own words.
 - **A `broker` source** names the broker (§8.7's descriptor), the provider, its

@@ -27,9 +27,9 @@ today's do; a Pact Broker is reached with the defaults below, as today's verifie
 |---|---|---|
 | `--hostname`/`-h` (`PACT_PROVIDER_HOSTNAME`), default `localhost` | `--hostname`, the same variable and default | No `-h`: it is help. `--provider-url`, when given, wins over all three |
 | `--port`/`-p` (`PACT_PROVIDER_PORT`), default the scheme's | `--port`/`-p`, the same variable and default | |
-| `--transport` (`PACT_PROVIDER_TRANSPORT`), default `http` | `--transport`, the same variable and default | `https` is the `http` transport over TLS, as today. Any other value names a transport component: `grpc` has none until the plugin bridge serves plugin transports (S5.2e) |
+| `--transport` (`PACT_PROVIDER_TRANSPORT`), default `http` | `--transport`, the same variable and default | `https` is the `http` transport over TLS, as today. Any other value names a transport component, bound optionally: `grpc` is the protobuf plugin's, which its bridge provides once a pact names the plugin ([Pact plugins](#pact-plugins)) |
 | One of the three, at least | `--provider-url <scheme>://<host>:<port>`, alias `--provider-base-url` | One URL in place of three options, and the Ruby verifier's spelling |
-| `--transports <NAME:PORT[/PATH]>...` | `--transports <NAME:PORT[/PATH]>`, repeatable or several in one quoted value | Plain HTTP on the provider URL's host, as today. An `http` entry is where HTTP interactions go; a message is asked for where [Message pacts](#message-pacts) says. A plugin transport (`grpc`) has nothing to route until the bridge serves it (S5.2e): such an interaction is refused by name. Fixtures `messages/*`, and `cli/tests/cli.rs` |
+| `--transports <NAME:PORT[/PATH]>...` | `--transports <NAME:PORT[/PATH]>`, repeatable or several in one quoted value | Plain HTTP on the provider URL's host, as today. An `http` entry is where HTTP interactions go; a message is asked for where [Message pacts](#message-pacts) says; any other entry is where that transport is reached, bound optionally, so an entry for a plugin transport no pact uses is harmless, as today (ADR 0111). Fixtures `messages/*`, and `cli/tests/cli.rs` |
 | `--base-path` (`PACT_PROVIDER_BASE_PATH`) | `--base-path`, the same variable; or a path in `--provider-url` | Fixture `connection/header-and-base-path` |
 | `--request-timeout` (`PACT_PROVIDER_REQUEST_TIMEOUT`), default 5000 ms | `--request-timeout`, the same variable and default | Today's also bounds a state-change call. Janus's state-change call is an `http` hook with its own `timeout-ms`, default 5000 ms. Fixtures `connection/request-timeout` and `connection/request-timeout-raised` |
 | `--header`/`-H KEY=VALUE`, repeatable | `--header`/`-H KEY=VALUE`, repeatable | Added to every request, replacing the pact's header of that name. **Differs:** Janus replaces a header whose name differs only in case; today's verifier keeps the pact's and sends its value (fixture `connection/header-case`, ADR 0035) |
@@ -142,8 +142,11 @@ a program beside `janus` or where `JANUS_PLUGIN_BRIDGE` names it, which loads ea
 same driver today's verifier does. A plugin's content matcher compares the bodies it claims, and its
 content generator fills a request body with generators, as today
 ([ADR 0110](decisions/0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md)).
-A plugin's transport (gRPC) and its matchers (`creditcard`) are not bridged yet (S5.2e, S5.2g): an
-interaction that needs one is refused by name, and the rest are verified
+An interaction carried over a plugin's transport (gRPC) is run by the plugin, which sends the request it
+builds from the pact, compares the answer and gives the verdict, as today
+([ADR 0111](decisions/0111-a-plugin-transports-exchange-is-one-send-and-its-verdict-a-reply-the-bridges-action-reads.md)).
+A plugin's matchers (`creditcard`) are not bridged yet (S5.2g): an interaction that uses one is refused
+by name, and the rest are verified
 ([ADR 0045](decisions/0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md)).
 
 | Today | `janus verify` | Notes |
@@ -151,7 +154,9 @@ interaction that needs one is refused by name, and the rest are verified
 | `PACT_PLUGIN_DIR`, default `~/.pact/plugins`: where plugins are found and installed | The same variable and default, read by the bridge | The bridge is granted `PACT_PLUGIN_DIR`, `HOME`, `USERPROFILE`, `PACT_DO_NOT_TRACK` and `RUST_LOG`, and nothing else of the environment |
 | A plugin the pact names is loaded before anything is verified; a missing one is installed from the plugin index, and one that cannot be ends the run with no results | The same, by the bridge: one bridge per plugin, declared from the pact's metadata, and loaded before anything runs, or when a broker's pact arrives | A plugin that cannot be loaded ends the run as `component-unavailable` naming the bridge. With no bridge to be found, each interaction that needs a plugin fails as `component-unavailable` naming `pact-plugin/<name>` and saying where the bridge was looked for. Fixtures `plugins/*` |
 | A plugin's mismatches, each in its own words | Each a mismatch of its own, at the body's path, with the plugin's location as `at` | The same verdicts (fixtures `plugins/*`) |
-| An interaction carried over a plugin transport (`grpc`), or using a plugin's matcher | Refused by name, the rest verified | **Differs** until S5.2e and S5.2g |
+| An interaction carried over a plugin transport (`grpc`), reached at the provider's host and the port of its `--transports` entry, else `--port` | The same: one exchange the plugin runs, through the kind its bridge drives, reached at its `--transports` entry, else the provider URL's host and port | The same verdicts (fixtures `plugins/grpc-area-calculator*`). A plugin's mismatch carries its path as `at`; a plugin that fails the exchange is `transport-failed`, as today's verifier fails it |
+| `--request-filter` and the plugin's output lines on a plugin transport | A `before-request` hook sees the pact and the interaction's key, not the request the plugin builds; the output is in the verdict, and no report prints it | **Differs** until S5.2i (ADR 0111 decision 5) |
+| An interaction using a plugin's matcher | Refused by name, the rest verified | **Differs** until S5.2g |
 
 `janus upgrade` drops an interaction that needs a plugin from the contract it writes, with an
 `interaction-dropped` finding naming the plugin (until S5.2f gives one a contract form), and

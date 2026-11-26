@@ -6,10 +6,13 @@
 //! declares is read, because a pact plugin is a v1–v4 pact's notion (S1.11). [`Bridges`] is what a run's
 //! bridges serve; [`bridged`] decides whether an interaction is verified through them, with each body a
 //! plugin's content matcher claims compiled to its bridge's `compare-contents` (ADR 0110 decision 3), or
-//! refused by name and why ([`Refused`], decision 5).
+//! refused by name and why ([`Refused`], decision 5). An interaction carried over a plugin's transport is
+//! one send through the transport kind its bridge drives, its verdict read by the bridge's `verdict` action
+//! ([`PluginTransport`], ADR 0111).
 
 use super::compile::PluginBody;
 use super::pact::{MessageInteraction, PactInteraction, PactPlugin, PluginGenerate, PluginInteraction};
+use crate::component::{Part, Parts, SlotValue};
 use crate::plan::RuntimeValue;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -36,9 +39,16 @@ struct Served {
   matchers: Vec<(Vec<String>, String)>,
   /// Each content generator, likewise (ADR 0110 decision 7).
   generators: Vec<(Vec<String>, String)>,
-  /// The keys of the plugin's transport entries, which no bridge serves yet (staged plan S5.2e).
-  transports: Vec<String>,
+  /// Each of the plugin's transport entries: its key, and the kind and verdict action the bridge drives
+  /// it as, when it does (ADR 0111 decision 1).
+  transports: Vec<(String, Option<(String, String)>)>,
 }
+
+/// The parts and slots of a plugin transport's exchange, as the bridge drives one (ADR 0111 decision 2).
+pub const TRANSPORT_REQUEST: &str = "request";
+pub const TRANSPORT_RESPONSE: &str = "response";
+pub const TRANSPORT_VERDICT: &str = "verdict";
+pub const TRANSPORT_PROVIDER_STATE: &str = "provider-state";
 
 impl Bridges {
   /// The bridges among a run's components: each component's name and handshake capabilities. A component
@@ -77,8 +87,15 @@ impl Bridges {
       let matchers = of_type("content-matcher").filter_map(served_by).collect();
       let generators = of_type("content-generator").filter_map(served_by).collect();
       let transports = of_type("transport")
-        .filter_map(|entry| entry.get("key").and_then(Value::as_str))
-        .map(str::to_string)
+        .filter_map(|entry| {
+          let key = entry.get("key").and_then(Value::as_str)?;
+          let driven = entry
+            .get("kind")
+            .and_then(Value::as_str)
+            .zip(entry.get("action").and_then(Value::as_str))
+            .map(|(kind, action)| (kind.to_string(), action.to_string()));
+          Some((key.to_string(), driven))
+        })
         .collect();
       served.insert(
         plugin.to_string(),
@@ -144,7 +161,7 @@ pub fn claims(pattern: &str, media_type: &str) -> bool {
 pub enum Refused {
   /// No bridge was declared for these plugins.
   NoBridge(Vec<String>),
-  /// It is carried over a plugin's transport, which no bridge serves yet (staged plan S5.2e).
+  /// It is carried over a plugin's transport, which its bridge does not drive.
   Transport { plugin: String, transport: String },
   /// One of its rules is a plugin's, which no bridge serves yet (staged plan S5.2g).
   Rules(Vec<String>),
@@ -175,8 +192,8 @@ impl Refused {
         if plugins.len() == 1 { "it" } else { "them" },
       ),
       Refused::Transport { plugin, transport } => format!(
-        "this interaction is carried over the pact plugin '{plugin}''s '{transport}' transport, which \
-         janus-plugin-bridge does not serve yet (staged plan S5.2e)"
+        "this interaction is carried over the pact plugin '{plugin}''s '{transport}' transport, which its \
+         bridge does not drive: a janus-plugin-bridge from before staged plan S5.2e"
       ),
       Refused::Rules(plugins) => format!(
         "this interaction has a matching rule a pact plugin provides ({}), which janus-plugin-bridge does \
@@ -198,13 +215,54 @@ fn named(plugins: &[String]) -> String {
     .join(", ")
 }
 
-/// `needs` as it is verified through the run's bridges: its HTTP or message interaction, with the body a
-/// plugin's content matcher claims compiled to its bridge's action, or why it cannot be.
+/// How an interaction that needs a plugin is verified through the run's bridges.
+#[derive(Clone)]
+pub enum Bridged {
+  /// Its HTTP or message interaction, each body a plugin's content matcher claims compiled to its bridge's
+  /// action (ADR 0110).
+  Interaction(PactInteraction),
+  /// Carried over a plugin's transport: one send through the kind the bridge drives (ADR 0111).
+  Transport(PluginTransport),
+}
+
+/// An interaction carried over a plugin's transport, as its bridge drives it (ADR 0111): the kind, the
+/// action that reads the verdict, and what the plugin builds the exchange from.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PluginTransport {
+  /// The transport kind the bridge contributes for it (`grpc`).
+  pub kind: String,
+  /// The bridge's `verdict` action.
+  pub action: String,
+  /// The v4 pact holding the interaction alone, with the pact's metadata.
+  pub pact: Value,
+  /// The interaction's key in it.
+  pub key: String,
+}
+
+impl PluginTransport {
+  /// The parts the send starts with (ADR 0111 decision 2): `pact` and `key` in the request part. Its
+  /// `provider-state` slot is written when the exchange's states have been set up.
+  pub fn request(&self) -> Parts {
+    let slot = |content: Value| SlotValue {
+      content,
+      encoded: None,
+      content_type: None,
+    };
+    let mut request = Part::new();
+    request.insert("pact".to_string(), slot(self.pact.clone()));
+    request.insert("key".to_string(), slot(json!(self.key)));
+    Parts::from([(TRANSPORT_REQUEST.to_string(), request)])
+  }
+}
+
+/// `needs` as it is verified through the run's bridges: carried over a plugin's transport its bridge drives,
+/// or its HTTP or message interaction, with the body a plugin's content matcher claims compiled to its
+/// bridge's action; or why it cannot be.
 pub fn bridged(
   needs: &PluginInteraction,
   bridges: &Bridges,
   pact_plugins: &[PactPlugin],
-) -> Result<PactInteraction, Refused> {
+) -> Result<Bridged, Refused> {
   let missing: Vec<String> = needs
     .plugins
     .iter()
@@ -217,18 +275,29 @@ pub fn bridged(
   if needs.plugin_rules {
     return Err(Refused::Rules(needs.plugins.clone()));
   }
+  // Today's verifier verifies an interaction through a plugin's transport when the plugin registered one
+  // of the name the interaction gives, and otherwise as it would with none.
   if let Some(transport) = &needs.transport
-    && let Some(plugin) = needs.plugins.iter().find(|plugin| {
-      bridges.served[*plugin]
+    && let Some((plugin, driven)) = needs.plugins.iter().find_map(|plugin| {
+      bridges.served[plugin]
         .transports
         .iter()
-        .any(|key| key.eq_ignore_ascii_case(transport))
+        .find(|(key, _)| key.eq_ignore_ascii_case(transport))
+        .map(|(_, driven)| (plugin, driven))
     })
   {
-    return Err(Refused::Transport {
+    let refused = || Refused::Transport {
       plugin: plugin.clone(),
       transport: transport.clone(),
-    });
+    };
+    let (kind, action) = driven.as_ref().ok_or_else(refused)?;
+    let (pact, key) = *needs.transport_pact.clone().ok_or_else(refused)?;
+    return Ok(Bridged::Transport(PluginTransport {
+      kind: kind.clone(),
+      action: action.clone(),
+      pact,
+      key,
+    }));
   }
   let configured = |plugin: &str, part: Option<&str>| configuration(needs, pact_plugins, plugin, part);
   match needs.inner.as_deref() {
@@ -246,7 +315,7 @@ pub fn bridged(
         // The driver hands a content generator the interaction's whole configuration for the plugin.
         configured(plugin, None)
       });
-      Ok(PactInteraction::Http(http))
+      Ok(Bridged::Interaction(PactInteraction::Http(http)))
     }
     Some(PactInteraction::Message(message)) => {
       let mut message: Box<MessageInteraction> = message.clone();
@@ -262,7 +331,7 @@ pub fn bridged(
           |plugin| configured(plugin, part),
         );
       }
-      Ok(PactInteraction::Message(message))
+      Ok(Bridged::Interaction(PactInteraction::Message(message)))
     }
     _ => Err(Refused::Kind),
   }
@@ -548,7 +617,8 @@ mod tests {
     );
     let csv = csv_bridge();
     let bridges = Bridges::read([("pact-plugin-csv", &csv)]);
-    let Ok(PactInteraction::Http(http)) = bridged(&needs, &bridges, &pact_plugins) else {
+    let Ok(Bridged::Interaction(PactInteraction::Http(http))) = bridged(&needs, &bridges, &pact_plugins)
+    else {
       panic!("it is verified through the bridge");
     };
     let body = http.plugin_body.expect("the response body is the plugin's");
@@ -581,6 +651,8 @@ mod tests {
       Some(Refused::NoBridge(vec!["csv".to_string()]))
     );
 
+    // A bridge from before S5.2e describes the plugin's transport and does not drive it.
+
     let mut over_grpc = csv_interaction();
     over_grpc["pluginConfiguration"] = json!({ "protobuf": {} });
     over_grpc["transport"] = json!("grpc");
@@ -602,5 +674,65 @@ mod tests {
     );
     assert_eq!(refused.why(), "transport");
     assert!(refused.message().contains("S5.2e"), "{}", refused.message());
+  }
+
+  fn grpc_interaction() -> Value {
+    json!({
+      "type": "Synchronous/Messages", "description": "calculate rectangle area request",
+      "transport": "grpc",
+      "pluginConfiguration": { "protobuf": { "descriptorKey": "d1", "service": ".area_calculator.Calculator/calculateOne" } },
+      "request": { "contents": { "content": "EgoNAABAQBUAAIBA", "contentType": "application/protobuf;message=.area_calculator.ShapeMessage", "encoded": "base64" } },
+      "response": [ { "contents": { "content": "CgQAAEBB", "contentType": "application/protobuf;message=.area_calculator.AreaResponse", "encoded": "base64" } } ]
+    })
+  }
+
+  #[test]
+  fn an_interaction_over_a_driven_plugin_transport_is_one_send_through_its_kind() {
+    let (needs, pact_plugins) = needs(
+      grpc_interaction(),
+      json!([{ "name": "protobuf", "version": "0.8.1", "configuration": { "d1": { "protoFile": "syntax = \"proto3\";" } } }]),
+    );
+    let mut protobuf = protobuf_bridge();
+    protobuf["pact-plugin"]["catalogue"][1] = json!({
+      "type": "transport", "key": "grpc", "kind": "grpc", "action": "pact-plugin-protobuf:verdict"
+    });
+    let bridges = Bridges::read([("pact-plugin-protobuf", &protobuf)]);
+    let Ok(Bridged::Transport(transport)) = bridged(&needs, &bridges, &pact_plugins) else {
+      panic!("it is driven through the bridge's transport");
+    };
+    assert_eq!(transport.kind, "grpc");
+    assert_eq!(transport.action, "pact-plugin-protobuf:verdict");
+    // The pact holding it alone, keyed, with the pact's metadata: what the plugin builds the request from.
+    let interactions = transport.pact["interactions"].as_array().expect("interactions");
+    assert_eq!(interactions.len(), 1);
+    assert_eq!(interactions[0]["key"], json!(transport.key));
+    assert_eq!(interactions[0]["description"], "calculate rectangle area request");
+    assert_eq!(
+      transport.pact["metadata"]["plugins"][0]["configuration"]["d1"]["protoFile"],
+      "syntax = \"proto3\";"
+    );
+    let request = transport.request();
+    assert_eq!(request["request"]["key"].content, json!(transport.key));
+    assert_eq!(request["request"]["pact"].content, transport.pact);
+    assert!(
+      !request["request"].contains_key("provider-state"),
+      "written once the states are set up"
+    );
+  }
+
+  #[test]
+  fn a_transport_no_plugin_registered_is_verified_as_with_none() {
+    let mut over_message = grpc_interaction();
+    over_message["transport"] = json!("message");
+    let (needs, pact_plugins) = needs(
+      over_message,
+      json!([{ "name": "protobuf", "version": "0.8.1", "configuration": {} }]),
+    );
+    let protobuf = protobuf_bridge();
+    let bridges = Bridges::read([("pact-plugin-protobuf", &protobuf)]);
+    assert!(matches!(
+      bridged(&needs, &bridges, &pact_plugins),
+      Ok(Bridged::Interaction(PactInteraction::Message(_)))
+    ));
   }
 }

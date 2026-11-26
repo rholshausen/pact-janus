@@ -26,7 +26,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
     "transport",
-    "options"
+    "options",
+    "optional"
 })
 public class TransportBinding {
 
@@ -44,6 +45,13 @@ public class TransportBinding {
     @JsonProperty("options")
     @JsonPropertyDescription("The transport's start options, passed to it as they stand. The built-in HTTP transport's drive options (base-url, headers, client) are the component interfaces' http-transport.schema.json's (component-interfaces spec.md \u00a75.6).")
     private Map<String, Object> options;
+    /**
+     * When no loaded component provides its kind, hold it rather than fail the call, and start it the first time an interaction of its kind is verified if a component loaded by then provides it, such as a fetched pact's plugin bridge (spec.md §8.3, ADR 0111). Never started, it is no error.
+     * 
+     */
+    @JsonProperty("optional")
+    @JsonPropertyDescription("When no loaded component provides its kind, hold it rather than fail the call, and start it the first time an interaction of its kind is verified if a component loaded by then provides it, such as a fetched pact's plugin bridge (spec.md \u00a78.3, ADR 0111). Never started, it is no error.")
+    private Boolean optional;
     @JsonIgnore
     private Map<java.lang.String, java.lang.Object> additionalProperties = new LinkedHashMap<java.lang.String, java.lang.Object>();
 
@@ -85,6 +93,24 @@ public class TransportBinding {
         this.options = options;
     }
 
+    /**
+     * When no loaded component provides its kind, hold it rather than fail the call, and start it the first time an interaction of its kind is verified if a component loaded by then provides it, such as a fetched pact's plugin bridge (spec.md §8.3, ADR 0111). Never started, it is no error.
+     * 
+     */
+    @JsonProperty("optional")
+    public Boolean getOptional() {
+        return optional;
+    }
+
+    /**
+     * When no loaded component provides its kind, hold it rather than fail the call, and start it the first time an interaction of its kind is verified if a component loaded by then provides it, such as a fetched pact's plugin bridge (spec.md §8.3, ADR 0111). Never started, it is no error.
+     * 
+     */
+    @JsonProperty("optional")
+    public void setOptional(Boolean optional) {
+        this.optional = optional;
+    }
+
     @JsonAnyGetter
     public Map<java.lang.String, java.lang.Object> getAdditionalProperties() {
         return this.additionalProperties;
@@ -107,6 +133,10 @@ public class TransportBinding {
         sb.append('=');
         sb.append(((this.options == null)?"<null>":this.options));
         sb.append(',');
+        sb.append("optional");
+        sb.append('=');
+        sb.append(((this.optional == null)?"<null>":this.optional));
+        sb.append(',');
         sb.append("additionalProperties");
         sb.append('=');
         sb.append(((this.additionalProperties == null)?"<null>":this.additionalProperties));
@@ -123,6 +153,7 @@ public class TransportBinding {
     public int hashCode() {
         int result = 1;
         result = ((result* 31)+((this.options == null)? 0 :this.options.hashCode()));
+        result = ((result* 31)+((this.optional == null)? 0 :this.optional.hashCode()));
         result = ((result* 31)+((this.transport == null)? 0 :this.transport.hashCode()));
         result = ((result* 31)+((this.additionalProperties == null)? 0 :this.additionalProperties.hashCode()));
         return result;
@@ -137,7 +168,7 @@ public class TransportBinding {
             return false;
         }
         TransportBinding rhs = ((TransportBinding) other);
-        return ((((this.options == rhs.options)||((this.options!= null)&&this.options.equals(rhs.options)))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
+        return (((((this.options == rhs.options)||((this.options!= null)&&this.options.equals(rhs.options)))&&((this.optional == rhs.optional)||((this.optional!= null)&&this.optional.equals(rhs.optional))))&&((this.transport == rhs.transport)||((this.transport!= null)&&this.transport.equals(rhs.transport))))&&((this.additionalProperties == rhs.additionalProperties)||((this.additionalProperties!= null)&&this.additionalProperties.equals(rhs.additionalProperties))));
     }
 
 }

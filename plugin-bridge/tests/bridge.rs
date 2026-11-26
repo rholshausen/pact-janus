@@ -6,9 +6,10 @@
 //! and run on every operating system. The real plugins are held to the bridge's conformance cases
 //! (`conformance/`), which CI runs with `janus component check` against pinned binaries.
 //!
-//! One test needs a plugin that is a process of its own, to kill it: it uses the pinned CSV plugin in the
-//! directory `JANUS_PACT_PLUGINS` names (`.github/scripts/pact-plugins.sh` installs it), and skips without
-//! one unless `CI` is set.
+//! Two tests need a plugin that is a process of its own: one kills the pinned CSV plugin, and one drives
+//! the pinned protobuf plugin's gRPC transport against the area calculator (`examples/area_calculator.rs`,
+//! which `cargo test` builds). They use the plugins in the directory `JANUS_PACT_PLUGINS` names
+//! (`.github/scripts/pact-plugins.sh` installs it), and skip without one unless `CI` is set.
 
 use pretty_assertions::assert_eq;
 use serde_json::{Value, json};
@@ -194,8 +195,18 @@ fn the_handshake_is_the_plugins_catalogue_translated() {
     json!({
       "component-protocol-version": 1,
       "component": { "name": "pact-plugin-lines", "version": "0.1.0" },
-      "interfaces": ["matcher"],
-      "contributes": { "actions": [{ "name": "pact-plugin-lines:compare-contents" }] },
+      "interfaces": ["matcher", "transport"],
+      "contributes": {
+        "actions": [
+          { "name": "pact-plugin-lines:compare-contents" },
+          { "name": "pact-plugin-lines:verdict" }
+        ],
+        "transports": [{
+          "kind": "lines",
+          "roles": ["drive"],
+          "exchange-parts": { "initiating": "request", "answering": "response" }
+        }]
+      },
       "capabilities": {
         "pact-plugin": {
           "name": "lines",
@@ -209,7 +220,13 @@ fn the_handshake_is_the_plugins_catalogue_translated() {
               "action": "pact-plugin-lines:compare-contents",
               "values": { "content-types": "text/x-lines;application/x-lines\\+text" }
             },
-            { "type": "transport", "key": "lines", "values": {} }
+            {
+              "type": "transport",
+              "key": "lines",
+              "kind": "lines",
+              "action": "pact-plugin-lines:verdict",
+              "values": {}
+            }
           ]
         }
       }
@@ -471,4 +488,123 @@ fn a_plugin_that_cannot_be_reached_is_unavailable_and_the_bridge_leaves() {
     );
     std::thread::sleep(Duration::from_millis(20));
   }
+}
+
+/// The area calculator example, listening on a port of its own until it is dropped.
+struct AreaCalculator {
+  child: Child,
+  port: u16,
+}
+
+impl AreaCalculator {
+  fn start(answers: &str) -> AreaCalculator {
+    let bridge = Path::new(env!("CARGO_BIN_EXE_janus-plugin-bridge"));
+    let program = bridge
+      .parent()
+      .unwrap()
+      .join("examples")
+      .join(format!("area_calculator{}", std::env::consts::EXE_SUFFIX));
+    let mut child = Command::new(&program)
+      .args(["--answers", answers])
+      .stdin(Stdio::piped())
+      .stdout(Stdio::piped())
+      .spawn()
+      .unwrap_or_else(|err| panic!("{}: {err}", program.display()));
+    let mut line = String::new();
+    BufReader::new(child.stdout.take().unwrap())
+      .read_line(&mut line)
+      .unwrap();
+    let port = line
+      .trim()
+      .strip_prefix("listening on ")
+      .and_then(|port| port.parse().ok())
+      .unwrap_or_else(|| panic!("the area calculator said '{line}'"));
+    AreaCalculator { child, port }
+  }
+}
+
+impl Drop for AreaCalculator {
+  fn drop(&mut self) {
+    drop(self.child.stdin.take());
+    let _ = self.child.kill();
+    let _ = self.child.wait();
+  }
+}
+
+/// ADR 0111: a plugin's transport is a kind the bridge drives, and one send is the whole exchange. The
+/// plugin builds the request from the pact, calls the provider, and its verdict is the reply, which the
+/// bridge's `verdict` action reads.
+#[test]
+fn a_plugin_transport_is_one_send_whose_reply_is_the_plugins_verdict() {
+  let Some(plugins) = pinned_plugins() else {
+    return;
+  };
+  let pact_file = Path::new(env!("CARGO_MANIFEST_DIR"))
+    .join("tests/fixtures/pacts/grpc-consumer-go-area-calculator-provider.json");
+  let mut pact: Value = serde_json::from_slice(&std::fs::read(pact_file).unwrap()).unwrap();
+  pact["interactions"][0]["key"] = json!("area-1");
+
+  for (answers, ok) in [("areas", true), ("nothing", false)] {
+    let calculator = AreaCalculator::start(answers);
+    let mut bridge = Bridge::start_in(&plugins, &["protobuf", "0.8.1"]);
+    let hello = bridge.call("component/hello", json!({ "component-protocol-versions": [1] }));
+    assert_eq!(
+      hello["ok"]["contributes"]["transports"][0]["kind"], "grpc",
+      "{hello}"
+    );
+
+    let started = bridge.call(
+      "transport/start",
+      json!({ "instance": "t-1", "kind": "grpc", "role": "drive",
+              "options": { "base-url": format!("http://127.0.0.1:{}", calculator.port) } }),
+    );
+    assert_eq!(
+      started["ok"]["endpoint"],
+      json!({ "host": "127.0.0.1", "port": calculator.port }),
+      "{started}"
+    );
+    let sent = bridge.call(
+      "transport/send",
+      json!({ "instance": "t-1", "await-reply": true, "parts": { "request": {
+        "pact": { "content": pact }, "key": { "content": "area-1" }, "provider-state": { "content": {} }
+      } } }),
+    );
+    let verdict = &sent["ok"]["reply"]["response"]["verdict"]["content"];
+    assert_eq!(verdict["ok"], json!(ok), "{answers}: {sent}");
+
+    let read = bridge.call(
+      "matcher/apply",
+      json!({ "action": "pact-plugin-protobuf:verdict", "values": [{ "content": verdict }] }),
+    );
+    let result = &read["ok"]["results"][0];
+    if ok {
+      assert_eq!(result, &json!({ "status": "ok" }), "{read}");
+    } else {
+      assert_eq!(result["status"], "error", "{read}");
+      assert_eq!(
+        result["mismatches"][0],
+        json!({ "message": "Expected message 'AreaResponse' but was missing or empty", "at": "$" })
+      );
+    }
+    assert_eq!(
+      bridge.call("transport/stop", json!({ "instance": "t-1" }))["ok"],
+      json!({})
+    );
+  }
+
+  // It drives the plugin's transports, of the kinds the plugin has, and serves none yet (S5.2f).
+  let mut bridge = Bridge::start_in(&plugins, &["protobuf", "0.8.1"]);
+  bridge.call("component/hello", json!({ "component-protocol-versions": [1] }));
+  let serve = bridge.call(
+    "transport/start",
+    json!({ "instance": "t-1", "kind": "grpc", "role": "serve" }),
+  );
+  assert_eq!(serve["error"]["code"], "operation-unsupported", "{serve}");
+  let unknown = bridge.call(
+    "transport/start",
+    json!({ "instance": "t-2", "kind": "kafka", "role": "drive" }),
+  );
+  assert_eq!(unknown["error"]["code"], "invalid-config", "{unknown}");
+  let unstarted = bridge.call("transport/send", json!({ "instance": "t-3", "parts": {} }));
+  assert_eq!(unstarted["error"]["code"], "invalid-config", "{unstarted}");
 }

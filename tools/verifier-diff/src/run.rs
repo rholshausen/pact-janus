@@ -53,6 +53,7 @@ pub enum CaseProvider {
     callback: StateCallback,
   },
   OrderService,
+  AreaCalculator(crate::fixture::AreaAnswers),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -155,6 +156,7 @@ pub fn expand(id: &str, dir: &Path, fixture: &Fixture) -> Result<Vec<Case>, Stri
       callback: state_callback.clone(),
     },
     ProviderSpec::OrderService => CaseProvider::OrderService,
+    ProviderSpec::AreaCalculator { answers } => CaseProvider::AreaCalculator(*answers),
   };
 
   if let Some(spec) = &fixture.broker {
@@ -707,6 +709,7 @@ struct Started {
   _scripted: Option<ScriptedProvider>,
   _order_service: Option<pact_janus_sample_order_service::Provider>,
   _tls: Option<pact_janus_test_servers::TlsProvider>,
+  _area_calculator: Option<crate::provider::AreaCalculator>,
 }
 
 impl Started {
@@ -742,6 +745,7 @@ impl Started {
           _scripted: Some(provider),
           _order_service: None,
           _tls: None,
+          _area_calculator: None,
         })
       }
       CaseProvider::OrderService => {
@@ -763,6 +767,19 @@ impl Started {
           _scripted: None,
           _order_service: Some(provider),
           _tls: None,
+          _area_calculator: None,
+        })
+      }
+      CaseProvider::AreaCalculator(answers) => {
+        let provider = crate::provider::AreaCalculator::start(*answers)?;
+        Ok(Started {
+          base_url: provider.base_url(),
+          port: provider.port(),
+          state_url: None,
+          _scripted: None,
+          _order_service: None,
+          _tls: None,
+          _area_calculator: Some(provider),
         })
       }
     }

@@ -258,6 +258,25 @@ pub fn compile_message(message: &LegacyMessage, part: &str) -> model::Plan {
   }
 }
 
+/// Compile a v1–v4 interaction carried over a pact plugin's transport (ADR 0111 decision 3) to a plan
+/// rooted at `part`: one node, the bridge's verdict `action` applied to the reply's `slot`, which holds
+/// what the plugin found when it ran the exchange. Nothing else is compiled: the plugin compared the
+/// request, the reply and their bodies, and nothing is compared twice.
+pub fn compile_plugin_verdict(action: &str, part: &str, slot: &str) -> model::Plan {
+  let at = format!("$.{}", path::root(part, slot));
+  model::Plan {
+    grammar: model::GRAMMAR_VERSION,
+    root: Node::container(
+      Some(part.to_string()),
+      vec![Node::container(
+        Some(slot.to_string()),
+        vec![Node::action(action, vec![Node::resolve(at)])],
+      )],
+    ),
+    variant: None,
+  }
+}
+
 /// Compile a v1–v4 request to a plan.
 pub fn compile_request(req: &LegacyRequest) -> model::Plan {
   let mut slots = vec![

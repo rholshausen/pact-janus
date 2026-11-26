@@ -20,6 +20,10 @@ path = "src/main.rs"
 anyhow = "1"
 base64 = "0.22"
 bytes = "1"
+# Reads a drive instance's `base-url` (ADR 0111 decision 4); already in the driver's tree.
+http = "1"
+# The driver's request metadata is keyed to `itertools::Either` values.
+itertools = "0.15"
 # The driver today's verifier and pact_ffi load plugins with, so discovery, manifests, process start,
 # Lua plugins, interface versions 1 and 2 and installing from the index behave as they do there.
 pact-plugin-driver = "1.2.7"
@@ -36,5 +40,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "tracin
 
 [dev-dependencies]
 pretty_assertions = "1"
+# The area calculator example (examples/area_calculator.rs): a gRPC provider the plugin transport is
+# verified against (staged plan S5.2e). Only the example uses them.
+prost = "0.14"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tonic-prost = "0.14"
 rstest = "0.28"
 tempfile = "3"
