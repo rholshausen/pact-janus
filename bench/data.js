@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795652934570,
+  "lastUpdate": 1795652937295,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -68652,6 +68652,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 97.9,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "e73983842fd6488a1db7673bafec64545d8d904e",
+          "message": "test: the subprocess tests give a handshake room on a busy runner, and the bridge's Windows clippy is clean\n\n- engine/component-host/tests/subprocess.rs: the tests whose point is a call that never answers ran with\n  a 200-500 ms deadline, which every handshake, Node starting included, has to fit in too. On a macOS\n  runner busy with a cold build, the first handshake took longer than 300 ms and the load failed. They\n  now use a 2 s deadline (the poll test waits longer than it), and still assert a hang ends well before\n  5 s.\n- plugin-bridge/tests/bridge.rs: pinned_plugins is used only by the Unix test that kills a plugin\n  process, so it is Unix-only too; on Windows it was dead code, which clippy -D warnings refuses.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-26T11:21:39+11:00",
+          "tree_id": "0b1835be5557a4339c2c003f52603652c25fcf84",
+          "url": "https://github.com/rholshausen/pact-janus/commit/e73983842fd6488a1db7673bafec64545d8d904e"
+        },
+        "date": 1795652936659,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 54668,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 54730,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 57.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 45.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 152.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 119.3,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
