@@ -406,20 +406,36 @@ fn version_and_help_are_for_a_person() {
   );
 }
 
-/// The pinned plugins' directory, or `None` when this machine has none and is not CI. Only the Unix test
-/// that kills a plugin process needs one.
+/// A plugin directory of the test's own, linking each pinned plugin in the directory `JANUS_PACT_PLUGINS`
+/// names, or `None` when this machine has none and is not CI. Only the Unix tests that need a plugin
+/// process of its own use one.
+///
+/// The pinned directory is never written to: `Bridge::start_in` writes its fixtures into the directory it
+/// is given, and the driver parses every manifest in a plugin directory, so a test rewriting one while
+/// another test's bridge reads it fails that bridge (an empty manifest sends the driver to the plugin
+/// index). A fixture's name is not linked, so it is written here rather than through the link.
 #[cfg(unix)]
-fn pinned_plugins() -> Option<std::path::PathBuf> {
-  match std::env::var_os("JANUS_PACT_PLUGINS") {
-    Some(dir) => Some(dir.into()),
+fn pinned_plugins() -> Option<tempfile::TempDir> {
+  let pinned: std::path::PathBuf = match std::env::var_os("JANUS_PACT_PLUGINS") {
+    Some(dir) => dir.into(),
     None if std::env::var_os("CI").is_some() => {
       panic!("JANUS_PACT_PLUGINS names no plugin directory, and CI is set")
     }
     None => {
       eprintln!("skipped: JANUS_PACT_PLUGINS names no directory of the pinned plugins");
-      None
+      return None;
     }
+  };
+  let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/plugins");
+  let own = tempfile::tempdir().unwrap();
+  for entry in std::fs::read_dir(&pinned).unwrap() {
+    let name = entry.unwrap().file_name();
+    if name == "broken-0.1.0" || fixtures.join(&name).exists() {
+      continue;
+    }
+    std::os::unix::fs::symlink(pinned.join(&name), own.path().join(&name)).unwrap();
   }
+  Some(own)
 }
 
 /// ADR 0109 decision 6: a plugin the bridge cannot reach is the bridge failing, not the provider's body.
@@ -430,7 +446,7 @@ fn a_plugin_that_cannot_be_reached_is_unavailable_and_the_bridge_leaves() {
   let Some(plugins) = pinned_plugins() else {
     return;
   };
-  let mut bridge = Bridge::start_in(&plugins, &["csv", "0.1.0"]);
+  let mut bridge = Bridge::start_in(plugins.path(), &["csv", "0.1.0"]);
   let hello = bridge.call("component/hello", json!({ "component-protocol-versions": [1] }));
   assert!(hello.get("ok").is_some(), "{hello}");
   let argument = json!({
@@ -491,11 +507,13 @@ fn a_plugin_that_cannot_be_reached_is_unavailable_and_the_bridge_leaves() {
 }
 
 /// The area calculator example, listening on a port of its own until it is dropped.
+#[cfg(unix)]
 struct AreaCalculator {
   child: Child,
   port: u16,
 }
 
+#[cfg(unix)]
 impl AreaCalculator {
   fn start(answers: &str) -> AreaCalculator {
     let bridge = Path::new(env!("CARGO_BIN_EXE_janus-plugin-bridge"));
@@ -523,6 +541,7 @@ impl AreaCalculator {
   }
 }
 
+#[cfg(unix)]
 impl Drop for AreaCalculator {
   fn drop(&mut self) {
     drop(self.child.stdin.take());
@@ -547,7 +566,7 @@ fn a_plugin_transport_is_one_send_whose_reply_is_the_plugins_verdict() {
 
   for (answers, ok) in [("areas", true), ("nothing", false)] {
     let calculator = AreaCalculator::start(answers);
-    let mut bridge = Bridge::start_in(&plugins, &["protobuf", "0.8.1"]);
+    let mut bridge = Bridge::start_in(plugins.path(), &["protobuf", "0.8.1"]);
     let hello = bridge.call("component/hello", json!({ "component-protocol-versions": [1] }));
     assert_eq!(
       hello["ok"]["contributes"]["transports"][0]["kind"], "grpc",
@@ -594,7 +613,7 @@ fn a_plugin_transport_is_one_send_whose_reply_is_the_plugins_verdict() {
   }
 
   // It drives the plugin's transports, of the kinds the plugin has, and serves none yet (S5.2f).
-  let mut bridge = Bridge::start_in(&plugins, &["protobuf", "0.8.1"]);
+  let mut bridge = Bridge::start_in(plugins.path(), &["protobuf", "0.8.1"]);
   bridge.call("component/hello", json!({ "component-protocol-versions": [1] }));
   let serve = bridge.call(
     "transport/start",
