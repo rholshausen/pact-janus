@@ -389,7 +389,9 @@ fn version_and_help_are_for_a_person() {
   );
 }
 
-/// The pinned plugins' directory, or `None` when this machine has none and is not CI.
+/// The pinned plugins' directory, or `None` when this machine has none and is not CI. Only the Unix test
+/// that kills a plugin process needs one.
+#[cfg(unix)]
 fn pinned_plugins() -> Option<std::path::PathBuf> {
   match std::env::var_os("JANUS_PACT_PLUGINS") {
     Some(dir) => Some(dir.into()),

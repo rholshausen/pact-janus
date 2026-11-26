@@ -24,6 +24,11 @@ fn fixtures() -> PathBuf {
 }
 
 /// The misbehaving component, declared as a project would: Node, its script relative to its directory.
+/// A deadline for the tests whose point is a call that never answers. Every handshake has to fit in it
+/// too, Node starting included, and a CI runner busy with a cold build has taken more than 300 ms to
+/// start one. The tests that time a hang assert only that it ends well before they would.
+const HANG_DEADLINE_MS: u64 = 2_000;
+
 fn misbehaving(node: &PathBuf, deadline_ms: u64, extra: &[&str]) -> ComponentDeclaration {
   let mut args = vec!["misbehaving.mjs".to_string()];
   args.extend(extra.iter().map(|arg| arg.to_string()));
@@ -94,7 +99,7 @@ fn a_component_written_in_javascript_passes_the_csv_components_own_cases() {
 #[test]
 fn a_call_that_never_answers_is_a_timeout_and_the_next_call_gets_a_new_process() {
   let Some(node) = node() else { return };
-  let loaded = load(&misbehaving(&node, 300, &[]));
+  let loaded = load(&misbehaving(&node, HANG_DEADLINE_MS, &[]));
   let content = loaded.content.expect("content");
   let first = pid(content.as_ref());
 
@@ -121,7 +126,7 @@ fn a_call_that_never_answers_is_a_timeout_and_the_next_call_gets_a_new_process()
 #[test]
 fn a_busy_loop_is_bounded_the_same_way() {
   let Some(node) = node() else { return };
-  let loaded = load(&misbehaving(&node, 300, &[]));
+  let loaded = load(&misbehaving(&node, HANG_DEADLINE_MS, &[]));
   let content = loaded.content.expect("content");
   let spun = decode(content.as_ref(), "x/spin").expect_err("it never answers");
   assert_eq!(spun.code, "component-timeout");
@@ -243,7 +248,7 @@ fn the_process_starts_in_its_cwd() {
 #[test]
 fn one_hung_call_takes_every_instance_in_the_process_and_says_which() {
   let Some(node) = node() else { return };
-  let loaded = load(&misbehaving(&node, 500, &[]));
+  let loaded = load(&misbehaving(&node, HANG_DEADLINE_MS, &[]));
   let transport = loaded.transport.expect("a transport");
   let start = |instance: &str| {
     let started = transport
@@ -300,7 +305,7 @@ fn one_hung_call_takes_every_instance_in_the_process_and_says_which() {
 #[test]
 fn a_poll_that_waits_longer_than_the_deadline_is_not_a_timeout() {
   let Some(node) = node() else { return };
-  let loaded = load(&misbehaving(&node, 200, &[]));
+  let loaded = load(&misbehaving(&node, HANG_DEADLINE_MS, &[]));
   let transport = loaded.transport.expect("a transport");
   transport
     .start(Start {
@@ -313,9 +318,9 @@ fn a_poll_that_waits_longer_than_the_deadline_is_not_a_timeout() {
   let polled = transport
     .poll_inbound(PollInbound {
       instance: "t-1".to_string(),
-      timeout_ms: 400,
+      timeout_ms: HANG_DEADLINE_MS + 500,
     })
-    .expect("a poll that waited its 400 ms");
+    .expect("a poll that waited longer than the deadline");
   assert_eq!(polled.inbound, None);
 }
 
