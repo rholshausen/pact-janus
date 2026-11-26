@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795673715177,
+  "lastUpdate": 1795673717787,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -69720,6 +69720,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 135.5,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "d78ced8447dd8c34e68c18c89595a6713bfb24cc",
+          "message": "feat: S5.2e, an interaction carried over a pact plugin's transport is verified through janus-plugin-bridge (ADR 0111)\n\njanus-plugin-bridge contributes a plugin's transport (the protobuf plugin's grpc) as a kind it drives,\nand one transport/send is the whole exchange: the plugin prepares the request from the pact it is sent\n(pact, key, provider-state), calls the provider and compares the answer, as pact_verifier's\nverify_interaction_using_transport has it do, and the reply is its verdict. The legacy compiler compiles\nsuch an interaction to one node, the bridge's <component>:verdict on $.response.verdict, so nothing is\ncompared twice; each plugin mismatch is reported with its path as `at`.\n\nA target.transports binding may be optional: held when no component provides its kind, and started the\nfirst time an interaction of its kind is verified if a component loaded by then does (a broker pact's\nbridge). A plugin transport with no binding is started with the provider's options, as today's verifier\nreaches it at the provider's host and port. janus verify binds --transports entries but http, and a\n--transport other than http or https, optionally.\n\nplugin-bridge/examples/area_calculator.rs is pact-plugins' gRPC area calculator (MIT), its messages and\nservice written as prost and tonic generate them. corpora/verifier/plugins/grpc-area-calculator* verify\nthe example's Go consumer pact against it: all six verdicts agree with pact_verifier_cli 1.5.0. A request\nfilter and a plugin's output lines on a plugin transport are the new S5.2i.\n\nProvenance: the transport flow follows pact_verifier 1.5.0's verify_interaction_using_transport and\npact-plugin-driver 1.2.7's prepare_validation_for_interaction and verify_interaction; the area\ncalculator follows pact-plugins' examples/gRPC/area_calculator proto and providers.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-26T17:00:33+11:00",
+          "tree_id": "a113d4c90b8de9fdb58c5360f50cd91634a4390c",
+          "url": "https://github.com/rholshausen/pact-janus/commit/d78ced8447dd8c34e68c18c89595a6713bfb24cc"
+        },
+        "date": 1795673717220,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 71468,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 55277,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 56.9,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 45,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 154.3,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 119.4,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
