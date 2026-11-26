@@ -535,6 +535,7 @@ impl Drop for AreaCalculator {
 /// plugin builds the request from the pact, calls the provider, and its verdict is the reply, which the
 /// bridge's `verdict` action reads.
 #[test]
+#[cfg(unix)]
 fn a_plugin_transport_is_one_send_whose_reply_is_the_plugins_verdict() {
   let Some(plugins) = pinned_plugins() else {
     return;
