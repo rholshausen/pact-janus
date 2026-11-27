@@ -1,0 +1,64 @@
+{
+  "name": "pact-plugin-creditcard/handshake",
+  "component": "pact-plugin-creditcard",
+  "calls": [
+    {
+      "op": "component/hello",
+      "body": {
+        "component-protocol-versions": [
+          1
+        ]
+      },
+      "expect": {
+        "ok": {
+          "component-protocol-version": 1,
+          "component": {
+            "name": "pact-plugin-creditcard",
+            "version": "0.0.0"
+          },
+          "interfaces": [
+            "matcher"
+          ],
+          "contributes": {
+            "actions": [
+              {
+                "name": "pact-plugin-creditcard:match-field"
+              },
+              {
+                "name": "pact-plugin-creditcard:generate-field"
+              }
+            ]
+          },
+          "capabilities": {
+            "pact-plugin": {
+              "name": "creditcard",
+              "version": "0.0.0",
+              "interface-version": 2,
+              "bridge": {
+                "name": "janus-plugin-bridge"
+              },
+              "catalogue": [
+                {
+                  "type": "generator",
+                  "key": "creditcard",
+                  "action": "pact-plugin-creditcard:generate-field",
+                  "values": {
+                    "config-key": "brand"
+                  }
+                },
+                {
+                  "type": "matcher",
+                  "key": "creditcard",
+                  "action": "pact-plugin-creditcard:match-field",
+                  "values": {
+                    "config-key": "brand"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

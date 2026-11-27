@@ -3156,6 +3156,32 @@ The component model, opened to the ecosystem.
     only a matcher (pact-plugins' `creditcard`), and `MatchField` and `GenerateField`, which a plugin of
     interface version 2 answers.
     *Exit:* the credit-card example verifies through the bridge, agreeing with today's verifier.
+    *Done 2026-11-27* ([ADR 0113](decisions/0113-a-plugins-field-level-rule-and-generator-are-its-bridges-match-field-and-generate-field-on-one-value.md)):
+    - A plugin of interface version 2's `matcher` entry is the bridge's `<component>:match-field`, and its
+      `generator` entry `<component>:generate-field`, each named as the entry's `action`, each one value
+      through the plugin's `MatchField` or `GenerateField` with the request pact-plugin-driver's
+      `FieldMatcher` and `FieldGenerator` build for today's verifier. A version 1 plugin's `matcher` stays
+      described and not contributed. A rule is named by its key or a longer form of the catalogue key.
+    - The legacy layer resolves each `MatchingRule::Plugin` one of the interaction's bridges provides to that
+      action, in its own copy of the interaction, the rule's name and values, its `mismatch-type` and its
+      slot's `root` becoming the argument; the compiler compiles it to the action on the value at its path,
+      on a scalar, object or array, cascaded or not, as `pact_matching` applies one. The bridge hands the
+      plugin the value's path as a pact writes it, worked out from the absolute path every application
+      carries. A body a content matcher compares keeps its rules for that plugin.
+    - A request generator `pact_models` reads as `Generator::Plugin` is filled through the bridge's
+      `generate-field` where the other request generators are (ADR 0034), the provider-state values as its
+      test context; one that fails sends the recorded value and is reported.
+    - ADR 0110 decision 5's `rules` refusal now names the rules and generators no bridge provides, and the
+      rest of a plugin interaction is verified.
+    - `plugin-bridge/pact-plugins.json` pins the `creditcard` plugin, which has no release, by its Lua files'
+      digests at the pact-plugins commit that last changed it; `pact-plugins.sh` installs a plugin pinned by
+      `files` on every platform. Its conformance cases (`plugin-bridge/conformance/creditcard/`) run in CI's
+      `rust` job. `corpora/verifier/plugins/creditcard-*` are the example's pact passing, failing the Luhn
+      check and failing the brand, and a request generator the provider recognises only when fresh: all 8
+      verdicts agree with `pact_verifier_cli` 1.5.0. `engine/kernel/tests/plugin_fields.rs` drives a stub
+      bridge.
+    - Not done, on purpose: a content plugin that delegates a field to a field-level plugin through a
+      host callback (proposal 007) is not bridged, since the bridge answers no callback.
   - **S5.2h Releasing the bridge** — **S**. Its files, for the five target triples, built and attested as
     the engine's are, and how `janus` finds an installed one, and how each SDK's verifier does, setting
     `options.plugin-bridge` as `janus verify` sets it (ADR 0110 decision 6). An ADR on whether they are assets of the
@@ -3607,7 +3633,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user (done: ADR 0101) | findings 12–14 |
 | S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099); generally available, with a guide (done: S5.1d, ADR 0104) | findings 15–17 |
-| S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 (the subprocess loader done: S5.2b, ADR 0108; the bridge and its handshake done: S5.2c, ADR 0109; a v1–v4 pact's plugin content verified: S5.2d, ADR 0110; plugin transports verified: S5.2e, ADR 0111, whose request filters and output are S5.2i; the bridge released with the engine and declared by both SDKs' verifiers: S5.2h, ADR 0112) | S1.8 |
+| S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 (the subprocess loader done: S5.2b, ADR 0108; the bridge and its handshake done: S5.2c, ADR 0109; a v1–v4 pact's plugin content verified: S5.2d, ADR 0110; plugin transports verified: S5.2e, ADR 0111, whose request filters and output are S5.2i; the bridge released with the engine and declared by both SDKs' verifiers: S5.2h, ADR 0112; field-level rules and generators: S5.2g, ADR 0113) | S1.8 |
 | S5.5 | Out-of-process containment and command form (moved to S5.2b by ADR 0106; done: ADR 0108); the subprocess binding has no author guide and is not generally available | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components (done: ADR 0103) | ADR 0040 decision 3 |
 | S5.8 | A component's substitutions do not reach content embedded in a slot | ADR 0103 |

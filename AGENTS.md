@@ -375,6 +375,13 @@ Three sources are the source of truth and take precedence over this file when th
 > release's own `janus` and bridge, side by side and with no Rust, before publishing. Both SDKs' verifiers
 > declare a bridge as `janus verify` does, from `pluginBridge` / `withPluginBridge` or else
 > `JANUS_PLUGIN_BRIDGE`.
+> S5.2g (ADR 0113): an interface version 2 plugin's field-level `matcher` and `generator` (pact-plugins'
+> `creditcard`) are the bridge's `<component>:match-field` and `<component>:generate-field`, one value each
+> through `MatchField` and `GenerateField`. The legacy layer resolves a `MatchingRule::Plugin` a bridge
+> provides to that action, its argument the rule's name, values, `mismatch-type` and slot `root`, and fills
+> a `Generator::Plugin` request value through `generate-field`; one no bridge provides is refused by name.
+> The plugin, which has no release, is pinned by its Lua files' digests (`plugin-bridge/pact-plugins.json`),
+> and `corpora/verifier/plugins/creditcard-*` agree with today's verifier.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -641,7 +648,7 @@ Its conformance cases need the pinned plugins and a built `janus`, as CI's `rust
 not needed; `jq` and `curl` are):
 
 ```bash
-.github/scripts/pact-plugins.sh <dir>                    # the pinned csv and protobuf plugins, digests checked
+.github/scripts/pact-plugins.sh <dir>                    # the pinned csv, protobuf and creditcard plugins, digests checked
 cp -r plugin-bridge/tests/fixtures/plugins/lines-0.1.0 <dir>/
 (cd plugin-bridge && cargo build)
 JANUS_PLUGIN_BRIDGE=$PWD/plugin-bridge/target/debug/janus-plugin-bridge PACT_PLUGIN_DIR=<dir> PACT_DO_NOT_TRACK=true \

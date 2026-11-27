@@ -10,6 +10,9 @@
 //!   generator ([`crate::generate`]). A plugin the call cannot reach is `unavailable`, and the bridge leaves
 //!   once it has answered, so the engine's next call starts a new bridge and a new plugin (ADR 0108
 //!   decision 3: out of process, the process is what is recreated).
+//! - `matcher/apply` of `<component>:match-field` applies an interface version 2 plugin's field-level
+//!   matching rule to one value, and of `<component>:generate-field` asks its field-level generator for one
+//!   ([`crate::field`], ADR 0113).
 //! - `transport/start`, `transport/send` and `transport/stop` drive the plugin's transport (ADR 0111): one
 //!   send is the whole exchange, the plugin preparing the request and verifying the interaction, and the
 //!   reply is its verdict, which `matcher/apply` of `<component>:verdict` reads ([`crate::transport`]).
@@ -19,6 +22,7 @@
 use crate::catalogue::{self, Entry, Plugin};
 use crate::compare::{self, Arguments};
 use crate::error::ComponentError;
+use crate::field;
 use crate::generate;
 use crate::transport::{self, Endpoint, Exchange};
 use itertools::Either;
@@ -334,6 +338,10 @@ impl Bridge {
         .collect::<Result<Vec<_>, _>>()?;
       return Ok(json!({ "results": results }));
     }
+    // A field-level rule or generator, one value at a time (ADR 0113).
+    if plugin.field_level() && (action == plugin.match_field() || action == plugin.generate_field()) {
+      return self.apply_field(loaded, action, body);
+    }
     // Which catalogue entries the action is served by: a content matcher's or a content generator's.
     let (kind, served) = if action == plugin.compare_contents() {
       ("content-matcher", "content matcher")
@@ -426,6 +434,87 @@ impl Bridge {
         )) {
           Err(err) if compare::unreachable(&err) => return Err(self.lost(plugin, err)),
           answer => generate::result(answer),
+        }
+      };
+      results.push(result);
+    }
+    Ok(json!({ "results": results }))
+  }
+
+  /// `match-field` or `generate-field` (ADR 0113): each value through the plugin's `MatchField` or
+  /// `GenerateField`, its catalogue entry the one the rule or generator names.
+  fn apply_field(&self, loaded: &Loaded, action: &str, body: &Value) -> Result<Value, ComponentError> {
+    let plugin = &loaded.plugin;
+    let matching = action == plugin.match_field();
+    let (kind, entry_type) = if matching {
+      ("matcher", CatalogueEntryType::MATCHER)
+    } else {
+      ("generator", CatalogueEntryType::GENERATOR)
+    };
+    let values = body
+      .get("values")
+      .and_then(Value::as_array)
+      .ok_or_else(|| ComponentError::invalid_config("matcher/apply has no 'values'"))?;
+    let config = body.get("config");
+    let keys = loaded
+      .entries
+      .iter()
+      .filter(|entry| entry.entry_type == entry_type)
+      .map(|entry| entry.key.as_str());
+    let (name, arguments) = if matching {
+      let arguments = field::MatchArguments::read(config)?;
+      (arguments.rule.clone(), Either::Left(arguments))
+    } else {
+      let arguments = field::GenerateArguments::read(config)?;
+      (arguments.generator.clone(), Either::Right(arguments))
+    };
+    let Some(key) = field::entry_key(plugin, kind, keys, &name) else {
+      // As today's verifier reports a rule no catalogue entry names: the value's failure, in its words.
+      let message = format!(
+        "Could not apply the '{name}' {} - the pact plugin '{}' registers no {kind} '{name}'",
+        if matching { "matching rule" } else { "generator" },
+        plugin.name
+      );
+      let result = json!({ "status": "error", "message": message });
+      return Ok(json!({ "results": vec![result; values.len()] }));
+    };
+    tracing::debug!(%key, %action, "applying");
+    let dependency = PluginDependency {
+      name: plugin.name.clone(),
+      version: Some(plugin.version.clone()),
+      dependency_type: Default::default(),
+    };
+    let Some(instance) = plugin_manager::lookup_plugin(&dependency) else {
+      return Err(self.lost(
+        plugin,
+        anyhow::anyhow!("the plugin driver no longer has it registered"),
+      ));
+    };
+    let mut results = Vec::with_capacity(values.len());
+    for value in values {
+      let result = match &arguments {
+        Either::Left(arguments) => {
+          let request = arguments.request(key, value)?;
+          let path = request.path.clone();
+          match self.runtime.block_on(instance.match_field_with_chain(
+            request,
+            &call_chain::new_call_chain_id(),
+            call_chain::default_deadline_ms(),
+          )) {
+            Err(err) if compare::unreachable(&err) => return Err(self.lost(plugin, err)),
+            answer => field::match_result(&path, answer),
+          }
+        }
+        Either::Right(arguments) => {
+          let request = arguments.request(key, value)?;
+          match self.runtime.block_on(instance.generate_field_with_chain(
+            request,
+            &call_chain::new_call_chain_id(),
+            call_chain::default_deadline_ms(),
+          )) {
+            Err(err) if compare::unreachable(&err) => return Err(self.lost(plugin, err)),
+            answer => field::generate_result(&name, answer),
+          }
         }
       };
       results.push(result);

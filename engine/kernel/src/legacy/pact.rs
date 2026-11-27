@@ -112,6 +112,9 @@ pub struct LegacyInteraction {
   /// Its request body's generators, when a pact plugin's content generator applies them (ADR 0110
   /// decision 7): set by [`super::plugins::bridged`].
   pub request_generator: Option<PluginGenerate>,
+  /// Each request generator a plugin provides at the field level, by name, and the bridge action that
+  /// applies it (ADR 0113 decision 3): set by [`super::plugins::bridged`].
+  pub field_generators: BTreeMap<String, String>,
 }
 
 /// A v4 interaction that needs a pact-plugins plugin (protobuf, gRPC, Avro, CSV…). It is verified
@@ -137,7 +140,7 @@ pub struct PluginInteraction {
   /// the interaction's key there, which a plugin's transport builds and verifies the exchange from (ADR
   /// 0111 decision 2).
   pub transport_pact: Option<Box<(Value, String)>>,
-  /// Whether one of its rules is a plugin's: a matcher-only plugin's (staged plan S5.2g).
+  /// Whether one of its matching rules or request generators is a plugin's, a field-level one (ADR 0113).
   pub plugin_rules: bool,
 }
 
@@ -311,6 +314,7 @@ fn plain_interaction(
       response: http.response,
       plugin_body: None,
       request_generator: None,
+      field_generators: BTreeMap::new(),
     })));
   }
   message_interaction(interaction).map(|message| PactInteraction::Message(Box::new(message)))
@@ -382,7 +386,8 @@ pub fn http_interactions(pact: &dyn Pact) -> Vec<LegacyInteraction> {
 /// `pluginConfiguration`, which is how a gRPC, protobuf, Avro or CSV interaction says so. A plugin
 /// that contributes only a matcher or a generator (the `creditcard` example) leaves no configuration
 /// there: the pact names it in its metadata's `plugins`, and the interaction carries a rule
-/// `pact_models` does not know, which it reads as `MatchingRule::Plugin`. Which of the pact's
+/// `pact_models` does not know, which it reads as `MatchingRule::Plugin` (or a request generator, a
+/// `Generator::Plugin`). Which of the pact's
 /// plugins provides that rule the pact does not say, so such an interaction needs every one it
 /// names, as today's verifier loads every one before it verifies anything. A rule nobody names a
 /// plugin for is not a plugin's: it compiles to an error node, as an unknown rule always has.
@@ -402,12 +407,15 @@ fn plugins_needed(
   plugins
 }
 
-/// Whether one of an interaction's rules is a plugin's: one `pact_models` reads as `MatchingRule::Plugin`.
+/// Whether one of an interaction's rules is a plugin's, one `pact_models` reads as `MatchingRule::Plugin`,
+/// or one of its request generators is, a `Generator::Plugin` (ADR 0113).
 fn has_plugin_rules(
   interaction: &(dyn pact_models::interaction::Interaction + Send + Sync + RefUnwindSafe),
 ) -> bool {
   interaction.as_v4_http().is_some_and(|http| {
-    has_plugin_rule(&http.request.matching_rules) || has_plugin_rule(&http.response.matching_rules)
+    has_plugin_rule(&http.request.matching_rules)
+      || has_plugin_rule(&http.response.matching_rules)
+      || has_plugin_generator(&http.request)
   }) || interaction
     .as_v4_async_message()
     .is_some_and(|message| has_plugin_rule(&message.contents.matching_rules))
@@ -418,6 +426,17 @@ fn has_plugin_rules(
           .iter()
           .any(|response| has_plugin_rule(&response.matching_rules))
     })
+}
+
+/// Whether one of a request's generators is a plugin's: one `pact_models` reads as `Generator::Plugin`,
+/// which a provider-side run applies (ADR 0113 decision 3).
+fn has_plugin_generator(request: &HttpRequest) -> bool {
+  request
+    .generators
+    .categories
+    .values()
+    .flat_map(|generators| generators.values())
+    .any(|generator| matches!(generator, Generator::Plugin { .. }))
 }
 
 fn has_plugin_rule(rules: &MatchingRules) -> bool {
@@ -1084,6 +1103,9 @@ pub struct RequestTemplate {
   request: HttpRequest,
   /// Its body's generators are a pact plugin's to apply, through this action (ADR 0110 decision 7).
   plugin: Option<PluginGenerate>,
+  /// The generators a plugin provides at the field level, by name, and the action each is applied
+  /// through (ADR 0113 decision 3).
+  fields: BTreeMap<String, String>,
 }
 
 /// A request body a pact plugin's content generator fills (ADR 0110 decision 7): the action its bridge
@@ -1101,12 +1123,22 @@ impl RequestTemplate {
     has_request_generators(request).then(|| RequestTemplate {
       request: request.clone(),
       plugin: None,
+      fields: BTreeMap::new(),
     })
   }
 
-  /// This template, its body's generators applied through `plugin` when one is given.
-  pub fn with_plugin(self, plugin: Option<PluginGenerate>) -> RequestTemplate {
-    RequestTemplate { plugin, ..self }
+  /// This template, its body's generators applied through `plugin` when one is given, and each
+  /// field-level generator a plugin provides through its action in `fields`.
+  pub fn with_plugin(
+    self,
+    plugin: Option<PluginGenerate>,
+    fields: BTreeMap<String, String>,
+  ) -> RequestTemplate {
+    RequestTemplate {
+      plugin,
+      fields,
+      ..self
+    }
   }
 
   /// The request with its generators applied, as the parts a transport sends, and every generator
@@ -1117,8 +1149,12 @@ impl RequestTemplate {
     generators: &dyn GeneratorComponent,
     actions: Option<&dyn ActionApplier>,
   ) -> (Parts, Vec<GeneratorFailure>) {
-    let plugin = self.plugin.as_ref().map(|plugin| (plugin, actions));
-    let (generated, failures) = generate_request(&self.request, provider_state, generators, plugin);
+    let plugins = PluginGenerators {
+      content: self.plugin.as_ref(),
+      fields: &self.fields,
+      actions,
+    };
+    let (generated, failures) = generate_request(&self.request, provider_state, generators, &plugins);
     (request_parts(&generated), failures)
   }
 }
@@ -1159,15 +1195,22 @@ fn generate_request(
   request: &HttpRequest,
   provider_state: &Map<String, Value>,
   generators: &dyn GeneratorComponent,
-  plugin: Option<(&PluginGenerate, Option<&dyn ActionApplier>)>,
+  plugins: &PluginGenerators<'_>,
 ) -> (HttpRequest, Vec<GeneratorFailure>) {
   let mut request = request.clone();
   let mut failures = Vec::new();
   let state = Value::Object(provider_state.clone());
-  let ask = |generator: &Generator, example: Value| generate_one(generators, generator, example, &state);
+  // A generator a plugin provides at the field level goes to its bridge (ADR 0113 decision 3), handed
+  // the path a pact writes for the value; every other one to the generator component.
+  let ask = |generator: &Generator, example: Value, path: &str| match generator {
+    Generator::Plugin { name, values } if plugins.fields.contains_key(name) => {
+      generate_field(plugins, name, values, example, path, &state)
+    }
+    _ => generate_one(generators, generator, example, &state),
+  };
 
   for (_, generator) in provider_side(&request, &GeneratorCategory::PATH) {
-    match ask(&generator, Value::String(request.path.clone())) {
+    match ask(&generator, Value::String(request.path.clone()), "") {
       Ok(value) => request.path = text_of(&value),
       Err(err) => failures.push(failure("$.request.path", &generator, err)),
     }
@@ -1184,7 +1227,7 @@ fn generate_request(
       .and_then(|k| headers.get(k))
       .and_then(|values| values.first().cloned())
       .unwrap_or_default();
-    match ask(&generator, Value::String(example)) {
+    match ask(&generator, Value::String(example), &key.to_string()) {
       Ok(value) => {
         headers.insert(
           existing.unwrap_or_else(|| name.to_string()),
@@ -1205,7 +1248,11 @@ fn generate_request(
       .unwrap_or_else(|| vec![Some(String::new())]);
     let mut generated = Vec::with_capacity(values.len());
     for value in values {
-      match ask(&generator, Value::String(value.clone().unwrap_or_default())) {
+      match ask(
+        &generator,
+        Value::String(value.clone().unwrap_or_default()),
+        &key.to_string(),
+      ) {
         Ok(new) => generated.push(Some(text_of(&new))),
         Err(err) => {
           failures.push(failure(&target, &generator, err));
@@ -1217,12 +1264,12 @@ fn generate_request(
   }
 
   // ADR 0110 decision 7: a plugin's content generator fills the whole body, as today's verifier has it.
-  if let Some((plugin, actions)) = plugin
+  if let Some(plugin) = plugins.content
     && let OptionalBody::Present(bytes, content_type, encoding) = &request.body
   {
     let mut argument = plugin.argument.clone();
     argument["test-context"] = state.clone();
-    let applied = actions.and_then(|actions| {
+    let applied = plugins.actions.and_then(|actions| {
       actions.apply(
         &plugin.action,
         &[
@@ -1269,6 +1316,7 @@ fn generate_request(
         let asking = Asking {
           ask: &ask,
           generator,
+          path: key.to_string(),
           failures: RefCell::new(Vec::new()),
         };
         apply_key(key, &asking);
@@ -1351,6 +1399,57 @@ fn provider_side(request: &HttpRequest, category: &GeneratorCategory) -> Vec<(Do
   generators
 }
 
+/// What a pact plugin's bridge applies to a request (ADR 0110 decision 7, ADR 0113 decision 3): a
+/// content generator for its whole body, the field-level generators by name, and the run's actions,
+/// which reach the bridges.
+struct PluginGenerators<'a> {
+  content: Option<&'a PluginGenerate>,
+  fields: &'a BTreeMap<String, String>,
+  actions: Option<&'a dyn ActionApplier>,
+}
+
+/// Ask a plugin's field-level generator for one value through its bridge's `generate-field` action
+/// (ADR 0113 decision 3): the example is the value under test, and the argument names the generator as
+/// the pact records it, the path a pact writes for the value, and the provider-state values as the test
+/// context, as today's verifier hands them to the plugin.
+fn generate_field(
+  plugins: &PluginGenerators<'_>,
+  name: &str,
+  values: &Value,
+  example: Value,
+  path: &str,
+  provider_state: &Value,
+) -> Result<Value, ComponentError> {
+  let action = &plugins.fields[name];
+  let argument = json!({
+    "generator": { "type": name, "values": values },
+    "path": path,
+    "test-context": provider_state,
+  });
+  let applied = plugins.actions.and_then(|actions| {
+    actions.apply(
+      action,
+      &[
+        RuntimeValue::from_json(&example),
+        RuntimeValue::from_json(&argument),
+      ],
+      None,
+    )
+  });
+  match applied {
+    Some(NodeResult::Value(value)) => Ok(value.to_json()),
+    Some(NodeResult::Error { message, .. }) => Err(ComponentError::generate_failed(action, message)),
+    Some(_) => Err(ComponentError::generate_failed(
+      action,
+      format!("'{action}' answered with no value"),
+    )),
+    None => Err(ComponentError::generate_failed(
+      action,
+      format!("no component in this run contributes '{action}'"),
+    )),
+  }
+}
+
 /// Ask the generator component for one value (component-interfaces spec §7.3).
 fn generate_one(
   generators: &dyn GeneratorComponent,
@@ -1375,21 +1474,25 @@ fn generate_one(
 /// The generator component, in the form `pact_models`' body handler asks for a value: it resolves
 /// the generator's path to every value it names, and this answers for each of them, keeping what
 /// went wrong, which the handler would otherwise drop.
-struct Asking<'a, F: Fn(&Generator, Value) -> Result<Value, ComponentError>> {
+struct Asking<'a, F: Fn(&Generator, Value, &str) -> Result<Value, ComponentError>> {
   ask: &'a F,
   generator: &'a Generator,
+  /// The generator's path as the pact writes it.
+  path: String,
   failures: RefCell<Vec<ComponentError>>,
 }
 
 /// A form value is text, so it is asked for as a string and the answer taken as text.
-impl<F: Fn(&Generator, Value) -> Result<Value, ComponentError>> GenerateValue<String> for Asking<'_, F> {
+impl<F: Fn(&Generator, Value, &str) -> Result<Value, ComponentError>> GenerateValue<String>
+  for Asking<'_, F>
+{
   fn generate_value(
     &self,
     value: &String,
     _context: &HashMap<&str, Value>,
     _matcher: &Box<dyn VariantMatcher + Send + Sync>,
   ) -> anyhow::Result<String> {
-    (self.ask)(self.generator, Value::String(value.clone()))
+    (self.ask)(self.generator, Value::String(value.clone()), &self.path)
       .map(|value| text_of(&value))
       .map_err(|err| {
         let message = err.message.clone();
@@ -1399,14 +1502,14 @@ impl<F: Fn(&Generator, Value) -> Result<Value, ComponentError>> GenerateValue<St
   }
 }
 
-impl<F: Fn(&Generator, Value) -> Result<Value, ComponentError>> GenerateValue<Value> for Asking<'_, F> {
+impl<F: Fn(&Generator, Value, &str) -> Result<Value, ComponentError>> GenerateValue<Value> for Asking<'_, F> {
   fn generate_value(
     &self,
     value: &Value,
     _context: &HashMap<&str, Value>,
     _matcher: &Box<dyn VariantMatcher + Send + Sync>,
   ) -> anyhow::Result<Value> {
-    (self.ask)(self.generator, value.clone()).map_err(|err| {
+    (self.ask)(self.generator, value.clone(), &self.path).map_err(|err| {
       let message = err.message.clone();
       self.failures.borrow_mut().push(err);
       anyhow::anyhow!(message)

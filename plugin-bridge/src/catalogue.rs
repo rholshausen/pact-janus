@@ -3,8 +3,9 @@
 //! The bridge is a component named `pact-plugin-<name>`, at the plugin's own version, implementing the
 //! matcher interface, and the transport interface when the plugin has a transport. What it contributes is
 //! only what it can be called for: a content matcher becomes the action `<component>:compare-contents`, a
-//! content generator `<component>:generate-content`, and a transport a kind the bridge drives, whose
-//! verdict `<component>:verdict` reads (ADR 0111). Every catalogue entry, bridged or not, is described under
+//! content generator `<component>:generate-content`, a transport a kind the bridge drives, whose
+//! verdict `<component>:verdict` reads (ADR 0111), and an interface version 2 plugin's field-level
+//! matchers and generators `<component>:match-field` and `<component>:generate-field` (ADR 0113). Every catalogue entry, bridged or not, is described under
 //! the handshake's `pact-plugin` capability, with the content types a content matcher claims, so the
 //! engine learns which bodies the plugin compares from the plugin, and nothing about the plugin itself.
 
@@ -41,6 +42,22 @@ impl Plugin {
   /// The action a transport's verdict is read through (ADR 0111 decision 3).
   pub fn verdict(&self) -> String {
     format!("{}:verdict", self.component())
+  }
+
+  /// The action a field-level matching rule is reached through (ADR 0113 decision 1).
+  pub fn match_field(&self) -> String {
+    format!("{}:match-field", self.component())
+  }
+
+  /// The action a field-level generator is reached through (ADR 0113 decision 1).
+  pub fn generate_field(&self) -> String {
+    format!("{}:generate-field", self.component())
+  }
+
+  /// Whether the plugin can be asked `MatchField` and `GenerateField`: they are on interface version 2
+  /// only, and a version 1 plugin's `matcher` entry was never callable.
+  pub fn field_level(&self) -> bool {
+    self.interface_version >= 2
   }
 }
 
@@ -114,8 +131,12 @@ pub fn handshake(plugin: &Plugin, entries: &[Entry]) -> Value {
   let compare_contents = plugin.compare_contents();
   let generate_content = plugin.generate_content();
   let verdict = plugin.verdict();
+  let match_field = plugin.match_field();
+  let generate_field = plugin.generate_field();
   let matches_contents = entries.iter().any(|entry| entry.kind == "content-matcher");
   let generates_contents = entries.iter().any(|entry| entry.kind == "content-generator");
+  let matches_fields = plugin.field_level() && entries.iter().any(|entry| entry.kind == "matcher");
+  let generates_fields = plugin.field_level() && entries.iter().any(|entry| entry.kind == "generator");
   // A plugin transport is a kind the bridge drives (ADR 0111 decision 1), its exchange one send.
   let mut kinds: Vec<&str> = entries
     .iter()
@@ -145,6 +166,12 @@ pub fn handshake(plugin: &Plugin, entries: &[Entry]) -> Value {
         described.insert("kind".to_string(), json!(entry.key));
         described.insert("action".to_string(), json!(verdict));
       }
+      if entry.kind == "matcher" && matches_fields {
+        described.insert("action".to_string(), json!(match_field));
+      }
+      if entry.kind == "generator" && generates_fields {
+        described.insert("action".to_string(), json!(generate_field));
+      }
       described.insert("values".to_string(), json!(entry.values));
       Value::Object(described)
     })
@@ -153,6 +180,8 @@ pub fn handshake(plugin: &Plugin, entries: &[Entry]) -> Value {
     (matches_contents, compare_contents),
     (generates_contents, generate_content),
     (!kinds.is_empty(), verdict),
+    (matches_fields, match_field),
+    (generates_fields, generate_field),
   ]
   .into_iter()
   .filter(|(served, _)| *served)
@@ -289,9 +318,47 @@ mod tests {
 
   #[test]
   fn a_plugin_with_nothing_the_bridge_serves_contributes_nothing() {
+    // A version 1 plugin's `matcher` entry was never callable: MatchField is version 2's.
     let hello = handshake(&protobuf(), &[entry("matcher", "credit-card", &[])]);
     assert_eq!(hello["interfaces"], json!(["matcher"]));
     assert_eq!(hello["contributes"], json!({ "actions": [] }));
+    assert_eq!(
+      hello["capabilities"]["pact-plugin"]["catalogue"][0],
+      json!({ "type": "matcher", "key": "credit-card", "values": {} })
+    );
+  }
+
+  #[test]
+  fn a_version_2_plugins_field_matcher_and_generator_are_the_field_actions() {
+    let creditcard = Plugin {
+      name: "creditcard".to_string(),
+      version: "0.0.0".to_string(),
+      interface_version: 2,
+    };
+    let hello = handshake(
+      &creditcard,
+      &[
+        entry("matcher", "creditcard", &[("config-key", "brand")]),
+        entry("generator", "creditcard", &[("config-key", "brand")]),
+      ],
+    );
+    assert_eq!(hello["interfaces"], json!(["matcher"]));
+    assert_eq!(
+      hello["contributes"],
+      json!({ "actions": [
+        { "name": "pact-plugin-creditcard:match-field" },
+        { "name": "pact-plugin-creditcard:generate-field" }
+      ] })
+    );
+    assert_eq!(
+      hello["capabilities"]["pact-plugin"]["catalogue"],
+      json!([
+        { "type": "generator", "key": "creditcard", "action": "pact-plugin-creditcard:generate-field",
+          "values": { "config-key": "brand" } },
+        { "type": "matcher", "key": "creditcard", "action": "pact-plugin-creditcard:match-field",
+          "values": { "config-key": "brand" } }
+      ])
+    );
   }
 
   #[test]

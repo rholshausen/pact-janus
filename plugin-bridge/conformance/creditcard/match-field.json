@@ -1,0 +1,264 @@
+{
+  "name": "pact-plugin-creditcard/match-field",
+  "component": "pact-plugin-creditcard",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:match-field",
+        "values": [
+          {
+            "content": "4111111111111111",
+            "path": "$.response.body.card.number"
+          }
+        ],
+        "config": {
+          "arguments": [
+            "4111111111111111",
+            {
+              "rule": "creditcard",
+              "values": {
+                "brand": "visa"
+              },
+              "mismatch-type": "body",
+              "root": "$.response.body"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:match-field",
+        "values": [
+          {
+            "content": "4111 1111 1111 1111",
+            "path": "$.response.body.card.number"
+          }
+        ],
+        "config": {
+          "arguments": [
+            "4111111111111111",
+            {
+              "rule": "matcher/creditcard",
+              "values": {},
+              "mismatch-type": "body",
+              "root": "$.response.body"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:match-field",
+        "values": [
+          {
+            "content": "4111111111111112",
+            "path": "$.response.body.card.number"
+          }
+        ],
+        "config": {
+          "arguments": [
+            "4111111111111111",
+            {
+              "rule": "creditcard",
+              "values": {
+                "brand": "visa"
+              },
+              "mismatch-type": "body",
+              "root": "$.response.body"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "error",
+              "message": "Expected a credit card number, but '4111111111111112' fails the Luhn check (its last digit is not a valid check digit)"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:match-field",
+        "values": [
+          {
+            "content": "5555555555554444",
+            "path": "$.response.body.card.number"
+          }
+        ],
+        "config": {
+          "arguments": [
+            "4111111111111111",
+            {
+              "rule": "plugin/creditcard/matcher/creditcard",
+              "values": {
+                "brand": "visa"
+              },
+              "mismatch-type": "body",
+              "root": "$.response.body"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:match-field",
+        "values": [
+          {
+            "content": 4111111111111111,
+            "path": "$.response.body.card.number"
+          }
+        ],
+        "config": {
+          "arguments": [
+            "4111111111111111",
+            {
+              "rule": "creditcard",
+              "values": {},
+              "mismatch-type": "body",
+              "root": "$.response.body"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "ok"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:match-field",
+        "values": [
+          {
+            "content": "4111111111111111",
+            "path": "$.response.body.card.number"
+          }
+        ],
+        "config": {
+          "arguments": [
+            "4111111111111111",
+            {
+              "rule": "creditcard",
+              "values": {
+                "brand": "nope"
+              },
+              "mismatch-type": "body",
+              "root": "$.response.body"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:match-field",
+        "values": [
+          {
+            "content": "4111111111111111",
+            "path": "$.response.body.card.number"
+          }
+        ],
+        "config": {
+          "arguments": [
+            "4111111111111111",
+            {
+              "rule": "reges",
+              "values": {},
+              "mismatch-type": "body",
+              "root": "$.response.body"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "error",
+              "message": "Could not apply the 'reges' matching rule - the pact plugin 'creditcard' registers no matcher 'reges'"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:match-field",
+        "values": [
+          {
+            "content": "4111111111111111"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "rule": "creditcard"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "error": {
+          "code": "invalid-config"
+        }
+      }
+    }
+  ]
+}

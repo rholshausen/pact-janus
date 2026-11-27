@@ -149,8 +149,12 @@ content generator fills a request body with generators, as today
 An interaction carried over a plugin's transport (gRPC) is run by the plugin, which sends the request it
 builds from the pact, compares the answer and gives the verdict, as today
 ([ADR 0111](decisions/0111-a-plugin-transports-exchange-is-one-send-and-its-verdict-a-reply-the-bridges-action-reads.md)).
-A plugin's matchers (`creditcard`) are not bridged yet (S5.2g): an interaction that uses one is refused
-by name, and the rest are verified
+A plugin's field-level matching rule (`creditcard`) is applied to the value at its path, and its
+field-level generator fills a request value, through the plugin's `MatchField` and `GenerateField`, as
+today
+([ADR 0113](decisions/0113-a-plugins-field-level-rule-and-generator-are-its-bridges-match-field-and-generate-field-on-one-value.md)).
+A rule or generator none of the pact's plugins provides (a misspelt rule name, or a plugin of interface
+version 1) is refused by name, and the rest of the pact is verified
 ([ADR 0045](decisions/0045-refuse-an-interaction-that-needs-a-pact-plugin-by-name-and-verify-the-rest.md)).
 
 | Today | `janus verify` | Notes |
@@ -160,7 +164,7 @@ by name, and the rest are verified
 | A plugin's mismatches, each in its own words | Each a mismatch of its own, at the body's path, with the plugin's location as `at` | The same verdicts (fixtures `plugins/*`) |
 | An interaction carried over a plugin transport (`grpc`), reached at the provider's host and the port of its `--transports` entry, else `--port` | The same: one exchange the plugin runs, through the kind its bridge drives, reached at its `--transports` entry, else the provider URL's host and port | The same verdicts (fixtures `plugins/grpc-area-calculator*`). A plugin's mismatch carries its path as `at`; a plugin that fails the exchange is `transport-failed`, as today's verifier fails it |
 | `--request-filter` and the plugin's output lines on a plugin transport | A `before-request` hook sees the pact and the interaction's key, not the request the plugin builds; the output is in the verdict, and no report prints it | **Differs** until S5.2i (ADR 0111 decision 5) |
-| An interaction using a plugin's matcher | Refused by name, the rest verified | **Differs** until S5.2g |
+| A matching rule or request generator a plugin provides (`creditcard`), the plugin named only in the pact's metadata | The same: the plugin's `MatchField` on the value at the rule's path, its mismatch in its words at that path; its `GenerateField` for a request value | The same verdicts (fixtures `plugins/creditcard*`). A rule or generator no plugin of the pact's provides fails before anything is sent, naming it, where today's verifier fails the value with `No catalogue entry found` |
 
 `janus upgrade` drops an interaction that needs a plugin from the contract it writes, with an
 `interaction-dropped` finding naming the plugin (until S5.2f gives one a contract form), and

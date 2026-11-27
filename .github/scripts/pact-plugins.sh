@@ -6,7 +6,9 @@
 # Each manifest and executable must have its pinned SHA-256: a download with any other digest is
 # refused, and no test installs a plugin from the plugin index (ADR 0106). An executable is written as
 # pact-plugin-driver's own installer writes it, the manifest's entryPoint, with .exe on Windows. A plugin
-# already installed with the pinned manifest is left alone, so a cached directory is reused.
+# written in Lua has no executable: its pin lists its `files`, each with its digest, which are the same on
+# every platform (staged plan S5.2g). A plugin already installed with the pinned manifest is left alone,
+# so a cached directory is reused.
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
@@ -53,13 +55,35 @@ for i in $(seq 0 $((count - 1))); do
   release="$(jq -r ".plugins[$i].release" "$pin")"
   manifest_file="$(jq -r ".plugins[$i].manifest.file" "$pin")"
   manifest_sha="$(jq -r ".plugins[$i].manifest.sha256" "$pin")"
+  target="$dir/$name-$version"
+  if [ "$(jq ".plugins[$i] | has(\"files\")" "$pin")" = true ]; then
+    # Its files, by digest: what .installed records, so a changed pin installs it again.
+    sha="$(jq -r ".plugins[$i].files | map(.sha256) | join(\",\")" "$pin")"
+    if [ -f "$target/pact-plugin.json" ] && [ "$(digest "$target/pact-plugin.json")" = "$manifest_sha" ] \
+      && [ -f "$target/.installed" ] && [ "$(cat "$target/.installed")" = "$sha" ]; then
+      echo "pact-plugins.sh: $name $version is installed" >&2
+      continue
+    fi
+    rm -rf "$target"
+    mkdir -p "$target"
+    curl -fsSL --retry 3 -o "$target/pact-plugin.json" "$release/$manifest_file"
+    check "$target/pact-plugin.json" "$manifest_sha"
+    files="$(jq '.plugins['"$i"'].files | length' "$pin")"
+    for f in $(seq 0 $((files - 1))); do
+      file="$(jq -r ".plugins[$i].files[$f].file" "$pin")"
+      curl -fsSL --retry 3 -o "$target/$file" "$release/$file"
+      check "$target/$file" "$(jq -r ".plugins[$i].files[$f].sha256" "$pin")"
+    done
+    echo "$sha" > "$target/.installed"
+    echo "pact-plugins.sh: installed $name $version" >&2
+    continue
+  fi
   file="$(jq -r --arg p "$platform" ".plugins[$i].executables[\$p].file" "$pin")"
   sha="$(jq -r --arg p "$platform" ".plugins[$i].executables[\$p].sha256" "$pin")"
   if [ "$file" = null ] || [ "$sha" = null ]; then
     echo "pact-plugins.sh: $pin pins no $name executable for $platform" >&2
     exit 2
   fi
-  target="$dir/$name-$version"
   if [ -f "$target/pact-plugin.json" ] && [ "$(digest "$target/pact-plugin.json")" = "$manifest_sha" ] \
     && [ -f "$target/.installed" ] && [ "$(cat "$target/.installed")" = "$sha" ]; then
     echo "pact-plugins.sh: $name $version is installed" >&2

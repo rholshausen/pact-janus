@@ -1,0 +1,39 @@
+{
+  "description": "A request body whose card number a matcher-only plugin's field-level generator fills, through janus-plugin-bridge's generate-field: the pact records a Visa number and generates a Mastercard one, and the provider recognises only a Mastercard number, so a verifier that sent the recorded value instead gets a 404",
+  "source": "staged plan S5.2g; ADR 0113 decision 3; pact-plugins' creditcard plugin's generator, on a request the credit card example's provider would store",
+  "pacts": [
+    "CreditCardClient-CreditCardServer.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "POST",
+          "path": "/cards",
+          "headers": {
+            "Content-Type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "card": {
+                "number": "4111111111111111",
+                "expiry": "04/28"
+              }
+            }
+          },
+          "patterns": {
+            "body/card/number": "(5[1-5]\\d{2}|2[2-7]\\d{2})\\d{12}"
+          }
+        },
+        "response": {
+          "status": 201
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

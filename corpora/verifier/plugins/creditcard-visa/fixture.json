@@ -1,0 +1,37 @@
+{
+  "description": "pact-plugins' credit card example: a JSON body whose card number a matcher-only plugin's field-level rule checks, through janus-plugin-bridge's match-field. The provider answers a valid Visa number",
+  "source": "staged plan S5.2g; ADR 0113; pact-plugins examples/creditcard/creditcard-consumer-jvm, its pact as written; the pinned creditcard plugin (plugin-bridge/pact-plugins.json)",
+  "pacts": [
+    "CreditCardClient-CreditCardServer.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/cards/visa"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "card": {
+                "number": "4111111111111111",
+                "expiry": "04/28",
+                "brand": "visa"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "pass"
+}

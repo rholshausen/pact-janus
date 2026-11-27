@@ -1,0 +1,79 @@
+{
+  "consumer": {
+    "name": "CreditCardClient"
+  },
+  "interactions": [
+    {
+      "description": "a request for a Visa card",
+      "key": "20fd2715",
+      "pending": false,
+      "request": {
+        "method": "GET",
+        "path": "/cards/visa"
+      },
+      "response": {
+        "body": {
+          "content": {
+            "card": {
+              "brand": "visa",
+              "expiry": "04/28",
+              "number": "4111111111111111"
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "generators": {
+          "body": {
+            "$.card.number": {
+              "brand": "visa",
+              "type": "creditcard"
+            }
+          }
+        },
+        "matchingRules": {
+          "body": {
+            "$.card.expiry": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "regex",
+                  "regex": "^\\d{2}/\\d{2}$"
+                }
+              ]
+            },
+            "$.card.number": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "brand": "visa",
+                  "match": "creditcard"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.7.4"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+      {
+        "name": "creditcard",
+        "version": "0.0.0"
+      }
+    ]
+  },
+  "provider": {
+    "name": "CreditCardServer"
+  }
+}

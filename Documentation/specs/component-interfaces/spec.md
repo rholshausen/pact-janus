@@ -1219,7 +1219,8 @@ bridged by exactly such a shim (§9.3.1).
 
 `janus-plugin-bridge` serves one of today's pact-plugins as a component reached through this binding
 ([ADR 0106](../../decisions/0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md),
-[ADR 0109](../../decisions/0109-a-bridged-plugins-content-matcher-is-one-compare-contents-action-and-its-catalogue-a-handshake-capability.md)).
+[ADR 0109](../../decisions/0109-a-bridged-plugins-content-matcher-is-one-compare-contents-action-and-its-catalogue-a-handshake-capability.md),
+[ADR 0113](../../decisions/0113-a-plugins-field-level-rule-and-generator-are-its-bridges-match-field-and-generate-field-on-one-value.md)).
 It lives in `plugin-bridge/`, a workspace of its own, so the plugin driver's gRPC stays out of every
 engine. A bridge is declared once per plugin, named `pact-plugin-<name>`, with the plugin's name and
 version as its arguments, and granted what the plugin driver reads from its environment:
@@ -1235,8 +1236,10 @@ version as its arguments, and granted what the plugin driver reads from its envi
 The bridge loads the plugin at the handshake and answers with its catalogue translated. Its version is
 the loaded plugin's. It implements `matcher`, and `transport` when the plugin registers a transport, and
 contributes only what it answers: the action `<component>:compare-contents` when the plugin registers a
-content matcher, `<component>:generate-content` for a content generator, and for each transport a kind of
-the entry's key, driven, with `<component>:verdict` (below). Every catalogue entry is described under the
+content matcher, `<component>:generate-content` for a content generator, for each transport a kind of
+the entry's key, driven, with `<component>:verdict`, and `<component>:match-field` and
+`<component>:generate-field` for a plugin of interface version 2 that registers a field-level `matcher` or
+`generator` (below). Every catalogue entry is described under the
 **`pact-plugin` capability**, which is how the engine learns which bodies a plugin compares, from the
 plugin:
 
@@ -1265,7 +1268,8 @@ plugin:
 A catalogue entry's `type` is the driver's name for it (`content-matcher`, `content-generator`,
 `transport`, `matcher`, `interaction`, `generator`), its `values` are the plugin's own, `action` names what
 an entry is reached through when the bridge serves it, and a transport it drives names its `kind`; the
-others are described and not contributed, until the bridge answers for them (staged plan S5.2f, S5.2g). Each of `content-types` is a
+others are described and not contributed: an `interaction` entry until the bridge answers for one (staged
+plan S5.2f), and a version 1 plugin's `matcher`, which no driver ever called. Each of `content-types` is a
 **pattern**, claimed as pact-plugin-driver claims it: a regular expression, anchored at both ends, over a
 media type's type and subtype with any suffix, parameters stripped (`text/csv` claims
 `text/csv;charset=utf-8`).
@@ -1345,13 +1349,62 @@ errors, unlocated. A plugin that answers either call with an error is the send's
 the plugin's message; one the bridge cannot reach is `unavailable`, as for any call. The bridge serves no
 plugin transport's mock: a `serve` instance is `operation-unsupported` (staged plan S5.2f).
 
+A plugin's **field-level** matching rule and generator (pact-plugins' proposal 006, a plugin of interface
+version 2: the `creditcard` example registers both, keyed `creditcard`) are reached one value at a time,
+through `MatchField` and `GenerateField` (ADR 0113). A rule or generator is named by its entry's key, or by
+a longer form of the catalogue key ending in it (`matcher/creditcard`, `plugin/creditcard/matcher/creditcard`),
+as the plugin driver resolves one.
+
+`<component>:match-field`'s value under test is the value the rule applies to, read from where its path
+says. It has two arguments: the value the pact records there, and an object naming the `rule` (its name in
+the pact), its `values` (the rule's configuration, as the pact writes it beside the name), the
+`mismatch-type` (the part the value came from, as today's verifier names it: `body`, `header`, `query`,
+`metadata`, `path`, `status`) and, for a value inside a part, the part's `root`. The plugin is handed the
+value's path as a pact writes it, its plan path with the root taken off, and no path for the request path
+or the status; no plugin configuration, and an empty test context, as today's verifier hands it:
+
+```json matcher-apply
+{
+  "action": "pact-plugin-creditcard:match-field",
+  "values": [ { "content": "4111111111111112", "path": "$.response.body.card.number" } ],
+  "config": { "arguments": [
+    "4111111111111111",
+    { "rule": "creditcard", "values": { "brand": "visa" }, "mismatch-type": "body", "root": "$.response.body" }
+  ] }
+}
+```
+
+The answer is `ok` when the plugin found nothing, and otherwise one `error` whose message is what the plugin
+said, its mismatches joined with `, ` as today's verifier joins them, or its error when it could not apply
+the rule (an unknown `brand`). When it found several, or located one elsewhere, the result's `mismatches`
+keep each, `at` the plugin's path:
+
+```json matcher-apply-result
+{
+  "results": [ {
+    "status": "error",
+    "message": "Expected a credit card number, but '4111111111111112' fails the Luhn check (its last digit is not a valid check digit)"
+  } ]
+}
+```
+
+`<component>:generate-field`'s value under test is the example the generated value replaces, and its one
+argument names the `generator` (its `type` and `values`), the `path` it fills as a pact writes it, and the
+`test-context`, the exchange's provider-state values; the plugin is asked in the provider's test mode. Its
+result is the generated value as a `value`, octets taken as their text, or an `error` when the plugin could
+not generate one. A name no entry of the plugin's has is the value's `error`, in today's verifier's words.
+
 A run uses a bridge for a v1–v4 interaction that needs its plugin (ADR 0110). The legacy compiler
 compiles a body the verifier compares, whose type a `content-matcher` entry claims, to that entry's
 `action`, with the argument above built from the pact, and a request body with generators, whose type a
 `content-generator` entry claims, is filled by that entry's `action` before it is sent. An interaction
 carried over a transport a `transport` entry's key names is driven through that entry's `kind`, its plan
 the entry's `action` on `$.response.verdict` and nothing else (ADR 0111); with no binding of the kind, the
-instance is started with the run's first binding's options, the provider's. A run whose host says how to
+instance is started with the run's first binding's options, the provider's. A matching rule the pact gives
+a name no core rule has compiles to the `action` of the `matcher` entry it names, on the value at its path
+(on an object or an array too, and whether or not it cascaded there, as today's verifier applies one), and a
+request generator of such a name is filled through the `generator` entry's `action`; an interaction with one
+no bridge for its plugins provides is refused by its name. A run whose host says how to
 start the bridge (engine-protocol spec §8.3's `options.plugin-bridge`) declares one for each plugin a pact
 names.
 

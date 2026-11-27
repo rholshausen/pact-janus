@@ -1,0 +1,37 @@
+{
+  "description": "The credit card example, the provider answering a valid Mastercard number where the rule's configuration asks for a Visa one: the rule's values reach the plugin",
+  "source": "staged plan S5.2g; ADR 0113 decision 2; pact-plugins examples/creditcard/creditcard-consumer-jvm, its pact as written; the pinned creditcard plugin (plugin-bridge/pact-plugins.json)",
+  "pacts": [
+    "CreditCardClient-CreditCardServer.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/cards/visa"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "card": {
+                "number": "5555555555554444",
+                "expiry": "04/28",
+                "brand": "mastercard"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail"
+}

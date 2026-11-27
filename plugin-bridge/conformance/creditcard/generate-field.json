@@ -1,0 +1,109 @@
+{
+  "name": "pact-plugin-creditcard/generate-field",
+  "component": "pact-plugin-creditcard",
+  "interface": "matcher",
+  "calls": [
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:generate-field",
+        "values": [
+          {
+            "content": "4111111111111111"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "generator": {
+                "type": "creditcard",
+                "values": {
+                  "brand": "mastercard"
+                }
+              },
+              "path": "$.card.number",
+              "test-context": {}
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "value",
+              "value": {}
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:generate-field",
+        "values": [
+          {
+            "content": "4111111111111111"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "generator": {
+                "type": "creditcard",
+                "values": {}
+              },
+              "path": "$.card.number",
+              "test-context": {}
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "value",
+              "value": {}
+            }
+          ]
+        }
+      }
+    },
+    {
+      "op": "matcher/apply",
+      "body": {
+        "action": "pact-plugin-creditcard:generate-field",
+        "values": [
+          {
+            "content": "4111111111111111"
+          }
+        ],
+        "config": {
+          "arguments": [
+            {
+              "generator": {
+                "type": "creditcard",
+                "values": {
+                  "brand": "nope"
+                }
+              },
+              "path": "$.card.number",
+              "test-context": {}
+            }
+          ]
+        }
+      },
+      "expect": {
+        "ok": {
+          "results": [
+            {
+              "status": "error"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

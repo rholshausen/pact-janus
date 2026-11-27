@@ -8,7 +8,9 @@
 //! plugin's content matcher claims compiled to its bridge's `compare-contents` (ADR 0110 decision 3), or
 //! refused by name and why ([`Refused`], decision 5). An interaction carried over a plugin's transport is
 //! one send through the transport kind its bridge drives, its verdict read by the bridge's `verdict` action
-//! ([`PluginTransport`], ADR 0111).
+//! ([`PluginTransport`], ADR 0111). A matching rule or request generator a plugin provides at the field
+//! level (a matcher-only plugin's, pact-plugins' `creditcard`) is its bridge's `match-field` or
+//! `generate-field` action on the one value it names, as [`bridged`] resolves them (ADR 0113).
 
 use super::compile::PluginBody;
 use super::pact::{MessageInteraction, PactInteraction, PactPlugin, PluginGenerate, PluginInteraction};
@@ -18,7 +20,8 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::ContentType;
-use pact_models::matchingrules::MatchingRules;
+use pact_models::generators::{Generator, GeneratorCategory};
+use pact_models::matchingrules::{Category, MatchingRule, MatchingRules};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 
@@ -42,6 +45,10 @@ struct Served {
   /// Each of the plugin's transport entries: its key, and the kind and verdict action the bridge drives
   /// it as, when it does (ADR 0111 decision 1).
   transports: Vec<(String, Option<(String, String)>)>,
+  /// Each field-level matching rule the bridge serves: its catalogue key, and the action (ADR 0113).
+  field_matchers: Vec<(String, String)>,
+  /// Each field-level generator, likewise.
+  field_generators: Vec<(String, String)>,
 }
 
 /// The parts and slots of a plugin transport's exchange, as the bridge drives one (ADR 0111 decision 2).
@@ -84,6 +91,13 @@ impl Bridges {
           .collect();
         Some((patterns, action.to_string()))
       };
+      let keyed = |entry: &Value| {
+        let key = entry.get("key").and_then(Value::as_str)?;
+        let action = entry.get("action").and_then(Value::as_str)?;
+        Some((key.to_string(), action.to_string()))
+      };
+      let field_matchers = of_type("matcher").filter_map(keyed).collect();
+      let field_generators = of_type("generator").filter_map(keyed).collect();
       let matchers = of_type("content-matcher").filter_map(served_by).collect();
       let generators = of_type("content-generator").filter_map(served_by).collect();
       let transports = of_type("transport")
@@ -104,6 +118,8 @@ impl Bridges {
           matchers,
           generators,
           transports,
+          field_matchers,
+          field_generators,
         },
       );
     }
@@ -124,6 +140,27 @@ impl Bridges {
   /// Likewise, a content generator (ADR 0110 decision 7).
   fn generator<'a>(&'a self, plugins: &'a [String], content_type: &str) -> Option<(&'a str, &'a str)> {
     self.find(plugins, content_type, |served| &served.generators)
+  }
+
+  /// The action of the one field-level matching rule (`matcher`) or generator (`generator`) among
+  /// `plugins`' bridges that `name` names, by its catalogue key or a longer form of it, as
+  /// pact-plugin-driver resolves a rule's name. `None` when none does, or when more than one does,
+  /// which the driver refuses as ambiguous.
+  fn field<'a>(&'a self, plugins: &[String], kind: &str, name: &str) -> Option<&'a str> {
+    let mut found = plugins.iter().flat_map(|plugin| {
+      let served = self.served.get(plugin);
+      let entries = match (served, kind) {
+        (Some(served), "matcher") => served.field_matchers.as_slice(),
+        (Some(served), _) => served.field_generators.as_slice(),
+        (None, _) => &[],
+      };
+      entries
+        .iter()
+        .filter(move |(key, _)| names(name, plugin, kind, key))
+        .map(|(_, action)| action.as_str())
+    });
+    let first = found.next()?;
+    found.next().is_none().then_some(first)
   }
 
   fn find<'a>(
@@ -156,6 +193,20 @@ pub fn claims(pattern: &str, media_type: &str) -> bool {
   regex::Regex::new(&format!("^(?:{pattern})$")).is_ok_and(|regex| regex.is_match(&base))
 }
 
+/// Whether a rule or generator `name`, as a pact writes it, names a plugin's catalogue entry `key` of
+/// type `kind`: its key, or the longer forms pact-plugin-driver's `resolve_capability` also accepts,
+/// whole components only (pact-plugins' proposal 006 §2).
+fn names(name: &str, plugin: &str, kind: &str, key: &str) -> bool {
+  name == key || name == format!("{kind}/{key}") || name == format!("plugin/{plugin}/{kind}/{key}")
+}
+
+/// The action a field-level rule's name is resolved to (ADR 0113 decision 2): a bridge's `match-field`.
+/// A rule of this name in a compiled interaction is one [`bridged`] resolved, compiled to that action
+/// on the value it applies to; any other plugin rule stays one the compiler cannot compile.
+pub fn is_match_field(name: &str) -> bool {
+  name.starts_with("pact-plugin-") && name.ends_with(":match-field")
+}
+
 /// Why an interaction that needs a plugin is not verified (ADR 0110 decision 5).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Refused {
@@ -163,7 +214,8 @@ pub enum Refused {
   NoBridge(Vec<String>),
   /// It is carried over a plugin's transport, which its bridge does not drive.
   Transport { plugin: String, transport: String },
-  /// One of its rules is a plugin's, which no bridge serves yet (staged plan S5.2g).
+  /// One of its matching rules or request generators is one no bridge for its plugins provides, by
+  /// these names (ADR 0113 decision 4).
   Rules(Vec<String>),
   /// Its kind is neither HTTP nor a message.
   Kind,
@@ -195,10 +247,11 @@ impl Refused {
         "this interaction is carried over the pact plugin '{plugin}''s '{transport}' transport, which its \
          bridge does not drive: a janus-plugin-bridge from before staged plan S5.2e"
       ),
-      Refused::Rules(plugins) => format!(
-        "this interaction has a matching rule a pact plugin provides ({}), which janus-plugin-bridge does \
-         not serve yet (staged plan S5.2g)",
-        named(plugins)
+      Refused::Rules(rules) => format!(
+        "this interaction has a matching rule or generator ({}) that none of the pact plugins it needs \
+         provides: a plugin registers one as a field-level matcher or generator, which only a plugin of \
+         interface version 2 can",
+        named(rules)
       ),
       Refused::Kind => "this interaction needs a pact plugin, and is neither an HTTP interaction nor a \
                         message"
@@ -272,9 +325,6 @@ pub fn bridged(
   if !missing.is_empty() {
     return Err(Refused::NoBridge(missing));
   }
-  if needs.plugin_rules {
-    return Err(Refused::Rules(needs.plugins.clone()));
-  }
   // Today's verifier verifies an interaction through a plugin's transport when the plugin registered one
   // of the name the interaction gives, and otherwise as it would with none.
   if let Some(transport) = &needs.transport
@@ -311,6 +361,20 @@ pub fn bridged(
         bridges,
         |plugin| configured(plugin, Some("response")),
       );
+      // A body a content matcher compares keeps its rules: they are that plugin's to read.
+      let mut unserved = Vec::new();
+      resolve_rules(
+        &mut http.response.matching_rules,
+        "response",
+        http.plugin_body.is_some(),
+        &needs.plugins,
+        bridges,
+        &mut unserved,
+      );
+      http.field_generators = field_generators(&http.request, &needs.plugins, bridges, &mut unserved);
+      if !unserved.is_empty() {
+        return Err(Refused::Rules(unserved));
+      }
       http.request_generator = request_generator(&http.request, &needs.plugins, bridges, |plugin| {
         // The driver hands a content generator the interaction's whole configuration for the plugin.
         configured(plugin, None)
@@ -331,10 +395,111 @@ pub fn bridged(
           |plugin| configured(plugin, part),
         );
       }
+      let compared_by_plugin = message.plugin_body.is_some();
+      if let Some(expected) = message.expected.as_mut() {
+        let mut unserved = Vec::new();
+        resolve_rules(
+          &mut expected.matching_rules,
+          super::pact::MESSAGE_PART,
+          compared_by_plugin,
+          &needs.plugins,
+          bridges,
+          &mut unserved,
+        );
+        if !unserved.is_empty() {
+          return Err(Refused::Rules(unserved));
+        }
+      }
       Ok(Bridged::Interaction(PactInteraction::Message(message)))
     }
     _ => Err(Refused::Kind),
   }
+}
+
+/// Each field-level matching rule in `rules` resolved to the bridge action that applies it (ADR 0113
+/// decision 2): a rule `pact_models` reads as `MatchingRule::Plugin` becomes one whose name is the action
+/// and whose values are its argument, the rule's own `name` and `values`, the `mismatch-type` today's
+/// verifier hands the plugin for the rule's category, and the `root` of the slot it applies in, from
+/// which the bridge works out the path a pact writes. A name no bridge serves is added to `unserved`. The
+/// `body` category is left as it is when a plugin's content matcher compares the body (`skip_body`).
+fn resolve_rules(
+  rules: &mut MatchingRules,
+  part: &str,
+  skip_body: bool,
+  plugins: &[String],
+  bridges: &Bridges,
+  unserved: &mut Vec<String>,
+) {
+  for (category, by_path) in rules.rules.iter_mut() {
+    if skip_body && *category == Category::BODY {
+      continue;
+    }
+    let (mismatch_type, slot) = match category {
+      Category::BODY => ("body", Some("body")),
+      Category::HEADER => ("header", Some("headers")),
+      Category::QUERY => ("query", Some("query")),
+      Category::METADATA => ("metadata", Some("metadata")),
+      Category::PATH => ("path", None),
+      Category::STATUS => ("status", None),
+      Category::METHOD => ("method", None),
+      _ => ("body", None),
+    };
+    for list in by_path.rules.values_mut() {
+      for rule in list.rules.iter_mut() {
+        let MatchingRule::Plugin { name, values } = rule else {
+          continue;
+        };
+        match bridges.field(plugins, "matcher", name) {
+          Some(action) => {
+            let mut argument = json!({ "rule": name, "values": values, "mismatch-type": mismatch_type });
+            if let Some(slot) = slot {
+              argument["root"] = json!(format!("$.{}", crate::shape::path::root(part, slot)));
+            }
+            *rule = MatchingRule::Plugin {
+              name: action.to_string(),
+              values: argument,
+            };
+          }
+          None if !unserved.contains(name) => unserved.push(name.clone()),
+          None => {}
+        }
+      }
+    }
+  }
+}
+
+/// Each request generator a plugin provides, by name, resolved to the bridge's `generate-field` action
+/// (ADR 0113 decision 3). A name no bridge serves is added to `unserved`.
+fn field_generators(
+  request: &pact_models::v4::http_parts::HttpRequest,
+  plugins: &[String],
+  bridges: &Bridges,
+  unserved: &mut Vec<String>,
+) -> BTreeMap<String, String> {
+  let mut resolved = BTreeMap::new();
+  for category in [
+    GeneratorCategory::PATH,
+    GeneratorCategory::HEADER,
+    GeneratorCategory::QUERY,
+    GeneratorCategory::BODY,
+  ] {
+    let Some(generators) = request.generators.categories.get(&category) else {
+      continue;
+    };
+    for generator in generators.values() {
+      let Generator::Plugin { name, .. } = generator else {
+        continue;
+      };
+      match bridges.field(plugins, "generator", name) {
+        Some(action) => {
+          resolved.insert(name.clone(), action.to_string());
+        }
+        None if !unserved.contains(name) => unserved.push(name.clone()),
+        None => {}
+      }
+    }
+  }
+  resolved
 }
 
 /// The body a plugin compares, when one of `plugins`' bridges claims its content type. A body no bridge

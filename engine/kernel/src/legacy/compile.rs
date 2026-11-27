@@ -42,10 +42,12 @@
 //! `compare_lists_with_matchingrule` apply them (staged plan S1.24, ADR 0042,
 //! [`compile_object_entries`], [`compile_array_rules`]); no specification test case covers them, so
 //! S1.1's `matching-rules/` fixtures are their oracle. Declared on text (a path, a header, a query or
-//! form value, XML), they and plugin-provided rules compile to a `flow:error` node naming the gap
-//! rather than a guess: a documented gap, not a silent one.
+//! form value, XML), they compile to a `flow:error` node naming the gap rather than a guess: a
+//! documented gap, not a silent one. A rule a pact plugin provides compiles to its bridge's
+//! `match-field` once the legacy layer has resolved it (ADR 0113), and to that error node otherwise.
 
 use crate::legacy::multipart;
+use crate::legacy::plugins;
 use crate::legacy::xml::{self, rule_name};
 use crate::plan::{self as model, CapturedValues, Literal, Node, RuntimeValue, Status, member_path};
 use crate::shape::path;
@@ -489,7 +491,8 @@ pub fn anchored_pattern(pattern: &str) -> String {
 /// other three accept any value in a document, as today's JSON matcher does. A text value one of
 /// them cascaded down to is accepted too, since today's string matcher passes a rule that cannot
 /// cascade (`can_cascade`) when it did. Declared on text itself (a path, a header, a query or form
-/// value, XML), they are still a documented gap, as are plugin-provided rules (module docs' "Scope").
+/// value, XML), they are still a documented gap (module docs' "Scope"). A plugin's rule compiles to its
+/// bridge's action once [`plugins::bridged`] has resolved it, and is otherwise a rule this compiler cannot compile.
 fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text, cascaded: bool) -> Node {
   match rule {
     // Text is read as today's verifier reads it against a type rule (module docs).
@@ -575,6 +578,11 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text, 
       STATUS_CLASS,
       vec![resolve, Node::value(Literal::from_json(&status_class(status)))],
     ),
+    // A plugin's field-level rule, resolved to its bridge's `match-field` (ADR 0113 decision 2): applied
+    // to the value at its path whether or not it cascaded there, as today's verifier applies it.
+    MatchingRule::Plugin { name, values } if plugins::is_match_field(name) => {
+      plugin_rule(name, values, resolve, example)
+    }
     other => Node::action(
       "flow:error",
       vec![Node::value(Literal::string(format!(
@@ -583,6 +591,19 @@ fn rule_node(rule: &MatchingRule, resolve: Node, example: &Literal, text: Text, 
       )))],
     ),
   }
+}
+
+/// A field-level rule a bridge applies (ADR 0113 decision 2): its action on the value under test, with the
+/// value the pact records there and the rule's argument, which [`plugins::bridged`] wrote as its values.
+fn plugin_rule(action: &str, argument: &Value, resolve: Node, example: &Literal) -> Node {
+  Node::action(
+    action,
+    vec![
+      resolve,
+      Node::value(example.clone()),
+      Node::value(Literal::from_json(argument)),
+    ],
+  )
 }
 
 /// The component operator a v4 `statusCode` matcher becomes (contract-file spec §8.2): the
@@ -1133,6 +1154,22 @@ fn compile_body_object(members: &IndexMap<String, RuntimeValue>, ctx: &BodyCtx) 
   }
   let mut by_name: Vec<(&String, &RuntimeValue)> = members.iter().collect();
   by_name.sort_by_key(|(name, _)| *name);
+  // A plugin's field-level rule applies to the object itself, as its plugin is handed it whole
+  // (ADR 0113 decision 2); its members are still walked.
+  let mut ruled: Vec<Node> = ctx
+    .best()
+    .into_iter()
+    .flat_map(|(list, _)| list.rules)
+    .filter_map(|rule| match &rule {
+      MatchingRule::Plugin { name, values } if plugins::is_match_field(name) => Some(plugin_rule(
+        name,
+        values,
+        ctx.resolve(),
+        &Literal::from_document(&RuntimeValue::Object(members.clone())),
+      )),
+      _ => None,
+    })
+    .collect();
   let mut nodes: Vec<Node> = by_name
     .iter()
     .map(|(name, value)| {
@@ -1149,7 +1186,8 @@ fn compile_body_object(members: &IndexMap<String, RuntimeValue>, ctx: &BodyCtx) 
     only_entries.extend(names);
     nodes.push(Node::action("legacy:only-entries", only_entries));
   }
-  nodes
+  ruled.append(&mut nodes);
+  ruled
 }
 
 /// The rules that, declared on an object's own path, describe its entries rather than leave its

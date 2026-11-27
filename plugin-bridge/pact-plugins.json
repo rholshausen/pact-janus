@@ -1,5 +1,5 @@
 {
-  "$comment": "The pact-plugins releases the bridge's conformance cases are run against in CI (staged plan S5.2c, ADR 0106). .github/scripts/pact-plugins.sh installs each into a plugin directory for its platform, refusing a manifest or executable with any other digest, so no test installs a plugin from the index. Moving a pin is a deliberate change: take the digests from the release's .sha256 files and rerun the cases.",
+  "$comment": "The pact-plugins releases the bridge's conformance cases are run against in CI (staged plan S5.2c, ADR 0106). .github/scripts/pact-plugins.sh installs each into a plugin directory for its platform, refusing a manifest or executable with any other digest (a plugin written in Lua has no executable: its files are pinned by digest at a commit of its repository, and installed on every platform), so no test installs a plugin from the index. Moving a pin is a deliberate change: take the digests from the release's .sha256 files and rerun the cases.",
   "plugins": [
     {
       "name": "csv",
@@ -62,6 +62,26 @@
           "sha256": "9fb1b3ada938a88b932491df00015dd6f0ec1bd2ff9d6519e640020032da5cc2"
         }
       }
+    },
+    {
+      "name": "creditcard",
+      "version": "0.0.0",
+      "$comment": "pact-plugins' field-level matcher and generator (proposal 006), which staged plan S5.2g verifies through the bridge. It is written in Lua and has no release: its files are taken from the commit that last changed it.",
+      "release": "https://raw.githubusercontent.com/pact-foundation/pact-plugins/67175912ef10121984bc83141b00954f8ce0b30a/plugins/creditcard",
+      "manifest": {
+        "file": "pact-plugin.json",
+        "sha256": "bdfb24252b9f57177ab85deb10bf4f899c72119c24a7306cf8d4ecd88a788de9"
+      },
+      "files": [
+        {
+          "file": "plugin.lua",
+          "sha256": "adbf535d0c1d95880e08a5469c77e7c8759aee35896fce8d4766ac513210e897"
+        },
+        {
+          "file": "creditcard.lua",
+          "sha256": "da377c11067b240ef2969be29d7d75e7ca49716634651e96038d9b3a1fa0272e"
+        }
+      ]
     }
   ]
 }

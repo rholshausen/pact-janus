@@ -19,6 +19,7 @@ mod bridge;
 mod catalogue;
 mod compare;
 mod error;
+mod field;
 mod frames;
 mod generate;
 mod transport;

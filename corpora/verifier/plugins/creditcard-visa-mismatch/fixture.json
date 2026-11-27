@@ -1,0 +1,37 @@
+{
+  "description": "The credit card example, the provider's number failing the Luhn check: the plugin's mismatch, in its words, at the field's path",
+  "source": "staged plan S5.2g; ADR 0113 decision 2; pact-plugins examples/creditcard/creditcard-consumer-jvm, its pact as written; the pinned creditcard plugin (plugin-bridge/pact-plugins.json)",
+  "pacts": [
+    "CreditCardClient-CreditCardServer.json"
+  ],
+  "provider": {
+    "kind": "scripted",
+    "state-callback": "none",
+    "routes": [
+      {
+        "request": {
+          "method": "GET",
+          "path": "/cards/visa"
+        },
+        "response": {
+          "status": 200,
+          "headers": {
+            "content-type": [
+              "application/json"
+            ]
+          },
+          "body": {
+            "json": {
+              "card": {
+                "number": "4111111111111112",
+                "expiry": "04/28",
+                "brand": "visa"
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  "expected": "fail"
+}

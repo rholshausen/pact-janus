@@ -2195,8 +2195,12 @@ fn prepare_legacy_http(
       content_shapes: BTreeMap::new(),
       states,
       request,
-      generate_from: RequestTemplate::of(&interaction.request)
-        .map(|template| Box::new(template.with_plugin(interaction.request_generator.clone()))),
+      generate_from: RequestTemplate::of(&interaction.request).map(|template| {
+        Box::new(template.with_plugin(
+          interaction.request_generator.clone(),
+          interaction.field_generators.clone(),
+        ))
+      }),
       fresh: BTreeMap::new(),
       legacy: true,
       warnings: Vec::new(),

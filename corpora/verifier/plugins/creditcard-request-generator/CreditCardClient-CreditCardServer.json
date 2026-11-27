@@ -1,0 +1,58 @@
+{
+  "consumer": {
+    "name": "CreditCardClient"
+  },
+  "provider": {
+    "name": "CreditCardServer"
+  },
+  "interactions": [
+    {
+      "type": "Synchronous/HTTP",
+      "key": "5b8e2f31",
+      "description": "a request to store a Mastercard",
+      "pending": false,
+      "request": {
+        "method": "POST",
+        "path": "/cards",
+        "headers": {
+          "Content-Type": [
+            "application/json"
+          ]
+        },
+        "body": {
+          "content": {
+            "card": {
+              "number": "4111111111111111",
+              "expiry": "04/28"
+            }
+          },
+          "contentType": "application/json",
+          "encoded": false
+        },
+        "generators": {
+          "body": {
+            "$.card.number": {
+              "type": "creditcard",
+              "brand": "mastercard"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 201
+      },
+      "transport": "http"
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+      {
+        "name": "creditcard",
+        "version": "0.0.0"
+      }
+    ]
+  }
+}

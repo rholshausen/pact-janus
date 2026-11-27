@@ -7,7 +7,7 @@
 #       pact-plugin-csv plugin-bridge/conformance/csv
 #
 # PACT_PLUGIN_DIR holds the plugins: `.github/scripts/pact-plugins.sh <dir>` installs the pinned csv and
-# protobuf releases, and lines is plugin-bridge/tests/fixtures/plugins/lines-0.1.0, copied in. A
+# protobuf releases and the creditcard plugin's Lua files, and lines is plugin-bridge/tests/fixtures/plugins/lines-0.1.0, copied in. A
 # subprocess component starts with an empty environment plus what it is granted (spec §9.3), so the
 # bridge is granted the plugin directory, and PACT_DO_NOT_TRACK, which keeps the plugin driver from
 # sending usage metrics. Starting a plugin process is slower than a call, so the deadline is wider.
@@ -24,3 +24,6 @@ components:
     source: { kind: subprocess, reference: "${JANUS_PLUGIN_BRIDGE}", args: [protobuf, 0.8.1] }
     grants: { env: [PACT_PLUGIN_DIR, PACT_DO_NOT_TRACK] }
     limits: { deadline-ms: 30000 }
+  - name: pact-plugin-creditcard
+    source: { kind: subprocess, reference: "${JANUS_PLUGIN_BRIDGE}", args: [creditcard, 0.0.0] }
+    grants: { env: [PACT_PLUGIN_DIR, PACT_DO_NOT_TRACK] }
