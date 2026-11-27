@@ -1,5 +1,7 @@
 ## 0.2.6 (2026-11-27)
 
+The SDK runs janus-engine 0.8.1, where it ran 0.8.0: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.8.1) says what changed.
+
 ### Features
 
 #### The verifier declares janus-plugin-bridge for pacts that name a pact plugin
