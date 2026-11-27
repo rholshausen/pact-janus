@@ -1,3 +1,116 @@
+## 0.8.1 (2026-11-27)
+
+### Features
+
+#### janus-plugin-bridge ships in every release
+
+Each release now carries `janus-plugin-bridge-<triple>` for the five triples `janus-engine` is built for
+(ADR 0112). The files are statically linked, listed in `SHA256SUMS` and attested like the rest, so a
+release is 23 files. The bridge's version is the engine's, and it is meant to be used with the engine and
+`janus` of its own release. Mixing versions is not supported while the subprocess binding is not
+generally available. To verify a pact that names a pact plugin, put the bridge beside `janus`, named
+`janus-plugin-bridge` (`.exe` on Windows), or set `JANUS_PLUGIN_BRIDGE` to it. Before a release is
+published, its own `janus` and bridge verify a protobuf pact on Linux, macOS and Windows with no Rust
+toolchain.
+
+`janus-spec.tar.gz` gains two provider conformance cases, `provider/plugin-bridge-declared` and
+`provider/plugin-bridge-as-given`, and the behavioural specification's `verify` now says how an SDK's
+verifier declares the bridge. An SDK that runs its gates against this release must pass them.
+
+#### A v1–v4 pact's plugin content is verified through janus-plugin-bridge
+
+An interaction that needs a pact plugin is no longer always refused (ADR 0110). Given
+`options.plugin-bridge` on `verification/verify` or `verification/explain` (a component declaration but
+its name, saying how to start `janus-plugin-bridge`), the engine declares `pact-plugin-<name>` for each
+plugin a pact's metadata names, unless `target.components` declares that name; a pact fetched from a
+broker or by URL is declared for when it arrives. A body a bridged content matcher claims compiles to
+its bridge's `compare-contents`, and a request body with generators is filled by its `generate-content`,
+as today's verifier fills it. `janus verify` and `janus explain` set the option from `JANUS_PLUGIN_BRIDGE`,
+else a `janus-plugin-bridge` beside `janus`.
+
+An interaction no bridge can verify is refused as before, `component-unavailable` with `details.reason`
+`pact-plugin`, and now `details.why`: `no-bridge`, `transport`, `rules` or `kind`. Its message says where
+the bridge was looked for.
+
+One plan node can report several mismatches: plan-grammar §2.3's `error` result may carry `mismatches`,
+each a `message` and an optional `at`, and a run reports each as a mismatch of its own. The engine
+protocol's `Mismatch` gains `at`, where the node located it inside the value, in its own words, and a
+text report writes `<path> (<at>): <message>`. A component's result `value` tagged `base64` is now read as
+octets.
+
+#### An interaction carried over a pact plugin's transport is verified through janus-plugin-bridge
+
+A v1–v4 interaction carried over a plugin's transport (the protobuf plugin's `grpc`) is no longer refused
+(ADR 0111). The bridge contributes the transport as a kind it drives, and one `transport/send` is the whole
+exchange: the plugin builds the request from the pact, calls the provider and compares its answer, and
+the reply is its verdict, which the run reads through the bridge's `<component>:verdict` action and
+nothing else. Each of the plugin's mismatches is reported with its path as `at`; a plugin that fails the
+exchange is the send's `transport-failed`. `details.why: transport` now means a bridge that does not drive
+the transport.
+
+A `target.transports` binding may say `optional: true`. When no loaded component provides its kind it is
+held rather than failing the call, and started the first time an interaction of its kind is verified if a
+component loaded by then provides it, such as a fetched pact's plugin bridge. A plugin transport with no
+binding of its own is started with the first binding's options, as today's verifier reaches it at the
+provider's host and port. `janus verify` binds each `--transports` entry but `http`, and a `--transport`
+other than `http` or `https`, optionally, so an entry for a transport no pact uses is harmless, as today.
+
+#### A component can be a process the engine starts: the subprocess loader
+
+`janus` and `janus-engine` now load a `subprocess` component source (component-interfaces spec §9.3,
+ADR 0108), and `engine/hello` lists `subprocess` among `components.loaders`. A source is
+`{ kind: subprocess, reference: <program>, args: [...], cwd: <dir> }`: the program is found on the
+engine's `PATH` when it is a bare name and is a path otherwise, its arguments are passed through no
+shell, and `cwd` is where it starts. A verifier configuration's loader gives a source with no `cwd`
+the configuration file's directory, so relative paths among the arguments mean the same from wherever
+a run starts. A declaration an SDK sends without a configuration file is read as written. `args` and
+`cwd` are new in `component-config.schema.json`. A `subprocess` source with a `digest`, `auth` or
+`signature` is refused.
+
+The process starts with an empty environment plus exactly its `env` grant (and `SystemRoot` on
+Windows). Every call has a deadline (`limits.deadline-ms`, 10 seconds by default, plus a poll's own
+wait), after which the process is killed (`component-timeout`). A process that exits fails its calls
+at once (`component-exited`). The next call starts a new process and handshakes it first, and one that
+comes back as another version is `component-malformed`. Out of process the unit of recreation is the
+process: the error names the transport instances that went with it as `details.instances`, and a later
+call on one of them fails at once with `details.lost: true`. Content, matcher and transport interfaces
+are bound; a component that implements `hook` is still refused.
+
+`janus component check --config <file> <name> <cases>...` runs the conformance cases of a component
+the configuration declares, of any source, through the binding a run loads it with.
+
+### Fixes
+
+#### A v1–v4 `eachValue` rule applies the rules below its values, as pact_verifier_cli 1.5.0 does
+
+S1.1's harness now pins `pact_verifier_cli` 1.5.0, which fixes pact-reference#586 (ADR 0107,
+rholshausen/pact-janus#16). A v4 `eachValue` rule on an object or an array used to hold the values to
+its own rules alone. Rules written below the values were ignored: `$.chips.*.amount`,
+`$.items[*].amount`, or a rule for one key such as `$.chips.main.amount`. That is how pact-js and
+`pact_ffi` write a matcher nested in an `eachValueMatches` example. `janus verify` now applies them,
+as today's verifier and pact-jvm do. The `eachValue` rule's own rules are merged into any rule already
+written for the values (`$.items[*]`), or replace one whose `combine` is `OR`. **A pact that passed can
+now fail**, at the nested rule, and its plan names the rules it now runs.
+
+`janus upgrade` converts with the same rules, so the upgraded contract reaches the pact's verdict. A
+map's `each-entry` has one shape for every value, so a rule for one key's value is converted from the
+pact's first member. A rule for that member's key then holds every value, reported as `rule-narrowed`.
+A rule for any other key is dropped, reported as `rule-unmapped`. A `values` map is converted the same
+way.
+
+#### The handshake schema defines the `pact-plugin` capability a plugin bridge declares
+
+The component-interfaces handshake schema now defines `PactPluginCapability`, the `pact-plugin` member of
+a handshake's `capabilities` (component-interfaces spec §9.3.1, ADR 0109). It is what
+`janus-plugin-bridge`, the new bridge for today's pact-plugins (`plugin-bridge/`, staged plan S5.2c),
+declares about the plugin it serves: the plugin's name, version and interface version, and every entry of
+its catalogue, with the content types a content matcher claims and the action a served entry is reached
+through. Its content matcher is the action `pact-plugin-<name>:compare-contents`, whose argument the spec
+section describes.
+
+Nothing the engine does changes: no engine reads the capability or declares a bridge yet (S5.2d). The
+bridge is not part of a release yet (S5.2h).
+
 ## 0.8.0 (2026-11-22)
 
 ### Breaking Changes

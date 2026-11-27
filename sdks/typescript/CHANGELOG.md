@@ -1,3 +1,31 @@
+## 0.2.6 (2026-11-27)
+
+### Features
+
+#### The verifier declares janus-plugin-bridge for pacts that name a pact plugin
+
+`Verifier` takes `pluginBridge`, the path of `janus-plugin-bridge`, and without it reads
+`JANUS_PLUGIN_BRIDGE` (ADR 0112). When either names a bridge, `verification/verify`'s options carry
+`plugin-bridge` as `janus verify` sends it, so a provider test verifies a protobuf, gRPC or CSV pact
+through the bridge where it was refused before. A `plugin-bridge` in `options` is sent as given. The
+pact-js provider API (`pact-janus/verifier`) gets the bridge from the variable. The bridge ships in each
+engine release: use the one from the release of the engine the SDK runs.
+
+### Fixes
+
+#### The generated protocol bindings carry `options.plugin-bridge` and `Mismatch.at`
+
+`verification/verify`'s and `verification/explain`'s options gain `plugin-bridge`, how the engine starts
+janus-plugin-bridge for a v1–v4 pact's plugins (ADR 0110), and a `Mismatch` gains `at`, where the
+action that found it located it inside the value. Explain's options are typed as `ExplainOptions`. The
+bindings gain the optional members; nothing an SDK does changes.
+
+#### The generated protocol bindings carry a transport binding's `optional`
+
+`verification/verify`'s `TransportBinding` gains `optional`, which holds a binding no loaded component
+provides yet rather than failing the call (ADR 0111). The bindings gain the optional member; nothing an
+SDK does changes.
+
 ## 0.2.5 (2026-11-22)
 
 The SDK runs janus-engine 0.8.0, where it ran 0.7.0: [its release](https://github.com/rholshausen/pact-janus/releases/tag/v0.8.0) says what changed.
