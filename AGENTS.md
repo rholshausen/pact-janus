@@ -369,8 +369,8 @@ Three sources are the source of truth and take precedence over this file when th
 > today. `plugin-bridge/examples/area_calculator.rs` is pact-plugins' gRPC provider, which
 > `corpora/verifier/plugins/grpc-area-calculator*` verify against (`JANUS_AREA_CALCULATOR`). A request
 > filter and a plugin's output lines on a plugin transport are S5.2i.
-> S5.2h (ADR 0112): the bridge is released with the engine, as `janus-plugin-bridge-<triple>` assets of its
-> `v<version>` release, at the engine's version (which `knope prepare-release` writes into
+> S5.2h (ADR 0112): the bridge is released with the engine, from 0.8.1, as `janus-plugin-bridge-<triple>`
+> assets of its `v<version>` release, at the engine's version (which `knope prepare-release` writes into
 > `plugin-bridge/Cargo.toml`). `release.yml`'s `plugin-bridge` job verifies a protobuf pact with the
 > release's own `janus` and bridge, side by side and with no Rust, before publishing. Both SDKs' verifiers
 > declare a bridge as `janus verify` does, from `pluginBridge` / `withPluginBridge` or else

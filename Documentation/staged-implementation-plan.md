@@ -3162,9 +3162,8 @@ The component model, opened to the ecosystem.
     engine's release (ADR 0030's names) or a release of their own (as ADR 0060 made the SDKs').
     *Exit:* a provider with no Rust toolchain installs the bridge from a release and verifies a protobuf
     pact.
-    *Built 2026-11-27* ([ADR 0112](decisions/0112-release-janus-plugin-bridge-with-the-engine-and-let-a-verifier-find-it-where-it-is-named.md),
-    amending ADR 0030's list of files); its exit runs in every release rehearsal, and holds when the first
-    release that carries the bridge is published:
+    *Done 2026-11-27* ([ADR 0112](decisions/0112-release-janus-plugin-bridge-with-the-engine-and-let-a-verifier-find-it-where-it-is-named.md),
+    amending ADR 0030's list of files), with engine 0.8.1, the first release to carry the bridge:
     - An asset of the engine's release, not a release of its own. The bridge and the engine speak the
       subprocess binding, which is not generally available, and S5.2f, S5.2g and S5.2i each change both
       sides of it. Released together, a bridge always matches the engine from its own release.
@@ -3187,7 +3186,12 @@ The component model, opened to the ecosystem.
       macOS and Windows, the release's own `janus` with the bridge beside it, the pinned protobuf plugin,
       and a provider in JavaScript (`.github/scripts/scripted-provider.mjs`, answering a fixture's routes)
       run through `without-rust.sh`: `janus verify` passes `corpora/verifier/plugins/protobuf-message`
-      and fails its mismatch twin.
+      and fails its mismatch twin. It passed on all four runners before 0.8.1 was published. The same
+      step, run on 0.8.1's `janus` and bridge downloaded from the release, checked against `SHA256SUMS`
+      and its attestation, gives the same verdicts.
+    - Found by the first rehearsal: `pact-plugins.sh` compared a digest that GNU `sha256sum` had prefixed
+      with `\`, because it escapes a file name holding a backslash (`D:\a\_temp`). It now hashes from
+      stdin.
     - Not done, on purpose: an SDK does not fetch the bridge as it fetches its engine. Whether a run needs
       one is known only once a pact is read, so fetching first would put a 15 MB download into every
       provider test. ADR 0112's tripwire says when that changes, and the engine pin can then carry the
