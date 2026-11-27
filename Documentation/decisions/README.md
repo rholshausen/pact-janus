@@ -46,7 +46,7 @@ superseding ADR instead.
 | [0027](0027-build-in-the-prototype-repository-and-graduate-sdks-into-their-existing-repositories.md) | Build in the prototype's repository, and graduate SDKs into their existing repositories | accepted |
 | [0028](0028-change-files-decide-a-releases-version-and-merging-their-pull-request-releases.md) | Decide a release's version with change files, and release by merging the pull request that consumes them | accepted (decision 9 extended by 0030; decision 1 amended by 0060) |
 | [0029](0029-attest-what-a-release-built-and-let-an-sdk-verify-the-digest-it-pins.md) | Attest what a release built, and let an SDK verify the digest it pins | accepted |
-| [0030](0030-a-release-carries-the-sdk-gates-and-the-executable-specification.md) | A release carries the SDK gates and the executable specification they run against | accepted |
+| [0030](0030-a-release-carries-the-sdk-gates-and-the-executable-specification.md) | A release carries the SDK gates and the executable specification they run against | accepted (its list of files amended by 0112) |
 | [0031](0031-rename-by-a-rehearsed-rewrite-and-read-persisted-identifiers-under-every-spelling.md) | Rename by a rehearsed rewrite, and read persisted identifiers under every spelling | accepted |
 | [0032](0032-speak-to-the-broker-through-protocol-operations-backed-by-a-native-host-capability.md) | Speak to the Pact Broker through protocol operations backed by a native host capability | accepted |
 | [0033](0033-count-a-runs-variants-per-source-document-in-its-summary.md) | Count a run's variants per source document in its summary | accepted |
@@ -126,8 +126,9 @@ superseding ADR instead.
 | [0107](0107-apply-the-rules-below-an-eachvalue-matcher-as-the-verifier-pinned-at-1-5-0-does.md) | Apply the rules below an `eachValue` matcher, as the verifier pinned at 1.5.0 does | accepted |
 | [0108](0108-a-subprocess-component-is-a-program-and-its-arguments-and-its-process-is-the-unit-of-recreation.md) | A subprocess component is a program and its arguments, and its process is the unit of recreation | accepted |
 | [0109](0109-a-bridged-plugins-content-matcher-is-one-compare-contents-action-and-its-catalogue-a-handshake-capability.md) | A bridged plugin's content matcher is one compare-contents action, and its catalogue a handshake capability | accepted |
-| [0110](0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md) | A v1–v4 plugin body compiles to its bridge's compare-contents, and one node reports each mismatch it found | accepted |
+| [0110](0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md) | A v1–v4 plugin body compiles to its bridge's compare-contents, and one node reports each mismatch it found | accepted (decision 6 refined for the SDKs by 0112) |
 | [0111](0111-a-plugin-transports-exchange-is-one-send-and-its-verdict-a-reply-the-bridges-action-reads.md) | A plugin transport's exchange is one send, and its verdict a reply the bridge's action reads | accepted |
+| [0112](0112-release-janus-plugin-bridge-with-the-engine-and-let-a-verifier-find-it-where-it-is-named.md) | Release janus-plugin-bridge with the engine, and let a verifier find it where it is named | accepted |
 
 ## Decision backlog
 

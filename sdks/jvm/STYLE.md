@@ -209,11 +209,13 @@ Interaction getOrder = janus.interaction("get an order")
 ## Provider verification
 
 - `Verifier.forProvider(url)`, then `withPacts(paths)`, `withBroker(map)` or `withUrls(map)`, and
-  optionally `withOptions(map)`, `withTransport(map)`, `withConfig(path)`, `withComponents(list)` and
-  `withEmbedding(embedding)`; then `state(name, setup)` or `state(name, setup, teardown)`,
+  optionally `withOptions(map)`, `withTransport(map)`, `withConfig(path)`, `withComponents(list)`,
+  `withPluginBridge(program)` and `withEmbedding(embedding)`; then `state(name, setup)` or `state(name, setup, teardown)`,
   `requestFilter(filter)` or `requestFilter(filter, slots)`, and `message(description, producer)`;
   then `verify()` (ADR 0055, ADR 0056). `withTransport` is the HTTP transport's options beside
-  `base-url` (`headers`, `client`), passed as given. The
+  `base-url` (`headers`, `client`), passed as given. `withPluginBridge` takes the path of
+  `janus-plugin-bridge` as a `String`, as written, like a component's reference, so it is sent with the
+  separators the test wrote; without it, `JANUS_PLUGIN_BRIDGE` names the bridge (ADR 0112). The
   verifier is mutable and each method returns it, so a test configures it in one chain. Nothing is
   sent before `verify()`.
 - The maps passed through — `withBroker`, `withUrls`, `withOptions` — are the protocol's documents,

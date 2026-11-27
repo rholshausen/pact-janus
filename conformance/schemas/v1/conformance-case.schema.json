@@ -431,6 +431,7 @@
         },
         "components": { "type": "array", "items": { "type": "object" }, "description": "The 'components' option, as given." },
         "transport": { "type": "object", "description": "The 'transport' option, as given: the HTTP transport's drive options beside 'base-url'." },
+        "plugin-bridge": { "type": "string", "description": "The 'plugin-bridge' option, as given: the path of the janus-plugin-bridge program (ADR 0112)." },
         "state-handlers": { "type": "array", "items": { "$ref": "#/$defs/StateHandler" } },
         "request-filters": { "type": "array", "items": { "$ref": "#/$defs/RequestFilter" } },
         "message-producers": { "type": "array", "items": { "$ref": "#/$defs/MessageProducer" } }

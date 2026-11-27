@@ -369,6 +369,12 @@ Three sources are the source of truth and take precedence over this file when th
 > today. `plugin-bridge/examples/area_calculator.rs` is pact-plugins' gRPC provider, which
 > `corpora/verifier/plugins/grpc-area-calculator*` verify against (`JANUS_AREA_CALCULATOR`). A request
 > filter and a plugin's output lines on a plugin transport are S5.2i.
+> S5.2h (ADR 0112): the bridge is released with the engine, as `janus-plugin-bridge-<triple>` assets of its
+> `v<version>` release, at the engine's version (which `knope prepare-release` writes into
+> `plugin-bridge/Cargo.toml`). `release.yml`'s `plugin-bridge` job verifies a protobuf pact with the
+> release's own `janus` and bridge, side by side and with no Rust, before publishing. Both SDKs' verifiers
+> declare a bridge as `janus verify` does, from `pluginBridge` / `withPluginBridge` or else
+> `JANUS_PLUGIN_BRIDGE`.
 > The layout and commands below describe the repo as built; trust the repo over this file if they diverge.
 
 ## Intended repository layout
@@ -444,7 +450,8 @@ plugin-bridge/   janus-plugin-bridge (S5.2c, ADR 0106, ADR 0109): one of today's
                  and Lua never enter a Janus binary; conformance/ holds its cases per plugin, tests/fixtures
                  a Lua plugin its tests load, pact-plugins.json the plugin releases CI runs it against
                  (and the verifier-diff job's plugins/ fixtures, through JANUS_PLUGIN_BRIDGE), and
-                 examples/area_calculator.rs the gRPC provider its plugin transport is verified against
+                 examples/area_calculator.rs the gRPC provider its plugin transport is verified against.
+                 Released with the engine, at its version, as janus-plugin-bridge-<triple> (ADR 0112)
 spikes/          The prototype's time-boxed experiments: each one's FINDINGS.md, at the path the
                  ADRs cite, and no code (S0.12 deleted it; `b8d5010` is the last commit with it)
 benchmarks/      Baseline/trend benchmark harness (task 1.7) — durable, standalone crate
@@ -595,10 +602,10 @@ to move to it; `minor`, they can do something new; `patch`, a fix. Before 1.0, `
 minor version and the other two the patch. The body is the changelog entry, written for an SDK
 maintainer deciding whether to move a pin. A release is prepared as a pull request (the
 `Prepare release` workflow, or `knope prepare-release` by hand) and made by merging it: `release.yml`
-builds `janus-engine`, `janus` and `janus-sdk-gates` for five target triples, `janus-engine.wasm` and
-`janus-spec.tar.gz`, runs each SDK's gates from those files alone, checks that each
-binary is statically linked and runs, attests every file, and only then tags `v<version>` and
-publishes. It rehearses everything but the publishing on any pull request that touches it. An SDK
+builds `janus-engine`, `janus`, `janus-sdk-gates` and `janus-plugin-bridge` for five target triples,
+`janus-engine.wasm` and `janus-spec.tar.gz`, runs each SDK's gates from those files alone, checks that each
+binary is statically linked and runs, verifies a protobuf pact with the release's `janus` and bridge
+(ADR 0112), attests every file, and only then tags `v<version>` and publishes. It rehearses everything but the publishing on any pull request that touches it. An SDK
 whose version (`sdks/typescript/package.json`, `sdks/jvm/gradle.properties`) has no tag is released by
 `release-sdks.yml` the same way (S1.36, ADR 0060): its suite against its pinned engine with no Rust,
 its files (`npm pack`'s tarball; `./gradlew releaseFiles`'s jars, Ivy descriptors and POMs) installed
@@ -622,7 +629,9 @@ line in the changelog entry of an SDK release waiting for it), to open a pull re
 cargo run -p pact_janus_engine_pin -- <version>   # gh attestation verify on SHA256SUMS, then the pin and pin.ts
 ```
 
-The plugin bridge (S5.2c, ADR 0109) is its own workspace: `cd plugin-bridge && cargo test` runs its tests
+The plugin bridge (S5.2c, ADR 0109) is its own workspace, versioned with the engine and released in its
+release (ADR 0112): a change to its sources, manifest or lockfile carries an `engine` change file, and
+never edit its version by hand. `cd plugin-bridge && cargo test` runs its tests
 against a Lua fixture plugin, downloading nothing; the one that kills a plugin process and the one that
 drives the protobuf plugin's gRPC transport against `examples/area_calculator.rs` need
 `JANUS_PACT_PLUGINS` to name a directory of the pinned plugins, and skip without it unless `CI` is set.
@@ -834,8 +843,9 @@ anything they print.
   (ADR 0017).
 - **A change that ships says so, in a change file.** The version and the changelog come from
   `.changeset/`, not from commit subjects (ADR 0028). The `v<version>` tag and the release's asset
-  names (`janus-engine-<triple>`, `janus-<triple>`, `janus-sdk-gates-<triple>`, `janus-engine.wasm`,
-  `janus-spec.tar.gz`, `SHA256SUMS`; ADR 0030) are what SDKs
+  names (`janus-engine-<triple>`, `janus-<triple>`, `janus-sdk-gates-<triple>`,
+  `janus-plugin-bridge-<triple>`, `janus-engine.wasm`, `janus-spec.tar.gz`, `SHA256SUMS`; ADR 0030,
+  ADR 0112) are what SDKs
   pin against: changing one is a superseding ADR, not an edit to a workflow. No release step may need
   a credential that outlives a workflow run (ADR 0028 decision 8, ADR 0029).
 - **Documents are cited by path, so links are load-bearing too.** Every relative link in the

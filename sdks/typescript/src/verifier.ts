@@ -4,7 +4,7 @@
 // its stream. It decides no verdict: the run's status is the engine's, and a failed run fails here.
 
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import { protocolVocabulary, type hooks, type protocol } from "./generated/index.js";
 import { Engine } from "./engine/engine.js";
 import { Loopback } from "./loopback.js";
@@ -46,6 +46,11 @@ export interface VerifierConfig {
   config?: string;
   /** Declared components, as for `Janus`. */
   components?: readonly ComponentDeclaration[];
+  /**
+   * The `janus-plugin-bridge` program, which verifies a v1–v4 pact that names a pact plugin (ADR 0112).
+   * Defaults to the `JANUS_PLUGIN_BRIDGE` environment variable; with neither, no bridge is declared.
+   */
+  pluginBridge?: string;
   /** How the engine is reached, as for `Janus`. */
   engine?: SubprocessOptions | (() => FramePipe);
   /** How much the engine logs, as for `Janus`. */
@@ -65,6 +70,30 @@ export interface StateHandler {
  * filter that returns nothing changes nothing.
  */
 export type RequestFilter = (request: Record<string, unknown>) => unknown;
+
+/**
+ * The run's options, with `plugin-bridge` added as `janus verify` sends it when they have none and a
+ * bridge is named (ADR 0110 decision 6, ADR 0112 decision 5). Nothing is checked: whether the bridge
+ * starts is the engine's answer, when a pact needs it.
+ */
+function withPluginBridge(
+  options: protocol.VerifyOptions,
+  named: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): protocol.VerifyOptions {
+  const program = named || env.JANUS_PLUGIN_BRIDGE || undefined;
+  if (options["plugin-bridge"] !== undefined || program === undefined) {
+    return options;
+  }
+  return {
+    ...options,
+    "plugin-bridge": {
+      source: { kind: "subprocess", reference: isAbsolute(program) ? program : resolve(program) },
+      grants: { env: ["PACT_PLUGIN_DIR", "HOME", "USERPROFILE", "PACT_DO_NOT_TRACK", "RUST_LOG"] },
+      limits: { "deadline-ms": 30_000 },
+    },
+  };
+}
 
 /** A message a producer returns: bytes, a string or any value written as JSON, and what labels it. */
 export interface Message {
@@ -128,7 +157,7 @@ export class Verifier {
       const { stream } = await engine.call(Op.VerificationVerify, {
         source,
         target,
-        options: { report: {}, ...this.#config.options },
+        options: withPluginBridge({ report: {}, ...this.#config.options }, this.#config.pluginBridge),
       });
       const result = await poll(engine, stream);
       if (result.status === "failed") {

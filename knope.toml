@@ -11,9 +11,10 @@
 #
 # `engine`: the Rust workspace. Its one version is `[workspace.package]`'s in the root Cargo.toml —
 # what `engine/hello` and `janus version` report, and what every artifact of its release carries.
-# Tagged `v<version>` by release.yml.
+# Tagged `v<version>` by release.yml. janus-plugin-bridge, a workspace of its own, ships in the same release
+# at the same version (ADR 0112 decision 2), so its manifest is written too.
 [packages.engine]
-versioned_files = ["Cargo.toml"]
+versioned_files = ["Cargo.toml", "plugin-bridge/Cargo.toml"]
 changelog = "CHANGELOG.md"
 
 # `typescript-sdk` and `jvm-sdk`: the SDKs, released as files on GitHub releases of their own until
@@ -64,6 +65,11 @@ command = "cargo update --workspace"
 type = "Command"
 command = "cargo update --manifest-path benchmarks/janus/Cargo.toml --workspace"
 
+# janus-plugin-bridge's lockfile names the bridge at its version, which is the engine's (ADR 0112).
 [[workflows.steps]]
 type = "Command"
-command = "git add Cargo.lock benchmarks/janus/Cargo.lock"
+command = "cargo update --manifest-path plugin-bridge/Cargo.toml --workspace"
+
+[[workflows.steps]]
+type = "Command"
+command = "git add Cargo.lock benchmarks/janus/Cargo.lock plugin-bridge/Cargo.lock"

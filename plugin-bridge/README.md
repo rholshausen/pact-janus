@@ -51,10 +51,25 @@ the driver sending usage metrics, and `RUST_LOG` to see its logs on standard err
 plugin the pact names. A body the plugin's content matcher claims is compared by `compare-contents`, and
 a request body with generators is filled by `generate-content`, the action a content generator is
 reached through. An interaction carried over the plugin's transport is driven through the bridge's kind
-(S5.2e), reached at the `--transports` entry of its name, else the provider's host and port.
+(S5.2e), reached at the `--transports` entry of its name, else the provider's host and port. An SDK's
+verifier declares it too, from its own option (`pluginBridge`, `withPluginBridge`) or else
+`JANUS_PLUGIN_BRIDGE`.
 
-Not yet: plugin matchers are described in the handshake and not served (S5.2g), a plugin transport's mock
-is not served (S5.2f), and the bridge is not released (S5.2h).
+Not yet: plugin matchers are described in the handshake and not served (S5.2g), and a plugin transport's
+mock is not served (S5.2f).
+
+## Releases
+
+The bridge ships in each engine release, as `janus-plugin-bridge-<triple>` for the five triples
+`janus-engine` is built for, statically linked, in `SHA256SUMS` and attested like the release's other
+files ([ADR 0112](../Documentation/decisions/0112-release-janus-plugin-bridge-with-the-engine-and-let-a-verifier-find-it-where-it-is-named.md)).
+Its version is the engine's: `knope prepare-release` writes it into this manifest, and CI fails one that
+differs. Use the bridge from the same release as `janus` or the engine an SDK runs. Mixing versions is not
+supported, since the two change the subprocess binding between them until it is generally available
+(S5.5). Before publishing, `release.yml` checks on Linux, macOS and Windows that the release's `janus`,
+with this bridge beside it and no Rust toolchain reachable, verifies the protobuf message fixture and
+fails its mismatch twin. A change to the bridge's sources, manifest or lockfile ships in the engine's
+release, so it carries an `engine` change file.
 
 ## Building and testing
 

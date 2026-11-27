@@ -139,7 +139,11 @@ Today's verifiers load the pact-plugins plugins a pact names (protobuf and gRPC,
 others). `janus verify` reaches them through `janus-plugin-bridge` ([S5.2](staged-implementation-plan.md),
 [ADR 0106](decisions/0106-bridge-pact-plugins-through-a-child-process-that-speaks-the-subprocess-binding.md)),
 a program beside `janus` or where `JANUS_PLUGIN_BRIDGE` names it, which loads each plugin through the
-same driver today's verifier does. A plugin's content matcher compares the bodies it claims, and its
+same driver today's verifier does. Each release carries it as `janus-plugin-bridge-<triple>`: download
+the one for your platform from the same release as `janus`, into the directory `janus` is in, named
+`janus-plugin-bridge` (`.exe` on Windows)
+([ADR 0112](decisions/0112-release-janus-plugin-bridge-with-the-engine-and-let-a-verifier-find-it-where-it-is-named.md)).
+The plugins themselves are found and installed as today, from `PACT_PLUGIN_DIR` or `~/.pact/plugins`. A plugin's content matcher compares the bodies it claims, and its
 content generator fills a request body with generators, as today
 ([ADR 0110](decisions/0110-a-v1-v4-plugin-body-compiles-to-its-bridges-compare-contents-and-one-node-reports-each-mismatch-it-found.md)).
 An interaction carried over a plugin's transport (gRPC) is run by the plugin, which sends the request it

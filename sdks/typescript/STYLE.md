@@ -176,11 +176,12 @@ the same reason; `problems` is the one member promoted to a typed accessor, beca
 
 ## Provider verification
 
-- `new Verifier({ providerUrl, pacts | broker | urls, options?, transport?, config?, components?, engine? })`,
+- `new Verifier({ providerUrl, pacts | broker | urls, options?, transport?, config?, components?, pluginBridge?, engine? })`,
   then `.state(name, setup | { setup, teardown })`, `.requestFilter(filter, { changes? })` and
   `.message(description, produce)`, each returning the verifier, then `await verifier.verify()`
   (ADR 0055, ADR 0056). Nothing is sent before `verify`. `transport` is the HTTP transport's options
-  beside `base-url` (`headers`, `client`), passed as given.
+  beside `base-url` (`headers`, `client`), passed as given. `pluginBridge` is the path of
+  `janus-plugin-bridge`; without it, `JANUS_PLUGIN_BRIDGE` names the bridge (ADR 0112).
 - The SDK's own options are camelCase; the documents it passes through — `broker`, `urls`,
   `options` — are spelled as the protocol spells them (`"consumer-version-selectors"`,
   `"provider-version"`), because they are the protocol's documents and the SDK translates none of

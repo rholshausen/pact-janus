@@ -128,6 +128,7 @@ export interface VerifierScript {
   "state-handlers"?: { state: string; setup: Behaviour; teardown?: Behaviour }[];
   "request-filters"?: { changes?: string[]; set?: Record<string, unknown>; throws?: string }[];
   transport?: Record<string, unknown>;
+  "plugin-bridge"?: string;
   "message-producers"?: { description: string; returns?: MessageScript; throws?: string }[];
 }
 

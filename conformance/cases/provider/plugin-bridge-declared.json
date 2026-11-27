@@ -1,0 +1,83 @@
+{
+  "$format": "janus-conformance-case/1",
+  "id": "provider/plugin-bridge-declared",
+  "category": "provider",
+  "title": "A named plugin bridge is sent as the run's plugin-bridge option, as janus verify sends it",
+  "covers": [
+    "verification.verify.plugin-bridge-declared"
+  ],
+  "why": "behavioural spec 'verify': with no 'plugin-bridge' in the options and a bridge named by the 'plugin-bridge' option, 'plugin-bridge' is added as 'janus verify' sends it: a subprocess source naming the program, the variables pact-plugin-driver reads granted, and a 30 s deadline (ADR 0110 decision 6, ADR 0112 decision 5). A reference with a root is passed as written.",
+  "verifier": {
+    "provider-url": "http://127.0.0.1:8080",
+    "pacts": [
+      {
+        "consumer": {
+          "name": "web-app"
+        },
+        "provider": {
+          "name": "orders-api"
+        },
+        "interactions": [
+          {
+            "description": "get an order",
+            "providerStates": [
+              {
+                "name": "an order exists",
+                "params": {
+                  "id": 42
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "path": "/orders/42"
+            },
+            "response": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "id": 42
+              }
+            }
+          }
+        ],
+        "metadata": {
+          "pactSpecification": {
+            "version": "3.0.0"
+          }
+        }
+      }
+    ],
+    "plugin-bridge": "/opt/janus/janus-plugin-bridge"
+  },
+  "expect": {
+    "frames": {
+      "verification/verify": {
+        "options": {
+          "report": {},
+          "plugin-bridge": {
+            "source": {
+              "kind": "subprocess",
+              "reference": "/opt/janus/janus-plugin-bridge"
+            },
+            "grants": {
+              "env": [
+                "PACT_PLUGIN_DIR",
+                "HOME",
+                "USERPROFILE",
+                "PACT_DO_NOT_TRACK",
+                "RUST_LOG"
+              ]
+            },
+            "limits": {
+              "deadline-ms": 30000
+            }
+          }
+        }
+      }
+    },
+    "outcome": "ok"
+  }
+}

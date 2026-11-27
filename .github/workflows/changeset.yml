@@ -31,7 +31,8 @@ jobs:
       # file has to name. The engine: its and the CLI's sources and what they are built from; the
       # corpora and the conformance suite, which say what the engine does; and, since S0.11, the
       # gates an SDK's CI runs (janus-sdk-gates and the three tools it is) and the rest of
-      # janus-spec.tar.gz — the spec schemas, the behavioural specification and the binding manifest.
+      # janus-spec.tar.gz — the spec schemas, the behavioural specification and the binding manifest;
+      # and, since S5.2h, janus-plugin-bridge's sources and what it is built from (ADR 0112 decision 3).
       # An SDK: its sources, generated bindings included, what it is built from, and the engine pin
       # it carries. Any other test, tool, document or workflow is in none of them.
       - name: A change to what ships carries a change file naming what it ships in
@@ -43,7 +44,7 @@ jobs:
           changed="$(git diff --name-only "$BASE"...HEAD)"
           added="$(git diff --name-only --diff-filter=A "$BASE"...HEAD -- '.changeset/*.md')"
           declare -A ships=(
-            [engine]='^(engine/[^/]+/(src|wit)/|(engine/[^/]+|cli)/Cargo\.toml$|cli/src/|Cargo\.(toml|lock)$|corpora/|conformance/|tools/(sdk-gates|conformance|thinness|bindings)/(src/|Cargo\.toml$)|Documentation/specs/[^/]+/schemas/|Documentation/specs/sdk-specification/behavioural-spec\.json$|sdks/bindings\.json$)'
+            [engine]='^(engine/[^/]+/(src|wit)/|(engine/[^/]+|cli)/Cargo\.toml$|cli/src/|Cargo\.(toml|lock)$|plugin-bridge/(src/|Cargo\.(toml|lock)$)|corpora/|conformance/|tools/(sdk-gates|conformance|thinness|bindings)/(src/|Cargo\.toml$)|Documentation/specs/[^/]+/schemas/|Documentation/specs/sdk-specification/behavioural-spec\.json$|sdks/bindings\.json$)'
             [typescript-sdk]='^(sdks/typescript/(src/|package(-lock)?\.json$|tsconfig(\.build|\.cjs)?\.json$|scripts/commonjs-package\.ts$)|sdks/engine-release\.json$)'
             [jvm-sdk]='^(sdks/jvm/((sdk|bindings)/(src/main/|build\.gradle\.kts$)|build\.gradle\.kts$|settings\.gradle\.kts$|gradle\.properties$|gradle/)|sdks/engine-release\.json$)'
           )

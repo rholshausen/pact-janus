@@ -93,6 +93,9 @@ final class ProviderRunner {
         // Relative to the working directory, as a test would write it (`config-loaded`).
         verifier.withConfig(relative(configFile));
       }
+      if (script.has("plugin-bridge")) {
+        verifier.withPluginBridge(script.get("plugin-bridge").asText());
+      }
       if (script.has("components")) {
         verifier.withComponents(Suite.MAPPER.convertValue(script.get("components"), new TypeReference<List<Map<String, Object>>>() {}));
       }

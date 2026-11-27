@@ -66,6 +66,7 @@ public final class Verifier {
   private Map<String, Object> transport;
   private Path config;
   private List<Map<String, Object>> components;
+  private String pluginBridge;
   private Embedding embedding;
   private final List<State> states = new ArrayList<>();
   private final List<Filter> filters = new ArrayList<>();
@@ -123,6 +124,16 @@ public final class Verifier {
   @SuppressWarnings("unchecked")
   public Verifier withComponents(List<? extends Map<String, ?>> components) {
     this.components = (List<Map<String, Object>>) Json.value(components, "components");
+    return this;
+  }
+
+  /**
+   * The {@code janus-plugin-bridge} program, which verifies a v1–v4 pact that names a pact plugin (ADR
+   * 0112), by its path as written, resolved against the working directory when it is relative. Defaults
+   * to the {@code JANUS_PLUGIN_BRIDGE} environment variable; with neither, no bridge is declared.
+   */
+  public Verifier withPluginBridge(String program) {
+    this.pluginBridge = Objects.requireNonNull(program, "program");
     return this;
   }
 
@@ -220,6 +231,7 @@ public final class Verifier {
       if (options != null) {
         sent.putAll(options);
       }
+      addPluginBridge(sent, pluginBridge, System.getenv());
       request.put("options", sent);
       String stream = (String) engine.send(RequestFrameOp.VERIFICATION_VERIFY, request).ok().get("stream");
       return new VerificationRun(engine, loopback, stream);
@@ -230,6 +242,23 @@ public final class Verifier {
       close(loopback, engine);
       throw e;
     }
+  }
+
+  /**
+   * Adds {@code plugin-bridge} to the run's options as {@code janus verify} sends it, when they have none
+   * and a bridge is named, by the option or else {@code JANUS_PLUGIN_BRIDGE} (ADR 0110 decision 6, ADR
+   * 0112 decision 5). Nothing is checked: whether the bridge starts is the engine's answer.
+   */
+  static void addPluginBridge(Map<String, Object> options, String named, Map<String, String> environment) {
+    String program = named != null && !named.isEmpty() ? named : environment.get("JANUS_PLUGIN_BRIDGE");
+    if (options.containsKey("plugin-bridge") || program == null || program.isEmpty()) {
+      return;
+    }
+    String reference = Janus.hasRoot(program) ? program : Path.of(System.getProperty("user.dir")).resolve(program).toString();
+    options.put("plugin-bridge", Map.of(
+        "source", Map.of("kind", "subprocess", "reference", reference),
+        "grants", Map.of("env", List.of("PACT_PLUGIN_DIR", "HOME", "USERPROFILE", "PACT_DO_NOT_TRACK", "RUST_LOG")),
+        "limits", Map.of("deadline-ms", 30_000)));
   }
 
   private static void close(Loopback loopback, EngineClient engine) {

@@ -51,6 +51,7 @@ export async function runProvider(testCase: Case, failures: string[]): Promise<v
       // Relative to the working directory, as a test would write it (`config-loaded`).
       ...(script.config !== undefined ? { config: relative(process.cwd(), configFile) } : {}),
       ...(script.components ? { components: script.components } : {}),
+      ...(script["plugin-bridge"] ? { pluginBridge: script["plugin-bridge"] } : {}),
       ...(pipe ? { engine: () => pipe } : {}),
     });
     (script["state-handlers"] ?? []).forEach(({ state, setup, teardown }, i) => {

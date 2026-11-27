@@ -161,6 +161,19 @@ class ContractTest {
 | `@IgnoreNoPactsToVerify` | A broker source's `require-pacts: false` | adapted |
 | pact-jvm's logs, through SLF4J | The engine's, through SLF4J too, to the logger `io.pact.janus.engine`, whose level is how much the engine logs: `logging.level.io.pact.janus.engine=debug` under Spring Boot ([ADR 0061](decisions/0061-the-engines-logs-are-the-runtimes-own-set-and-shown-by-its-logging-configuration.md)) | kept |
 
+## Pacts that need a pact plugin
+
+A pact that names a pact plugin (protobuf, gRPC, CSV, …) is verified through `janus-plugin-bridge`, as
+`janus verify` verifies it ([verifier-migration.md](verifier-migration.md#pact-plugins)). Each engine
+release carries the bridge as `janus-plugin-bridge-<triple>`. Download the one for your platform from
+the release of the engine the SDK runs, and set `JANUS_PLUGIN_BRIDGE` to it where the tests run, or name
+it in the test: `pluginBridge` in the TypeScript `Verifier`'s options, `withPluginBridge(path)` on the
+JVM's. pact-js's and pact-jvm's provider APIs read `JANUS_PLUGIN_BRIDGE` too, so a test written with them
+changes nothing
+([ADR 0112](decisions/0112-release-janus-plugin-bridge-with-the-engine-and-let-a-verifier-find-it-where-it-is-named.md)).
+The plugins are installed as today. Without a bridge, an interaction that needs a plugin is refused by
+name and the rest of the pact is verified.
+
 ## Differences from today's verdicts
 
 - **A credential header in a Janus contract.** A contract records the `Authorization`, `Cookie` and

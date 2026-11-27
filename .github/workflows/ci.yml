@@ -59,6 +59,17 @@ jobs:
               cargo metadata --locked --format-version 1 --manifest-path "$(dirname "$lock")/Cargo.toml" > /dev/null
             fi
           done
+      # ADR 0112 decision 2: janus-plugin-bridge ships in the engine's release at the engine's version,
+      # which `knope prepare-release` writes into both manifests. A hand edit to one is found here, not by
+      # the release's smoke test.
+      - name: The plugin bridge is versioned with the engine
+        run: |
+          engine="$(sed -n '/^\[workspace\.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' Cargo.toml)"
+          bridge="$(sed -n '/^\[package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' plugin-bridge/Cargo.toml)"
+          if [ -z "$engine" ] || [ "$engine" != "$bridge" ]; then
+            echo "::error::plugin-bridge/Cargo.toml's version ('$bridge') is not the engine's ('$engine') (ADR 0112)."
+            exit 1
+          fi
       # Plan task 6.5: "SDKs are thin" as an exit code. Every SDK source file must be classified into
       # a layer, and the hand-written layers must stay inside their budgets — so matching logic or
       # orchestration creeping back into an SDK shows up as a failing build, not as a stale number.

@@ -3162,6 +3162,36 @@ The component model, opened to the ecosystem.
     engine's release (ADR 0030's names) or a release of their own (as ADR 0060 made the SDKs').
     *Exit:* a provider with no Rust toolchain installs the bridge from a release and verifies a protobuf
     pact.
+    *Built 2026-11-27* ([ADR 0112](decisions/0112-release-janus-plugin-bridge-with-the-engine-and-let-a-verifier-find-it-where-it-is-named.md),
+    amending ADR 0030's list of files); its exit runs in every release rehearsal, and holds when the first
+    release that carries the bridge is published:
+    - An asset of the engine's release, not a release of its own. The bridge and the engine speak the
+      subprocess binding, which is not generally available, and S5.2f, S5.2g and S5.2i each change both
+      sides of it. Released together, a bridge always matches the engine from its own release.
+      `release.yml` builds `janus-plugin-bridge-<triple>` for the five triples in the engine's matrix job,
+      from the bridge's own workspace and lockfile, checks it is statically linked, and runs `--version`.
+      A release is 23 files.
+    - Its version is the engine's: `knope prepare-release` writes `plugin-bridge/Cargo.toml` and refreshes
+      its lockfile, and CI's `checks` job fails a bridge whose version differs. The bridge's sources,
+      manifest and lockfile ship in the engine's release, so the `Change file` workflow counts them.
+      Mixing versions is not supported. The engine does not check the bridge's version, because the
+      handshake already says what a bridge can do.
+    - `janus` finds it as before, where `JANUS_PLUGIN_BRIDGE` names it or else beside `janus`, and the
+      release notes say to put it there. Both SDKs' verifiers declare it as `janus verify` does: from their
+      own option (`pluginBridge`; `withPluginBridge(program)`, a `String` as written), else
+      `JANUS_PLUGIN_BRIDGE`, which they read as they read `JANUS_ENGINE`. A run's own `plugin-bridge` is
+      sent as given. pact-js's and pact-jvm's provider APIs on the facades get it from the variable.
+      Behavioural spec `verify`. The cases are `provider/plugin-bridge-declared` and
+      `provider/plugin-bridge-as-given`; each SDK tests the variable itself.
+    - The exit is `release.yml`'s `plugin-bridge` job, which `publish` needs. On Linux (x86_64 and arm64),
+      macOS and Windows, the release's own `janus` with the bridge beside it, the pinned protobuf plugin,
+      and a provider in JavaScript (`.github/scripts/scripted-provider.mjs`, answering a fixture's routes)
+      run through `without-rust.sh`: `janus verify` passes `corpora/verifier/plugins/protobuf-message`
+      and fails its mismatch twin.
+    - Not done, on purpose: an SDK does not fetch the bridge as it fetches its engine. Whether a run needs
+      one is known only once a pact is read, so fetching first would put a 15 MB download into every
+      provider test. ADR 0112's tripwire says when that changes, and the engine pin can then carry the
+      bridge's digests.
   - **S5.2i A plugin transport's request filter and output** — **S**. Today's verifier hands the request a
     plugin transport prepared to `--request-filter` (`call_non_http`) before the plugin sends it, and prints
     the plugin's output lines under the interaction. ADR 0111 decision 5 leaves both out: a `before-request`
@@ -3573,7 +3603,7 @@ Everything the prototype left open, assigned to the item that needs it. The deta
 | S4.11 | A check tries every provider-shape entry for every interaction (done: ADR 0096) | ADR 0095; found measuring S4.5 |
 | S5.3 | `encode` sees the shape; decode errors and degradations reach the user (done: ADR 0101) | findings 12–14 |
 | S5.1 | Recording the components that took part (done: S5.1a, ADR 0097); registry credentials (done: S1.27, ADR 0052); `wkg` artifacts (done: S5.1b, ADR 0098); signing (done: S5.1c, ADR 0099); generally available, with a guide (done: S5.1d, ADR 0104) | findings 15–17 |
-| S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 (the subprocess loader done: S5.2b, ADR 0108; the bridge and its handshake done: S5.2c, ADR 0109; a v1–v4 pact's plugin content verified: S5.2d, ADR 0110; plugin transports verified: S5.2e, ADR 0111, whose request filters and output are S5.2i) | S1.8 |
+| S5.2 | Interactions that need a pact plugin are refused (ADR 0045); split into S5.2a–h by ADR 0106 (the subprocess loader done: S5.2b, ADR 0108; the bridge and its handshake done: S5.2c, ADR 0109; a v1–v4 pact's plugin content verified: S5.2d, ADR 0110; plugin transports verified: S5.2e, ADR 0111, whose request filters and output are S5.2i; the bridge released with the engine and declared by both SDKs' verifiers: S5.2h, ADR 0112) | S1.8 |
 | S5.5 | Out-of-process containment and command form (moved to S5.2b by ADR 0106; done: ADR 0108); the subprocess binding has no author guide and is not generally available | findings 18, 20 |
 | S5.6 | A multipart part's body reaches only the built-in content components (done: ADR 0103) | ADR 0040 decision 3 |
 | S5.8 | A component's substitutions do not reach content embedded in a slot | ADR 0103 |
