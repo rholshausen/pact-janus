@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795740531437,
+  "lastUpdate": 1795740534220,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -71856,6 +71856,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 72.1,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "7754ebb8830217e3e3f66e72bb9ae04f33078800",
+          "message": "fix: pact-plugins.sh hashes a file from stdin, so a Windows path's backslashes do not put a '\\' before its digest\n\nGNU sha256sum escapes a file name that holds a backslash and marks the line with a leading '\\', so on\nWindows, given $RUNNER_TEMP as written (D:\\a\\_temp), every digest differed from its pin. CI's rust job\npassed it through cygpath -m first; release.yml's plugin-bridge job (S5.2h) did not.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T11:39:54+11:00",
+          "tree_id": "047f257d196469286426b53ae350638d6b29fbbf",
+          "url": "https://github.com/rholshausen/pact-janus/commit/7754ebb8830217e3e3f66e72bb9ae04f33078800"
+        },
+        "date": 1795740533590,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 27330,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20160,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 44.4,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 30.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 105,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 72.7,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
