@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795738182299,
+  "lastUpdate": 1795738184357,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -71322,6 +71322,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 126,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "82670617a5e25d44795ae1069b0238f6b471ef77",
+          "message": "feat: S5.2h, janus-plugin-bridge ships in the engine's release at its version, and both SDKs' verifiers declare it (ADR 0112)\n\nEach v<version> release carries janus-plugin-bridge-<triple> for the five triples, built from the\nbridge's own workspace and lockfile in the engine's matrix job, statically linked, version-checked,\nin SHA256SUMS and attested: 23 files, amending ADR 0030's list. The bridge's version is the engine's,\nwritten by knope prepare-release, and CI's checks job fails one that differs; its sources, manifest and\nlockfile ship in the engine's release, so the Change file workflow counts them.\n\nrelease.yml's new plugin-bridge job, which publish needs, is S5.2h's exit: on Linux (x86_64, arm64),\nmacOS and Windows, the release's own janus with the bridge beside it, the pinned protobuf plugin and a\nprovider in JavaScript (.github/scripts/scripted-provider.mjs) verify the protobuf-message fixture and\nfail its mismatch twin, with no Rust toolchain reachable.\n\nBoth SDKs' verifiers send options.plugin-bridge as janus verify does, from their own option\n(pluginBridge; withPluginBridge(String)) or else JANUS_PLUGIN_BRIDGE; a run's own plugin-bridge is sent\nas given. Behavioural spec 'verify', with conformance cases provider/plugin-bridge-declared and\nprovider/plugin-bridge-as-given; each SDK tests the variable itself. The JVM's idiomatic layer stays\ninside its budget.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T11:00:46+11:00",
+          "tree_id": "10d818170bbd6aacadfd5a51215f4975b9f8509e",
+          "url": "https://github.com/rholshausen/pact-janus/commit/82670617a5e25d44795ae1069b0238f6b471ef77"
+        },
+        "date": 1795738183905,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 21740,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20110,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 45.4,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 31,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 100.4,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 72.1,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
