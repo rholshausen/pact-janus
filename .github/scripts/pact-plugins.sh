@@ -26,10 +26,12 @@ case "$(uname -s)-$(uname -m)" in
   *) echo "pact-plugins.sh: no pinned plugins for $(uname -s)-$(uname -m) in $pin" >&2; exit 2 ;;
 esac
 
+# Read from stdin, so no file name is printed: GNU sha256sum escapes a name holding a backslash and then
+# puts a '\' before the digest, which a Windows path written with backslashes (D:\a\_temp) always does.
 if command -v sha256sum >/dev/null; then
-  digest() { sha256sum "$1" | cut -d' ' -f1; }
+  digest() { sha256sum < "$1" | cut -d' ' -f1; }
 else
-  digest() { shasum -a 256 "$1" | cut -d' ' -f1; }
+  digest() { shasum -a 256 < "$1" | cut -d' ' -f1; }
 fi
 
 # check <file> <sha256>: the file has the pinned digest, or it is deleted and the script fails.
