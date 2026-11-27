@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795755950580,
+  "lastUpdate": 1795755953702,
   "repoUrl": "https://github.com/rholshausen/pact-janus",
   "entries": {
     "Janus — time and size (lower is better)": [
@@ -73992,6 +73992,66 @@ window.BENCHMARK_DATA = {
           {
             "name": "subsumption-fleet-all-pairs-4threads (wasm)",
             "value": 70.5,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "committer": {
+            "email": "ronald.holshausen@smartbear.com",
+            "name": "Ronald Holshausen",
+            "username": "rholshausen"
+          },
+          "distinct": true,
+          "id": "8d9fa89228b9b4bbf494f7db3f0ed3bc7752689f",
+          "message": "feat: S5.2g, a pact plugin's field-level matching rule and generator are verified through its bridge's match-field and generate-field (ADR 0113)\n\nAn interface version 2 plugin's `matcher` and `generator` catalogue entries (pact-plugins' `creditcard`)\nare janus-plugin-bridge's `<component>:match-field` and `<component>:generate-field`, each one value\nthrough the plugin's MatchField and GenerateField, built as pact-plugin-driver builds them for today's\nverifier. The bridge derives the pact path the plugin is handed from the value's absolute path less the\nargument's `root`, and joins the plugin's mismatches with \", \" as pact_matching does.\n\nThe legacy layer rewrites each MatchingRule::Plugin a bridge provides into a rule naming its match-field\naction, with the rule's name, values, mismatch-type and slot root as its argument, and the compiler\napplies that action to the value at the rule's path. A Generator::Plugin request value is filled through\ngenerate-field. `details.why: rules` now refuses only a rule or generator no bridge provides, by name.\n\ncreditcard has no release, so plugin-bridge/pact-plugins.json pins its Lua files by SHA-256 at the\npact-plugins commit that last changed them (6717591), and pact-plugins.sh installs a plugin pinned so.\ncorpora/verifier/plugins/creditcard-* (a pass, a Luhn failure, a brand failure, and a request generator\nthe provider recognises only when fresh) agree with pact_verifier_cli 1.5.0.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T15:45:57+11:00",
+          "tree_id": "ba62b72701ec9c79f129f7c9052cdf6a49489230",
+          "url": "https://github.com/rholshausen/pact-janus/commit/8d9fa89228b9b4bbf494f7db3f0ed3bc7752689f"
+        },
+        "date": 1795755952902,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "mock-server-throughput-4engines (native)",
+            "value": 20653,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "mock-server-throughput-4engines (subprocess)",
+            "value": 20142,
+            "unit": "requests per second",
+            "extra": "engines 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (native)",
+            "value": 39.7,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-1threads (wasm)",
+            "value": 28.8,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 1"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (native)",
+            "value": 96.6,
+            "unit": "pairs per second",
+            "extra": "runs 3, interactions 18500, pairs 500, threads 4"
+          },
+          {
+            "name": "subsumption-fleet-all-pairs-4threads (wasm)",
+            "value": 68.2,
             "unit": "pairs per second",
             "extra": "runs 3, interactions 18500, pairs 500, threads 4"
           }
